@@ -18,6 +18,13 @@ import com.vidadomu.nexus.cut.CutChatDocument
 import com.vidadomu.nexus.cut.CutChatStore
 import com.vidadomu.nexus.cut.NexusCut
 import com.vidadomu.nexus.cut.PendingCutChatTurn
+import com.vidadomu.nexus.cut.command.CutEvent
+import com.vidadomu.nexus.cut.command.CutSession
+import com.vidadomu.nexus.cut.command.ErrorCode
+import com.vidadomu.nexus.cut.command.GroupStatus
+import com.vidadomu.nexus.cut.command.Origin
+import com.vidadomu.nexus.cut.command.Outcome
+import com.vidadomu.nexus.cut.command.Request
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CancellationException
@@ -27,7 +34,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -50,6 +62,21 @@ data class CutChatUiState(
     val modelLabel: String = "",
     val libraryResults: List<Attachment> = emptyList(),
     val libraryResultsOpen: Boolean = false,
+    /** Pasos que el agente ya ha aplicado en el turno en curso (se ven mientras trabaja). */
+    val liveSteps: List<String> = emptyList(),
+    /** Ensayos del agente que siguen siendo válidos: el usuario decide si se aplican. */
+    val proposals: List<CutProposal> = emptyList(),
+    /** Revisión del montaje: cambia con cada edición, deshacer o rehacer, y refresca el estado de cada turno. */
+    val revision: Long = 0,
+)
+
+/**
+ * Lo que el agente propuso sin aplicarlo (dry_run). Guarda la petición exacta, ligada a la revisión en la que
+ * se ensayó: si el montaje cambia, «Aplicar» se rechaza en vez de hacer otra cosa.
+ */
+data class CutProposal(
+    val id: String, val label: String, val changeCount: Int, val detail: String?,
+    val request: Request, val messageId: String? = null,
 )
 
 /** The montage owns its chat and cancellation; the main Assistant conversation is never selected or edited. */
@@ -65,8 +92,24 @@ class CutChatViewModel(app: Application, val projectId: String) : AndroidViewMod
     private var turnJob: Job? = null
     private var activeTurnId: String? = null
     private val presentedLibraryEvents = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<UiEvent.ResultsWall, Boolean>())
+    private var session: CutSession? = null
+    private val turnSteps = ArrayList<String>()
+    private val turnGroups = LinkedHashSet<String>()
+    private var turnFirstSummary: kotlinx.serialization.json.JsonObject? = null
+    private var turnLastSummary: kotlinx.serialization.json.JsonObject? = null
+    private val turnProposals = ArrayList<CutProposal>()
+    private val _toasts = MutableSharedFlow<String>(extraBufferCapacity = 4)
+    /** Avisos breves de las acciones sobre los turnos (deshacer, aplicar una propuesta). */
+    val toasts: SharedFlow<String> = _toasts.asSharedFlow()
 
     init {
+        // La misma sesión que el editor: los cambios del agente se reconocen por su origen y su grupo (el turno).
+        viewModelScope.launch {
+            val s = try { NexusCut.workspace(nexus).session(projectId) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+            session = s ?: return@launch
+            launch(start = CoroutineStart.UNDISPATCHED) { s.events.collect(::onCutEvent) }
+            launch { s.state.map { it.revision }.distinctUntilChanged().collect { r -> _ui.update { it.copy(revision = r) } } }
+        }
         viewModelScope.launch {
             try {
                 // No autosave runs until the existing chat and any interrupted-turn marker are loaded.
@@ -99,8 +142,10 @@ class CutChatViewModel(app: Application, val projectId: String) : AndroidViewMod
         val turnId = id()
         activeTurnId = turnId
         presentedLibraryEvents.clear()
+        turnSteps.clear(); turnGroups.clear(); turnProposals.clear()
+        turnFirstSummary = null; turnLastSummary = null
         document = document.copy(messages = document.messages + user, draft = originalDraft, pending = PendingCutChatTurn(user.id, user.at))
-        _ui.update { it.copy(messages = document.messages, draft = "", thinking = true, streamingText = "", activity = "Preparando el montaje") }
+        _ui.update { it.copy(messages = document.messages, draft = "", thinking = true, streamingText = "", activity = "Preparando el montaje", liveSteps = emptyList(), proposals = emptyList()) }
         turnJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             var answer: String? = null
             var by: String? = null
@@ -145,20 +190,40 @@ class CutChatViewModel(app: Application, val projectId: String) : AndroidViewMod
             } finally {
                 // Navigation/stop cancels this ViewModel's job, but must still close the persisted pending marker.
                 withContext(NonCancellable) {
+                    // Deja pasar los últimos eventos del montaje que ya estén en cola antes de cerrar el turno.
+                    kotlinx.coroutines.yield()
                     val items = document.messages.toMutableList()
+                    // Lo que el agente cambió de verdad en este turno, para revisarlo y deshacerlo de una vez.
+                    val group = turnGroups.lastOrNull()
+                    val steps = turnSteps.toList()
+                    val verified = if (steps.isEmpty()) null else CutTurnSummary.describe(turnFirstSummary, turnLastSummary)
+                    var cardId: String? = null
                     if (failure == null) {
-                        answer?.let { items += CutChatMessage(id(), CutChatRole.ASSISTANT, it, System.currentTimeMillis(), by?.let(::safe)) }
+                        answer?.let { text ->
+                            items += CutChatMessage(id(), CutChatRole.ASSISTANT, text, System.currentTimeMillis(), by?.let(::safe),
+                                turnGroup = group, steps = steps, verified = verified, verifiedBefore = turnFirstSummary.takeIf { steps.isNotEmpty() }).also { cardId = it.id }
+                        }
+                        if (answer == null && steps.isNotEmpty()) items += CutChatMessage(id(), CutChatRole.NOTICE,
+                            "El agente aplicó ${steps.size} ${if (steps.size == 1) "cambio" else "cambios"} en el montaje.", System.currentTimeMillis(),
+                            turnGroup = group, steps = steps, verified = verified, verifiedBefore = turnFirstSummary.takeIf { steps.isNotEmpty() }).also { cardId = it.id }
                         items += notes.filter { it.isNotBlank() }.map { notice(it) }
                     } else {
                         _ui.value.streamingText.takeIf { it.isNotBlank() }?.let {
                             items += CutChatMessage(id(), CutChatRole.ASSISTANT, safe(it), System.currentTimeMillis(), by?.let(::safe), error = true)
                         }
+                        if (steps.isNotEmpty()) items += CutChatMessage(id(), CutChatRole.NOTICE,
+                            "Antes de pararse, el agente aplicó ${steps.size} ${if (steps.size == 1) "cambio" else "cambios"}. Puedes deshacerlos aquí.",
+                            System.currentTimeMillis(), turnGroup = group, steps = steps, verified = verified, verifiedBefore = turnFirstSummary.takeIf { steps.isNotEmpty() }).also { cardId = it.id }
                         items += notice(failure!!, error = true)
                     }
+                    // Solo siguen en pie las propuestas ensayadas sobre la revisión actual (la última de cada turno).
+                    val revisionNow = session?.state?.value?.revision
+                    val live = turnProposals.filter { it.request.expectedRevision == revisionNow }.takeLast(1)
+                        .map { it.copy(messageId = cardId ?: items.lastOrNull()?.id) }
                     val nextDraft = _ui.value.draft.ifBlank { if (failure != null) originalDraft else "" }
                     document = document.copy(messages = items, draft = nextDraft, pending = null)
                     activeTurnId = null
-                    _ui.update { it.copy(messages = items, draft = nextDraft, thinking = false, streamingText = "", activity = "") }
+                    _ui.update { it.copy(messages = items, draft = nextDraft, thinking = false, streamingText = "", activity = "", liveSteps = emptyList(), proposals = live) }
                     saveOrDisable()
                 }
             }
@@ -167,6 +232,77 @@ class CutChatViewModel(app: Application, val projectId: String) : AndroidViewMod
     }
 
     fun stop() { turnJob?.cancel(CancellationException("Detenido desde el editor.")) }
+
+    /** Estado actual de los cambios de un turno en el historial compartido (null si la sesión no está). */
+    fun turnStatus(group: String): GroupStatus? = session?.groupStatus(group)
+
+    /**
+     * Deshace juntos los pasos del agente de ese turno. Si después se hicieron otros cambios, [includeLater]
+     * debe venir confirmado por el usuario: se deshacen también, en orden, y quedan en «Rehacer».
+     */
+    fun revertTurn(group: String, includeLater: Boolean) {
+        val s = session ?: return
+        viewModelScope.launch {
+            when (val out = s.undoGroup(group, Origin.USER, includeLater)) {
+                is Outcome.Done -> _toasts.tryEmit("Turno del agente deshecho")
+                is Outcome.Failed -> _toasts.tryEmit(out.error.message)
+            }
+        }
+    }
+
+    fun redoTurn(group: String) {
+        val s = session ?: return
+        viewModelScope.launch {
+            (s.redoGroup(group, Origin.USER) as? Outcome.Failed)?.let { _toasts.tryEmit(it.error.message) }
+        }
+    }
+
+    /** Aplica tal cual lo que el agente ensayó; si el montaje cambió desde entonces, no se aplica nada. */
+    fun applyProposal(proposal: CutProposal) {
+        val s = session ?: return
+        viewModelScope.launch {
+            when (val out = s.execute(proposal.request.copy(dryRun = false, idempotencyKey = "proposal-${proposal.id}"))) {
+                is Outcome.Done -> {
+                    _ui.update { it.copy(proposals = it.proposals - proposal) }
+                    val group = proposal.request.group
+                    val items = document.messages.map { m ->
+                        if (m.id == proposal.messageId) m.copy(turnGroup = group ?: m.turnGroup, steps = m.steps + safe(out.label),
+                            // Lo comprobado pasa a ser el turno entero: del antes del turno al resultado de la propuesta.
+                            verified = CutTurnSummary.describe(m.verifiedBefore ?: out.summary, out.summary) ?: m.verified,
+                            verifiedBefore = m.verifiedBefore ?: out.summary)
+                        else m
+                    }
+                    document = document.copy(messages = items)
+                    _ui.update { it.copy(messages = items) }
+                    saveOrDisable()
+                    _toasts.tryEmit("Aplicado: ${out.label}")
+                }
+                is Outcome.Failed -> _toasts.tryEmit(
+                    if (out.error.code == ErrorCode.REVISION_CONFLICT) "El montaje cambió después de la propuesta. Pide al agente que la repita."
+                    else out.error.message)
+            }
+        }
+    }
+
+    fun dismissProposal(proposal: CutProposal) { _ui.update { it.copy(proposals = it.proposals - proposal) } }
+
+    private fun onCutEvent(event: CutEvent) {
+        if (event.origin != Origin.AGENT || activeTurnId == null) return
+        when (event) {
+            is CutEvent.Committed -> {
+                event.group?.let(turnGroups::add)
+                turnSteps += safe(event.label)
+                if (turnFirstSummary == null) turnFirstSummary = event.summary
+                event.summary?.let { turnLastSummary = it }
+                _ui.update { it.copy(liveSteps = turnSteps.toList()) }
+            }
+            is CutEvent.Undone -> { event.group?.let(turnGroups::add); turnSteps += "Deshacer: ${safe(event.label)}"; _ui.update { it.copy(liveSteps = turnSteps.toList()) } }
+            is CutEvent.Redone -> { event.group?.let(turnGroups::add); turnSteps += "Rehacer: ${safe(event.label)}"; _ui.update { it.copy(liveSteps = turnSteps.toList()) } }
+            is CutEvent.Proposed -> turnProposals += CutProposal(id(), safe(event.label), event.changeCount,
+                CutTurnSummary.describe(event.summary, event.summary)?.takeUnless { it == "Comprobado en el montaje" }, event.request)
+            is CutEvent.Rejected -> Unit
+        }
+    }
 
     fun closeLibraryResults() { _ui.update { it.copy(libraryResultsOpen = false) } }
 

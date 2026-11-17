@@ -21,6 +21,20 @@ data class CutChatMessage(
     val at: Long,
     val by: String? = null,
     val error: Boolean = false,
+    /**
+     * Grupo del historial compartido con los cambios que el agente hizo en este turno: permite revisarlos y
+     * deshacerlos juntos. Opcional para leer chats anteriores.
+     */
+    val turnGroup: String? = null,
+    /** Pasos aplicados por el agente en el montaje durante el turno, en orden (sus etiquetas de «Deshacer»). */
+    val steps: List<String> = emptyList(),
+    /** Antes → después comprobado por el motor («Duración 00:20 → 00:16 · 6 → 5 clips»). */
+    val verified: String? = null,
+    /**
+     * El «antes» del motor al empezar el turno (duración y clips, sin contenido del usuario): si luego se
+     * aplica una propuesta del turno, [verified] se rehace desde aquí hasta el resultado real.
+     */
+    val verifiedBefore: kotlinx.serialization.json.JsonObject? = null,
 )
 
 /** A marker for an in-flight user message, never a saved request or an executable tool call. */
@@ -115,7 +129,7 @@ class CutChatStore(
 
     private fun CutChatDocument.redacted() = copy(
         draft = Redactor.redact(draft),
-        messages = messages.map { it.copy(text = Redactor.redact(it.text), by = it.by?.let(Redactor::redact)) },
+        messages = messages.map { it.copy(text = Redactor.redact(it.text), by = it.by?.let(Redactor::redact), steps = it.steps.map(Redactor::redact)) },
     )
 
     private companion object {
