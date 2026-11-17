@@ -22,6 +22,22 @@ class ModelBasicsTest {
     }
 
     @Test
+    fun standardRateOfAClipToleratesWhatPhonesReport() {
+        assertEquals(FrameRate.FPS_30, FrameRate.standardFor(30.0))
+        assertEquals(FrameRate.FPS_30, FrameRate.standardFor(29.83))
+        assertEquals(FrameRate.FPS_30, FrameRate.standardFor(30.02))
+        assertEquals(FrameRate.FPS_29_97, FrameRate.standardFor(29.97))
+        assertEquals(FrameRate.FPS_23_976, FrameRate.standardFor(23.976))
+        assertEquals(FrameRate.FPS_24, FrameRate.standardFor(24.0))
+        assertEquals(FrameRate.FPS_60, FrameRate.standardFor(59.94))
+        assertEquals(FrameRate.FPS_25, FrameRate.standardFor(25.0))
+        assertNull(FrameRate.standardFor(120.0))
+        assertNull(FrameRate.standardFor(15.0))
+        assertNull(FrameRate.standardFor(0.0))
+        assertNull(FrameRate.standardFor(Double.NaN))
+    }
+
+    @Test
     fun noDriftOverManySplits() {
         val fx = Fx().also { it.media("long", 3600) }
         var t = Timeline(videoTracks = listOf(vtrack("V1", clip("A", 0, 1000))))

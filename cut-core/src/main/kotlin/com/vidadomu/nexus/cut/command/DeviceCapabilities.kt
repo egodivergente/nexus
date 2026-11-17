@@ -4,6 +4,8 @@ import com.vidadomu.nexus.cut.command.CapabilityKind.EDIT
 import com.vidadomu.nexus.cut.command.CapabilityKind.JOB
 import com.vidadomu.nexus.cut.command.CapabilityKind.READ
 import com.vidadomu.nexus.cut.model.ExportResolution
+import com.vidadomu.nexus.cut.model.FrameRate
+import com.vidadomu.nexus.cut.model.MediaKind
 import com.vidadomu.nexus.cut.model.MediaRef
 import com.vidadomu.nexus.cut.model.VideoCodec
 import kotlinx.serialization.json.JsonArray
@@ -62,7 +64,10 @@ object DeviceCapabilities {
             us("at_us", "Dónde empieza el primero; por defecto al final"); str("mode", "Cómo entran.", enum = listOf("insert", "overwrite"))
             bool("with_audio", "Colocar también el sonido de los vídeos; por defecto true.")
         },
-        output = Schema.obj { ids("media_ids", "Medios del montaje, en el mismo orden."); ids("clip_ids", "Clips creados."); int("reused", "Archivos que ya estaban.") },
+        output = Schema.obj {
+            ids("media_ids", "Medios del montaje, en el mismo orden."); ids("clip_ids", "Clips creados."); int("reused", "Archivos que ya estaban.")
+            str("project_fps", "Solo si el montaje aún no tenía ningún vídeo y ha adoptado los fotogramas por segundo del primero.")
+        },
         requires = setOf(LIBRARY), errors = setOf(ErrorCode.NOT_FOUND, ErrorCode.REJECTED_BY_ENGINE, ErrorCode.PRECONDITION_FAILED),
         handler = Handler.Staged { state, a ->
             val ids = a.reqIds("asset_ids").toList()
@@ -74,6 +79,8 @@ object DeviceCapabilities {
             val passthrough = a.json.filterKeys { it in setOf("at_us", "mode", "with_audio") };
             { d: Draft ->
                 val inDraft = d.project.media.filter { it.assetId != null }.associateBy { it.assetId!! }.toMutableMap()
+                // Sin ningún vídeo todavía (puede haber música o imágenes, que no tienen rejilla de fotogramas).
+                val fresh = d.project.media.none { it.kind == MediaKind.VIDEO }
                 val added = ArrayList<MediaRef>()
                 for ((assetId, lib) in probed) {
                     if (assetId in inDraft) continue
@@ -82,6 +89,11 @@ object DeviceCapabilities {
                     d.warnings += lib.warnings
                 }
                 if (added.isNotEmpty()) d.header("Importar") { it.copy(media = it.media + added) }
+                // Un montaje vacío toma la rejilla de fotogramas de su primer vídeo, antes de colocar nada: así un
+                // fotograma del montaje es un fotograma del material y los cortes no caen entre dos.
+                val adopted = if (!fresh || !place) null else ids.firstNotNullOfOrNull { id -> inDraft.getValue(id).takeIf { it.kind == MediaKind.VIDEO }?.frameRate }
+                    ?.let(FrameRate::standardFor)?.takeIf { it != d.project.settings.frameRate }
+                if (adopted != null) d.header("Formato") { it.copy(settings = it.settings.copy(frameRate = adopted)) }
                 val mediaIds = ids.map { inDraft.getValue(it).id }
                 val clips = if (!place) emptyList() else {
                     val items = JsonArray(ids.map { assetId ->
@@ -97,6 +109,7 @@ object DeviceCapabilities {
                 buildJsonObject {
                     put("media_ids", Outcome.strings(mediaIds)); put("clip_ids", Outcome.strings(clips))
                     put("imported", added.size); put("reused", ids.size - probed.size)
+                    if (adopted != null) put("project_fps", adopted.toString())
                 }
             }
         })

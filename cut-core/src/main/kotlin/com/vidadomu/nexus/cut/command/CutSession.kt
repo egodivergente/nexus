@@ -257,7 +257,7 @@ class CutSession(
         publish(committed, draft.view, before.view)
         val outcome = done(committed.revision, committed = true)
         request.idempotencyKey?.let { replays[it] = outcome }
-        _events.tryEmit(CutEvent.Committed(committed.revision, request.origin, label, request.ops.map { it.id }, touched, focus, outcome.warnings, request.group, changeCount))
+        _events.tryEmit(CutEvent.Committed(committed.revision, request.origin, label, request.ops.map { it.id }, touched, focus, outcome.warnings, request.group, changeCount, summary))
         logged { it.committed(committed.revision, committed.modifiedAtMs, request.origin, label, request.idempotencyKey, request.ops, draft.created) }
         return outcome
     }

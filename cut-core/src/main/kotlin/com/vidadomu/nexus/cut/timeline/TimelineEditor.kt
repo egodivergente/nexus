@@ -61,9 +61,14 @@ object TimelineEditor {
             }
             val spanUs = placements.maxOf { it.offsetUs + it.durationUs }
             val targets = placements.map { it.trackId }.toSet()
+            // Insertar al final de lo que hay en las pistas de destino (o en una pista vacía) no empuja nada: no hay
+            // nada detrás que apartar. Sin esto, añadir un vídeo con la música ya puesta la desplazaba o la partía.
+            val pushes = targets.any { id -> w.track(id).clips.any { it.endUs > atUs } }
             if (mode == EditMode.INSERT) {
-                Ripple.insertSpace(w, atUs, spanUs, emptySet(), targets)
-                shiftMarkersForInsert(w, atUs, spanUs)
+                if (pushes) {
+                    Ripple.insertSpace(w, atUs, spanUs, emptySet(), targets)
+                    shiftMarkersForInsert(w, atUs, spanUs)
+                }
             } else {
                 for (p in placements) Ripple.clearRange(w, w.track(p.trackId), atUs + p.offsetUs, atUs + p.offsetUs + p.durationUs, emptySet())
             }
@@ -280,6 +285,48 @@ object TimelineEditor {
                 dst.sort()
             }
             insertAt - a
+        }
+    }
+
+    /**
+     * Result of [reorderSlot]: the delta to hand to [move] and, when the block has snapped against a
+     * neighbour, where it starts in the resulting timeline (null: placed freely or left where it was).
+     */
+    data class ReorderSlot(val deltaUs: Long, val landsAtUs: Long?)
+
+    /**
+     * Magnetic reorder for a drag in INSERT mode on the same track. An insert-move drops the block at an
+     * arbitrary time, so dropping it over a neighbour would split that neighbour in two. Here the drop point
+     * is resolved against the dragged clip's own track: the block jumps past a neighbour once its leading
+     * edge (right edge going right, left edge going left) crosses the middle of that neighbour, and stays
+     * put until then. Between the last neighbour passed and the next one it is placed freely (a gap) or
+     * butted against whichever it would otherwise overlap. The returned delta, given to [move], never splits
+     * a clip of that track. Null when the selection is not one contiguous block (the edit explains why).
+     */
+    fun reorderSlot(timeline: Timeline, ctx: EditContext, clipIds: Set<String>, anchorClipId: String, deltaUs: Long): ReorderSlot? {
+        val w = WorkingTimeline(timeline, ctx)
+        val track = w.locate(anchorClipId)?.first ?: return null
+        val ids = closure(w, clipIds + anchorClipId, links = true, groups = true)
+        val ranges = mergeRanges(ids.map { w.locate(it)!!.second }.map { it.timelineStartUs to it.endUs })
+        if (ranges.size != 1) return null
+        val (a, b) = ranges.single()
+        val len = b - a
+        val p = maxOf(0L, a + deltaUs)
+        val stay = ReorderSlot(0, null)
+        val others = track.clips.filter { it.id !in ids }
+        fun mid(c: Clip) = c.timelineStartUs + c.durationUs / 2
+        return if (p > a) {
+            val after = others.filter { it.timelineStartUs >= b }
+            val lower = after.filter { mid(it) <= p + len }.maxOfOrNull { it.endUs } ?: b
+            val upper = after.filter { it.timelineStartUs >= lower }.minOfOrNull { it.timelineStartUs } ?: Long.MAX_VALUE
+            val at = p.coerceIn(lower, upper)
+            if (at <= b) stay else ReorderSlot(at - a, if (at == lower || at == upper) at - len else null)
+        } else {
+            val before = others.filter { it.endUs <= a }
+            val upper = before.filter { mid(it) >= p }.minOfOrNull { it.timelineStartUs } ?: a
+            val lower = before.filter { it.endUs <= upper }.maxOfOrNull { it.endUs } ?: 0L
+            val at = p.coerceIn(lower, upper)
+            if (at >= a) stay else ReorderSlot(at - a, if (at == lower || at == upper) at else null)
         }
     }
 

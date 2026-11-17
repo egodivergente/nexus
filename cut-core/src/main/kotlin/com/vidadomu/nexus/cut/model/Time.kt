@@ -98,6 +98,18 @@ data class FrameRate(val num: Int, val den: Int = 1) {
         val FPS_30 = FrameRate(30)
         val FPS_50 = FrameRate(50)
         val FPS_60 = FrameRate(60)
+
+        /**
+         * The standard rate a clip reporting [fps] was shot at, or null when none is close. Phones report
+         * 29.83, 30.02 or 59.94 for what is 30 or 60 fps footage; only a rate that is exactly NTSC keeps
+         * its fraction.
+         */
+        fun standardFor(fps: Double): FrameRate? {
+            if (!fps.isFinite() || fps <= 0.0) return null
+            listOf(FPS_23_976, FPS_29_97).firstOrNull { Math.abs(it.fps - fps) <= 0.005 }?.let { return it }
+            val best = listOf(FPS_24, FPS_25, FPS_30, FPS_50, FPS_60).minByOrNull { Math.abs(it.fps - fps) }!!
+            return best.takeIf { Math.abs(it.fps - fps) <= 0.75 }
+        }
     }
 }
 

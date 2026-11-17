@@ -191,6 +191,8 @@ sealed interface CutEvent {
         override val revision: Long, override val origin: Origin, val label: String, val ops: List<String>,
         val touchedClips: Set<String>, val focusUs: Long?, val warnings: List<String>,
         val group: String? = null, val changeCount: Int = 0,
+        /** Antes/después comprobado (duración, clips, qué clips cambiaron): lo que la interfaz enseña como verificado. */
+        val summary: JsonObject? = null,
     ) : CutEvent
 
     /** [count] pasos deshechos de una vez (más de uno al revertir un grupo). */

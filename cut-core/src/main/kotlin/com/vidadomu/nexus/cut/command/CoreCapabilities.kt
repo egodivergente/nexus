@@ -85,7 +85,7 @@ object CoreCapabilities {
             input = Schema.obj {
                 str("resolution", "Resolución de salida.", enum = ExportResolution.entries.map { it.label })
                 str("codec", "Códec de vídeo.", enum = listOf("h264", "h265"))
-                str("fps", "Fotogramas por segundo; «project» usa los del montaje.", enum = RATES.keys.toList() + "project")
+                str("fps", "Tope de fotogramas por segundo de la salida (descarta fotogramas si el material tiene más); «project» no fuerza nada y conserva la cadencia del material.", enum = RATES.keys.toList() + "project")
                 str("bitrate", "Calidad.", enum = BitratePreset.entries.map { it.name.lowercase() })
                 int("custom_bitrate_kbps", "Bitrate de vídeo en kbps cuando bitrate es «custom»."); int("audio_bitrate_kbps", "Bitrate de audio en kbps.")
             },
