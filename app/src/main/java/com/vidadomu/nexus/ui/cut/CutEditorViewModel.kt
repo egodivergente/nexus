@@ -193,6 +193,9 @@ class CutEditorViewModel(app: Application, val projectId: String) : AndroidViewM
     /** De vuelta en pantalla: la reproducción vuelve a quedar preparada para arrancar al instante. */
     fun onForeground() = preview.setForeground(true)
 
+    /** Hay un dedo en el editor: la reproducción no se prepara ni se libera en mitad del gesto. */
+    fun onTouching(value: Boolean) = preview.setTouching(value)
+
     /** [pxPerSecond] null mientras el zoom inicial no se ha elegido (montaje vacío): no se guarda uno de relleno. */
     fun saveView(pxPerSecond: Float?) {
         prefs.saveProjectView(projectId, pxPerSecond, preview.positionUs.value)

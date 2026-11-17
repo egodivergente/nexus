@@ -18,6 +18,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -122,6 +124,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -770,6 +773,19 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
     Surface(Modifier.fillMaxSize(), color = if (immersive) Color.Black else palette.bg) {
         BoxWithConstraints(
             Modifier.fillMaxSize()
+                // Solo observa (pase inicial, sin consumir): cualquier dedo en el editor aplaza la preparación de
+                // la reproducción, que ocupa el hilo principal, hasta que se levanta.
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        vm.onTouching(true)
+                        try {
+                            do { val e = awaitPointerEvent(PointerEventPass.Initial) } while (e.changes.any { it.pressed })
+                        } finally {
+                            vm.onTouching(false)
+                        }
+                    }
+                }
                 .windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.top)
                 .windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)
         ) {
@@ -790,6 +806,8 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
                 // campo enfocado se destruiría y el teclado se cerraría al abrirse): solo se recogen la cabecera y
                 // la línea de tiempo, y la imagen sigue a la vista a su izquierda mientras se escribe.
                 val writing = agentOpen && typing
+                // El asa del agente también reparte el alto en horizontal (por defecto, como antes: ~55 % para el agente).
+                val agentShare = (chatFraction + .15f).coerceIn(.35f, .85f)
                 Column(Modifier.fillMaxSize()) {
                     if (!writing) {
                         EditorHeader()
@@ -801,8 +819,8 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
                             if (!writing) Transport(resizable = false, total = 0f)
                         }
                         Column(Modifier.weight(1f).fillMaxHeight()) {
-                            if (!writing) TimelinePane(Modifier.weight(1f))
-                            if (agentOpen) Agent(Modifier.weight(1.25f), compact = writing, total = totalHeightDp)
+                            if (!writing) TimelinePane(Modifier.weight(if (agentOpen) 1f - agentShare else 1f))
+                            if (agentOpen) Agent(Modifier.weight(if (writing) 1f else agentShare), compact = writing, total = totalHeightDp)
                             else Dock()
                         }
                     }

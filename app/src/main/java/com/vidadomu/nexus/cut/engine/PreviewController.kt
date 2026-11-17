@@ -69,6 +69,7 @@ class PreviewController(private val context: Context, private val scope: Corouti
     private var prerollStartedMs = 0L
     private var foreground = true
     private var exporting = false
+    private var touching = false
     private var playRequestedMs = 0L
     private var playWarm = false
     private val prerollAllowed = !context.getSystemService(ActivityManager::class.java).isLowRamDevice
@@ -264,11 +265,13 @@ class PreviewController(private val context: Context, private val scope: Corouti
     /**
      * Prepares, paused, the player Play would build right now. Debounced: while the user keeps
      * scrubbing or editing nothing is built (and the stale one is released only when this fires).
+     * Building and releasing cost the main thread (up to ~70 and ~160 ms measured on a Pixel 8 Pro):
+     * never while a finger is on the editor ([setTouching]), so a drag or a pinch is not interrupted.
      */
     private fun schedulePreroll() {
         prerollJob?.cancel()
         prerollJob = null
-        if (!prerollAllowed || !foreground || exporting || _playing.value || surface == null || scrub.active) return
+        if (!prerollAllowed || !foreground || exporting || touching || _playing.value || surface == null || scrub.active) return
         val p = project ?: return
         if (p.timeline.durationUs <= 0) return
         prerollJob = scope.launch {
@@ -281,7 +284,7 @@ class PreviewController(private val context: Context, private val scope: Corouti
     private fun buildPreroll() {
         val p = project ?: return
         val s = surface ?: return
-        if (_playing.value || scrub.active || !foreground || exporting || p.timeline.durationUs <= 0) return
+        if (_playing.value || scrub.active || touching || !foreground || exporting || p.timeline.durationUs <= 0) return
         val from = playFrom()
         val key = prerollKeyFor(p, from)
         if (preroll != null && key == prerollKey) return
@@ -354,14 +357,25 @@ class PreviewController(private val context: Context, private val scope: Corouti
     /** Leaving the screen frees the paused pre-rolled decoders; coming back prepares them again. */
     fun setForeground(value: Boolean) {
         foreground = value
-        if (value) schedulePreroll() else dropPreroll()
+        // A failure while away (decoders taken by another app) must not block this playhead for good.
+        if (value) { prerollFailedKey = null; schedulePreroll() } else dropPreroll()
     }
 
     /** An export needs the hardware codecs: no paused decoders are kept waiting meanwhile. */
     fun setExporting(value: Boolean) {
         if (value == exporting) return
         exporting = value
-        if (value) dropPreroll() else schedulePreroll()
+        if (value) dropPreroll() else { prerollFailedKey = null; schedulePreroll() }
+    }
+
+    /**
+     * A finger is on the editor (any gesture: drag, trim, pinch, scroll, long press). Nothing is built or
+     * released meanwhile; the quiet time starts again when the last finger lifts.
+     */
+    fun setTouching(value: Boolean) {
+        if (value == touching) return
+        touching = value
+        if (value) { prerollJob?.cancel(); prerollJob = null } else schedulePreroll()
     }
 
     private fun startPlayback(fromUs: Long) {

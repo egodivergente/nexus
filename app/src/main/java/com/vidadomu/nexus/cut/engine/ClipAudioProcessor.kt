@@ -24,8 +24,10 @@ import java.nio.ByteBuffer
  * milliseconds more than its place in the montage (up to one AAC packet, 21 ms at 48 kHz), and a
  * sequence simply appends its items: every cut pushed the rest of the lane later (measured on a
  * Pixel 8 Pro with a flash/beep clip: +24 ms after eight cuts, growing with each one). With
- * [itemDurationUs] the item emits exactly its share of the lane, see [itemFrames]; what is left is a
- * fixed offset below one packet per clip, which does not add up.
+ * [itemDurationUs] the item never emits more than its share of the lane (see [itemFrames]): the extra
+ * decoded tail is dropped. What is left is a fixed offset below one packet per clip, which does not add
+ * up. An item that decodes *less* than its share is not padded (Media3 rounds cuts up, so it has not
+ * been seen).
  */
 @UnstableApi
 class ClipAudioProcessor(
