@@ -170,6 +170,19 @@ por huecos (`LinkAndGroupTest`), turnos del agente (`CutSessionGroupsTest`, `Bou
 (`AudioAnalysisTest`), reparto y pistas vacías (`CutInteractionStateTest`), regla (`CutRulerFormattingTest`) y
 textos (`CutEditorTextTest`).
 
+**GitHub Actions** (`build-apk.yml`, en cada push): sobre `764bf6ed` (run 44043579716), compilación, APK y pruebas
+unitarias en verde y fallo en «Run presentation UI tests (offline fixtures)», un paso con emulador que ejecuta
+`AssistantPresentationUiTest` y `ChatRichContentDeviceTest` (no tocan Cut). Sobre `1dbe3073` (run 44048242874, lo
+mismo más los arreglos de vc221l), todos los pasos en verde, también ese. La causa del primer fallo no se ha leído
+(los registros piden sesión de GitHub); el mismo paso fallaba ya en otras ramas anteriores a esta.
+
+**Prueba en dispositivo heredada** (`CutFeedbackDeviceTest`, opcional: `-PnexusFeedbackDeviceTests=true` y
+`-e cutProjectId`): `previewGesturesAndAgentMinimizeDoNotEditTheMontage` buscaba etiquetas del editor anterior
+(«Minimizar agente», «Mostrar agente del montaje», el asa con nombre) y habría fallado. Está actualizada al editor
+nuevo: asa en la barra de transporte, agente oculto de entrada, comprobación sobre imagen + línea de tiempo y
+reparto guardado restaurado al acabar. Está contrastada con los volcados de accesibilidad tomados en el Pixel, pero
+**no se ha ejecutado en el dispositivo** (el Pixel quedó al 11 % de batería); Actions la compila, no la ejecuta.
+
 ## 5. Límites conocidos
 
 - La exportación conserva la cadencia del material de origen; los fps del montaje son la rejilla de edición. Con
@@ -190,8 +203,18 @@ textos (`CutEditorTextTest`).
   teclado (no solo el del chat) recoge cabecera y línea de tiempo; el diseño horizontal se elige por orientación,
   no por ancho (pantalla dividida); el reproductor en espera mantiene sus decodificadores mientras el editor está
   quieto y solo los suelta al exportar, girar o salir.
+- Segunda verificación independiente (solo lectura) de `764bf6ed..1dbe3073`: 7 puntos correctos, ninguno incorrecto.
+  Hallazgos bajos sin corregir, para que el código publicado de la app siga siendo el de la APK instalada: con un
+  dedo puesto aún puede liberarse el reproductor si falla en espera, cambia la superficie o llega un LUT (el
+  comentario de `setTouching` promete más de lo que hace); el observador de toques usa `pointerInput(Unit)` y debería
+  depender del `vm`; el asa del agente en horizontal tiene una pequeña zona muerta en los extremos y su reparto por
+  defecto es 55 % (antes 55,6 %).
+- El asa que reparte imagen y línea de tiempo ya no tiene nombre de accesibilidad (antes «Tamaño de la
+  previsualización y la línea de tiempo»). Conserva sus tres acciones («Agrandar la línea de tiempo», «Agrandar la
+  imagen», «Reparto automático»), pero sin nombre un lector de pantalla puede no detenerse en ella. Sin corregir por
+  el mismo motivo; no se ha probado con TalkBack.
 - Montajes de prueba creados en el proyecto «General» del Pixel: «QA Cut premium», «QA importar» y «QA orden», más
-  cuatro exportaciones «QA_Cut_premium-…» en la Biblioteca. No se ha borrado nada.
+  cinco exportaciones «QA_Cut_premium-…» en la Biblioteca. No se ha borrado nada.
 
 ## 6. Capturas
 

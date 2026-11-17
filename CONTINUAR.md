@@ -13,7 +13,8 @@ alto en horizontal; ajustes y exportación en hojas; modo inmersivo; reordenaci�
 agente en botón flotante con turnos comprobados, propuestas, deshacer/rehacer del turno y `audio.find_silences`;
 sincronía de audio por clip; Reproducir arranca en 0,13 s con el reproductor pre-preparado (antes 0,8–1,6 s).
 Pendiente: háptica en el S25, distribución en el S25 real, agente con modelo real, tirones del primer segundo de
-reproducción. Informe: `docs/NEXUS-CUT-PREMIUM-20261117.md`.
+reproducción, ejecutar en dispositivo `CutFeedbackDeviceTest` (actualizada al editor nuevo, sin ejecutar).
+Informe: `docs/NEXUS-CUT-PREMIUM-20261117.md`.
 
 # vc220 / 1.9.184-agent: burbuja en vivo acumulada — INSTALADA en S25 — 17/11/2026
 
