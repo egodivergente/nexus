@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Rect
 import android.graphics.Bitmap
 import android.media.MediaExtractor
@@ -21,11 +22,13 @@ import com.vidadomu.nexus.cut.NexusCut
 import com.vidadomu.nexus.cut.command.*
 import com.vidadomu.nexus.cut.export.*
 import com.vidadomu.nexus.cut.model.*
+import com.vidadomu.nexus.ui.cut.CutViewPrefs
 import com.vidadomu.nexus.ui.theme.NexusTheme
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Assume.assumeFalse
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -134,15 +137,27 @@ class CutFeedbackDeviceTest {
         val activity = activity()
         val session = runBlocking { NexusCut.workspace(app).session(id) }
         val original = session.state.value.project
-        inst.runOnMainSync { NexusCut.open(id) }
-        waitFor { node("Previsualización del montaje") != null }
+        // The image/timeline split is a screen preference kept outside the project: put it back afterwards.
+        val viewPrefs = CutViewPrefs(app)
+        val split = viewPrefs.timelineFraction
+        val preview = "Previsualización del montaje"
         try {
+            // Image above timeline only exists in portrait; in landscape they sit side by side with a fixed split.
+            assumeTrue("Portrait only", activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT)
+            inst.runOnMainSync { NexusCut.open(id) }
+            waitFor { node(preview) != null }
             screenshot("workspace")
-            val before = bounds("Previsualización del montaje")
-            val handle = bounds("Tamaño de la previsualización y la línea de tiempo")
-            drag(handle.exactCenterX(), handle.exactCenterY(), 0f, 100f)
-            assertTrue(bounds("Previsualización del montaje").height() > before.height())
-            pinch(bounds("Previsualización del montaje"))
+            val before = bounds(preview)
+            // The transport bar between image and timeline is the resize handle. Drag it by the gap between
+            // the playhead clock and the frame-step buttons, which are not part of the handle.
+            val clock = Rect().also { r ->
+                requireNotNull(nodes().firstOrNull { it.contentDescription?.toString()?.startsWith("Cabezal en") == true }).getBoundsInScreen(r)
+            }
+            val handleX = (clock.right + bounds("Fotograma anterior").left) / 2f
+            val handleY = (before.bottom + bounds("Línea de tiempo del montaje").top) / 2f
+            drag(handleX, handleY, 0f, 100f)
+            waitFor { bounds(preview).height() > before.height() }
+            pinch(bounds(preview))
             waitFor { node("Ajustar") != null }
             screenshot("zoom")
             click("Ajustar")
@@ -152,15 +167,23 @@ class CutFeedbackDeviceTest {
             drag(timeline.exactCenterX(), timeline.top + 10f, 150f, 0f)
             waitFor { node("Pausa") != null }
             click("Pausa")
-            val visible = bounds("Previsualización del montaje").height()
-            click("Minimizar agente")
-            waitFor { node("Mostrar agente del montaje") != null }
-            assertTrue(bounds("Previsualización del montaje").height() > visible)
+            // The agent starts hidden behind its button. Opening it takes height from the editing area (the
+            // timeline alone while the split is automatic, image and timeline otherwise); hiding it gives it back.
+            fun editing() = bounds(preview).height() + bounds("Línea de tiempo del montaje").height()
+            val hidden = editing()
+            click("Agente del montaje")
+            waitFor { node("Ocultar el agente") != null && editing() < hidden }
+            val withAgent = editing()
+            screenshot("agent-open")
+            click("Ocultar el agente")
+            waitFor { node("Agente del montaje") != null && editing() > withAgent }
             screenshot("agent-hidden")
-            click("Mostrar agente del montaje")
-            waitFor { node("Minimizar agente") != null }
             assertEquals(original, session.state.value.project)
-        } finally { if (node("Pausa") != null) click("Pausa"); activity.finish() }
+        } finally {
+            if (node("Pausa") != null) click("Pausa")
+            activity.finish()
+            viewPrefs.timelineFraction = split
+        }
     }
 
     @Test fun sequentialRendersProduceTwoCompleteMp4FilesWithAudio() {
