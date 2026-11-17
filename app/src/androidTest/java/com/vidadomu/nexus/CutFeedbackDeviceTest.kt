@@ -155,8 +155,10 @@ class CutFeedbackDeviceTest {
             }
             val handleX = (clock.right + bounds("Fotograma anterior").left) / 2f
             val handleY = (before.bottom + bounds("Línea de tiempo del montaje").top) / 2f
-            drag(handleX, handleY, 0f, 100f)
-            waitFor { bounds(preview).height() > before.height() }
+            // Move the split away from its nearer limit: a split saved at its minimum leaves no room to grow the image.
+            val grow = bounds("Línea de tiempo del montaje").height() * 2 > before.height()
+            drag(handleX, handleY, 0f, if (grow) 100f else -100f)
+            waitFor { bounds(preview).height().let { if (grow) it > before.height() else it < before.height() } }
             pinch(bounds(preview))
             waitFor { node("Ajustar") != null }
             screenshot("zoom")
