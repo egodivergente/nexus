@@ -3,7 +3,13 @@
 Rama `merge/v219-streaming-20261117` = `merge/v218-con-polish-20261116` (47d90d76, vc219 de otro agente) +
 el arreglo de `fix/agente-streaming-acumulado-20261117` (50318bf). Compilación en AWS CodeBuild; se instala en el
 S25 solo después de la vc219. Coordinación: `C:\Users\User\.agent-infra\coordinacion-nexus-20261117.md` (AXELPC).
-**Estado: rama preparada; APK pendiente; sin instalar.**
+**Estado (01:00):** AWS CodeBuild `vidal-android-build:dd292af8-c981-46ee-9bc3-5d19caea8591` SUCCEEDED con el
+buildspec de vc218 (CMake desactivado; `libnexus_whisper.so` original de vc218 vía `nexusAgentPrebuiltJniDir`).
+Firmado en AXELPC con la identidad instalada (cert `8b75db0f…7127`), vc220/1.9.184-agent-preview, 16 KiB verificado,
+6/6 `.so` idénticas a las instaladas. APK SHA-256 `879f8b3d5ce1e0a15b70f355681b1b5adf7d9bb43a4d9cde23b86c012c5ab761`
+(`C:\Users\User\nexus-vc220-work\`). **Sin instalar todavía:** `entregar_vc220.py` espera a que la vc219 esté instalada
+(señal en el archivo de coordinación o vc219 estable 15 min) y entonces hace `adb install -r` y verifica versión, hash,
+datos y arranque; el resultado queda en `entrega.log` y en el archivo de coordinación.
 
 **Síntoma (S25, AKI · Haiku):** encima de «Pensando…» salía una sola palabra que sustituía a la anterior («t», «fuerza»).
 **Causa:** `OpenAiCompatibleStreamingProvider` y `ResponsesApiStreamingProvider` entregaban a `onTextDelta` solo el trozo
