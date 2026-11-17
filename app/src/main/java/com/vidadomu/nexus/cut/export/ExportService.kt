@@ -359,6 +359,17 @@ class ExportService : Service() {
     }
 
     override fun onDestroy() {
+        // Si el sistema destruye el servicio con una exportación a medias, no queda el codificador trabajando
+        // ni el temporal en disco, y el editor deja de mostrar «Exportando».
+        if (job != null && !ended) {
+            ended = true
+            val t = transformer
+            transformer = null
+            progressJob?.cancel()
+            try { t?.cancel() } catch (e: RuntimeException) { Log.w(TAG, "cancel on destroy", e) }
+            tmp?.delete()
+            ExportManager.update(ExportState.Failed(job?.project?.id, "La exportación se interrumpió antes de terminar. Vuelve a exportar."))
+        }
         scope.cancel()
         wakeLock?.let { if (it.isHeld) it.release() }
         super.onDestroy()

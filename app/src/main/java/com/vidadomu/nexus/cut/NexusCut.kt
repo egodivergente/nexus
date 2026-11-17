@@ -10,6 +10,7 @@ import com.vidadomu.nexus.agent.core.assets.AssetRole
 import com.vidadomu.nexus.agent.core.assets.AssetSource
 import com.vidadomu.nexus.agent.core.assets.AssetType
 import com.vidadomu.nexus.assistant.AssistantRuntime
+import com.vidadomu.nexus.cut.command.AudioAnalysisCapabilities
 import com.vidadomu.nexus.cut.command.CoreCapabilities
 import com.vidadomu.nexus.cut.command.CutFailure
 import com.vidadomu.nexus.cut.command.CutLibrary
@@ -28,6 +29,7 @@ import com.vidadomu.nexus.cut.export.ExportManager
 import com.vidadomu.nexus.cut.export.ExportMath
 import com.vidadomu.nexus.cut.export.ExportService
 import com.vidadomu.nexus.cut.export.ExportState
+import com.vidadomu.nexus.cut.media.AudioLoudnessAnalyzer
 import com.vidadomu.nexus.cut.media.MediaImportException
 import com.vidadomu.nexus.cut.media.MediaProbe
 import com.vidadomu.nexus.cut.storage.ProjectStore
@@ -53,8 +55,8 @@ object NexusCut {
 
     fun workspace(app: NexusApplication): CutWorkspace = instance ?: synchronized(this) {
         instance ?: run {
-            val registry = CutRegistry { setOf(DeviceCapabilities.LIBRARY, DeviceCapabilities.EXPORT) }
-                .register(CoreCapabilities.all() + DeviceCapabilities.all(Library(app), Renderer(app)))
+            val registry = CutRegistry { setOf(DeviceCapabilities.LIBRARY, DeviceCapabilities.EXPORT, AudioAnalysisCapabilities.ANALYZER) }
+                .register(CoreCapabilities.all() + DeviceCapabilities.all(Library(app), Renderer(app), AudioLoudnessAnalyzer(app)))
             CutWorkspace(ProjectStore(File(app.filesDir, "cut/projects").apply { mkdirs() }), registry)
         }.also { instance = it }
     }

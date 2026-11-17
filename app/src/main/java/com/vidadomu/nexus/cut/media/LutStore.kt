@@ -62,9 +62,16 @@ object LutStore {
         synchronized(this) { cache[uri]?.let { return Loaded.Ok(it) } }
         val result: Loaded = try {
             val text = context.contentResolver.openInputStream(Uri.parse(uri))?.use { s ->
-                val bytes = s.readBytes()
-                if (bytes.size > MAX_BYTES) throw CubeLutException("El archivo es demasiado grande para ser un LUT (${bytes.size / 1024} KB).")
-                String(bytes, Charsets.UTF_8)
+                // Lectura con tope: un archivo enorme elegido por error no se carga entero en memoria.
+                val out = java.io.ByteArrayOutputStream()
+                val chunk = ByteArray(64 * 1024)
+                while (true) {
+                    val n = s.read(chunk)
+                    if (n < 0) break
+                    out.write(chunk, 0, n)
+                    if (out.size() > MAX_BYTES) throw CubeLutException("El archivo es demasiado grande para ser un LUT (más de ${MAX_BYTES / 1024} KB).")
+                }
+                String(out.toByteArray(), Charsets.UTF_8)
             } ?: throw IOException("no se puede abrir")
             Loaded.Ok(CubeLut.parse(text))
         } catch (e: CubeLutException) {

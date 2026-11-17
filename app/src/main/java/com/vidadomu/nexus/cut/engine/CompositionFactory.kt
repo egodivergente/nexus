@@ -195,7 +195,10 @@ object CompositionFactory {
             val clipId = seg.clipId!!
             val (l, r) = eval.panOf(clipId)
             val processors: List<AudioProcessor> = listOf(
-                ClipAudioProcessor(seg.timelineStartUs + fromUs, { t -> eval.gainAt(clipId, t) }, eval.isAnimated(clipId), l, r),
+                ClipAudioProcessor(
+                    seg.timelineStartUs + fromUs, { t -> eval.gainAt(clipId, t) }, eval.isAnimated(clipId), l, r,
+                    itemDurationUs = producedUs(seg, ref),
+                ),
             )
             editedItem(seg, ref, 30)
                 .setRemoveVideo(true)

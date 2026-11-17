@@ -74,9 +74,10 @@ class WaveformRepository(context: Context, private val scope: CoroutineScope) {
 
     private suspend fun decode(ref: MediaRef): Waveform {
         val ex = MediaExtractor()
-        ex.setDataSource(appContext, Uri.parse(ref.uri), null)
         var codec: MediaCodec? = null
         try {
+            // Dentro del try: si el archivo no se puede abrir, el extractor se libera igualmente.
+            ex.setDataSource(appContext, Uri.parse(ref.uri), null)
             val track = (0 until ex.trackCount).firstOrNull { ex.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true }
                 ?: throw IOException("no audio track")
             ex.selectTrack(track)
