@@ -171,4 +171,67 @@ class BoundCutToolsTest {
         assertEquals(null, rendered)
         assertFalse(cancelled)
     }
+
+    @Test fun `los pasos de un turno quedan agrupados, el historial los marca y cut_revert los deshace juntos`() = runTest {
+        val montage = workspace.create("Turnos")
+        montage.run("media.import", Origin.USER, "asset_ids" to listOf("take")).done()
+        val before = montage.state.value.project
+        val h = Harness()
+        val llm = ScriptedLlmProvider(listOf(
+            { _ -> ScriptedLlmProvider.tools(use("a", "cut_edit", """{"label":"Corte","expected_revision":1,"ops":[{"id":"clip.split","args":{"at_us":1000000}}]}""")) },
+            { _ -> ScriptedLlmProvider.tools(use("b", "cut_edit", """{"label":"Nombre","ops":[{"id":"project.rename","args":{"name":"Turnos 2"}}]}""")) },
+            { _ -> ScriptedLlmProvider.tools(use("c", "cut_history", "{}")) },
+            { request ->
+                val undo = request.resultJson("c")["undo"] as kotlinx.serialization.json.JsonArray
+                assertEquals(listOf("Nombre", "Corte"), undo.take(2).map { it.jsonObject["label"]!!.jsonPrimitive.content })
+                assertTrue(undo.take(2).all { it.jsonObject["this_turn"]?.jsonPrimitive?.content == "true" })
+                assertEquals("user", undo[2].jsonObject["by"]!!.jsonPrimitive.content)
+                ScriptedLlmProvider.text("Listo: corte y nombre nuevo.")
+            },
+        ))
+        val orchestrator = AgentOrchestrator(
+            llm, AgentConfig(provider = "scripted", modelId = "test", region = "", endpoint = "", mode = AgentMode.AGENT),
+            CutTools.forProject(workspace, montage.projectId), h.skills, h.assets,
+        )
+        val result = orchestrator.send(orchestrator.newConversation(), "Corta en 1 s y renombra")
+        assertEquals(listOf("cut_edit", "cut_edit", "cut_history"), result.toolCalls)
+        val group = montage.history().undo.first().group!!
+        assertEquals(2, montage.groupStatus(group).undoable)
+        assertTrue(montage.groupStatus(group).onTop)
+
+        val revert = CutTools.forProject(workspace, montage.projectId).single { it.name == "cut_revert" }
+        assertFalse(revert.run(input("{}"), agent).isError)
+        assertEquals(before.timeline, montage.state.value.project.timeline)
+        assertEquals("Turnos", montage.state.value.project.name)
+        assertEquals(2, montage.groupStatus(group).redoable)
+        // Nada más del agente que deshacer: lo del usuario no se toca.
+        assertTrue(revert.run(input("{}"), agent).isError)
+        assertEquals(before.timeline, montage.state.value.project.timeline)
+    }
+
+    @Test fun `cut_edit rechaza revision mal escrita y argumentos inexistentes sin cambiar nada`() = runTest {
+        val montage = workspace.create("Estricto")
+        workspace.create("Ajeno")
+        montage.run("media.import", Origin.USER, "asset_ids" to listOf("take")).done()
+        val tools = CutTools.forProject(workspace, montage.projectId).associateBy { it.name }
+        val edit = tools.getValue("cut_edit")
+        assertTrue(edit.run(input("""{"expected_revision":"la última","ops":[{"id":"project.rename","args":{"name":"X"}}]}"""), agent).isError)
+        val typo = edit.run(input("""{"ops":[{"id":"clip.split","args":{"at":1000000}}]}"""), agent)
+        assertTrue(typo.isError)
+        assertTrue(typo.result.toString().contains("at_us"), typo.result.toString())
+        assertEquals(1L, montage.state.value.revision)
+        val trial = edit.run(input("""{"dry_run":true,"ops":[{"id":"clip.split","args":{"at_us":1000000}}]}"""), agent)
+        assertFalse(trial.isError)
+        assertTrue(trial.result.jsonObject.containsKey("would_change"))
+        assertEquals(1L, montage.state.value.revision)
+        val catalog = tools.getValue("cut_catalog").run(input("{}"), agent).result.jsonObject
+        val montages = catalog["montages"] as kotlinx.serialization.json.JsonArray
+        assertEquals(listOf(montage.projectId), montages.map { it.jsonObject["project_id"]!!.jsonPrimitive.content })
+        assertEquals("true", catalog["truncated"]?.jsonPrimitive?.content)
+        val read = tools.getValue("cut_read").run(input("""{"ops":[{"id":"timeline.seek","args":{"at_us":0}}]}"""), agent)
+        assertTrue(read.isError); assertTrue(read.result.toString().contains("cut_edit"))
+        val context = CutTools.context(workspace, montage.projectId)!!
+        assertTrue(context.contains("expected_revision=1"), context)
+        assertTrue(context.contains("Deshacer"), context)
+    }
 }

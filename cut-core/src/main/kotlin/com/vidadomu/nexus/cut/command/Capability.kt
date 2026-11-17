@@ -138,10 +138,17 @@ class CutRegistry(private val features: () -> Set<String> = { emptySet() }) {
     }
 
     fun catalog(domain: String? = null, query: String? = null, kinds: Set<CapabilityKind>? = null, limit: Int = 40): JsonObject = buildJsonObject {
-        val found = search(domain, query, kinds, limit)
+        val matching = search(domain, query, kinds, 200)
+        val found = matching.take(limit.coerceIn(1, 200))
         put("total", size)
         put("domains", buildJsonObject { for ((d, n) in domains) put(d, n) })
         put("capabilities", buildJsonArray { for (c in found) add(c.brief(available(c))) })
+        put("returned", found.size)
+        // Que falten capacidades sin decirlo hace creer al agente que no existen.
+        if (matching.size > found.size) {
+            put("truncated", true)
+            put("hint", "Hay ${matching.size} coincidencias y se muestran ${found.size}. Filtra por domain o sube limit para ver el resto.")
+        }
     }
 
     fun describe(ids: Collection<String>): JsonObject = buildJsonObject {

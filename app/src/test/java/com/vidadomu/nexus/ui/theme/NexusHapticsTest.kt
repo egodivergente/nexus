@@ -90,4 +90,27 @@ class NexusHapticsTest {
         assertEquals(NexusHapticEvent.GESTURE_END, NexusVibration.eventFor(NexusVibration.Kind.END))
         assertEquals(NexusHapticEvent.CONFIRMATION, NexusVibration.eventFor(NexusVibration.Kind.CLICK))
     }
+
+    @Test
+    fun editingGesturesHaveDistinctSignalsWithFallbacks() {
+        assertEquals(HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE, NexusHapticPolicy.feedbackConstant(NexusHapticEvent.SNAP, 34))
+        assertEquals(HapticFeedbackConstants.CLOCK_TICK, NexusHapticPolicy.feedbackConstant(NexusHapticEvent.SNAP, 26))
+        assertEquals(HapticFeedbackConstants.DRAG_START, NexusHapticPolicy.feedbackConstant(NexusHapticEvent.PICK_UP, 34))
+        assertEquals(HapticFeedbackConstants.LONG_PRESS, NexusHapticPolicy.feedbackConstant(NexusHapticEvent.PICK_UP, 30))
+        listOf(26, 30, 34).forEach { sdk ->
+            val boundary = NexusHapticPolicy.feedbackConstant(NexusHapticEvent.BOUNDARY, sdk)
+            assertNotEquals(NexusHapticPolicy.feedbackConstant(NexusHapticEvent.SNAP, sdk), boundary)
+            assertNotEquals(NexusHapticPolicy.feedbackConstant(NexusHapticEvent.ERROR, sdk), boundary)
+        }
+    }
+
+    @Test
+    fun movementFeedbackIsSpacedNeverContinuous() {
+        assertTrue(NexusHapticPolicy.throttled(NexusHapticEvent.SNAP, nowMs = 1_050, lastMs = 1_000))
+        assertFalse(NexusHapticPolicy.throttled(NexusHapticEvent.SNAP, nowMs = 1_200, lastMs = 1_000))
+        assertTrue(NexusHapticPolicy.throttled(NexusHapticEvent.GESTURE_TICK, nowMs = 1_030, lastMs = 1_000))
+        assertFalse(NexusHapticPolicy.throttled(NexusHapticEvent.SNAP, nowMs = 1_000, lastMs = null))
+        // Discrete actions are never dropped: two confirmations in a row both count.
+        assertFalse(NexusHapticPolicy.throttled(NexusHapticEvent.CONFIRMATION, nowMs = 1_001, lastMs = 1_000))
+    }
 }

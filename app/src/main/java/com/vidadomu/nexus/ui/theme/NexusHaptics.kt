@@ -12,7 +12,13 @@ import androidx.compose.ui.platform.LocalView
 
 enum class NexusHapticEvent {
     SELECTION, TOGGLE_DECISIVE, CANCEL_CONFIRMED, CONFIRMATION, ERROR,
-    GESTURE_START, GESTURE_TICK, GESTURE_END
+    GESTURE_START, GESTURE_TICK, GESTURE_END,
+    /** A dragged edge or clip locks onto a cut, marker or the playhead (only on entering the magnet). */
+    SNAP,
+    /** A gesture reached a hard limit: the media has no more frames, a clip cannot pass a neighbour, max zoom. */
+    BOUNDARY,
+    /** An object is picked up to be moved (long press on a clip). */
+    PICK_UP,
 }
 
 object NexusHapticPolicy {
@@ -30,8 +36,25 @@ object NexusHapticPolicy {
         NexusHapticEvent.ERROR,
         NexusHapticEvent.GESTURE_START,
         NexusHapticEvent.GESTURE_TICK,
-        NexusHapticEvent.GESTURE_END -> changed && accepted
+        NexusHapticEvent.GESTURE_END,
+        NexusHapticEvent.SNAP,
+        NexusHapticEvent.BOUNDARY,
+        NexusHapticEvent.PICK_UP -> changed && accepted
     }
+
+    /**
+     * Minimum spacing between two identical events. Movement may cross many snap points or detents per
+     * second; feedback is a sequence of distinct taps, never a continuous buzz.
+     */
+    fun minIntervalMs(event: NexusHapticEvent): Long = when (event) {
+        NexusHapticEvent.GESTURE_TICK -> 70
+        NexusHapticEvent.SNAP -> 90
+        NexusHapticEvent.BOUNDARY -> 250
+        else -> 0
+    }
+
+    fun throttled(event: NexusHapticEvent, nowMs: Long, lastMs: Long?): Boolean =
+        lastMs != null && nowMs - lastMs in 0 until minIntervalMs(event)
 
     /** Success, failure and continuous gestures use distinct platform effects, with API 26 fallbacks. */
     fun feedbackConstant(event: NexusHapticEvent, sdkInt: Int): Int = when (event) {
@@ -49,6 +72,11 @@ object NexusHapticPolicy {
             if (sdkInt >= 34) HapticFeedbackConstants.SEGMENT_FREQUENT_TICK else HapticFeedbackConstants.CLOCK_TICK
         NexusHapticEvent.GESTURE_END ->
             if (sdkInt >= 30) HapticFeedbackConstants.GESTURE_END else HapticFeedbackConstants.CONTEXT_CLICK
+        NexusHapticEvent.SNAP ->
+            if (sdkInt >= 34) HapticFeedbackConstants.GESTURE_THRESHOLD_ACTIVATE else HapticFeedbackConstants.CLOCK_TICK
+        NexusHapticEvent.BOUNDARY -> HapticFeedbackConstants.CONTEXT_CLICK
+        NexusHapticEvent.PICK_UP ->
+            if (sdkInt >= 34) HapticFeedbackConstants.DRAG_START else HapticFeedbackConstants.LONG_PRESS
     }
 
     internal fun allowsFeedback(appEnabled: Boolean, viewEnabled: Boolean) = appEnabled && viewEnabled
@@ -56,10 +84,15 @@ object NexusHapticPolicy {
 
 @Stable
 class NexusHaptics internal constructor(private val view: View) {
+    private val last = java.util.EnumMap<NexusHapticEvent, Long>(NexusHapticEvent::class.java)
+
     /** Uses no flags, so the system "touch feedback" setting is honoured. Returns whether a tick was requested. */
     fun perform(event: NexusHapticEvent, changed: Boolean = true, accepted: Boolean = true): Boolean {
         if (!isEnabled()) return false
         if (!NexusHapticPolicy.shouldEmit(event, changed, accepted)) return false
+        val now = android.os.SystemClock.uptimeMillis()
+        if (NexusHapticPolicy.throttled(event, now, last[event])) return false
+        last[event] = now
         return view.performHapticFeedback(NexusHapticPolicy.feedbackConstant(event, Build.VERSION.SDK_INT))
     }
 

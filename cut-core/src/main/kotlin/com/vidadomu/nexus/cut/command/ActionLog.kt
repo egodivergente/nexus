@@ -15,11 +15,11 @@ import java.io.File
  * Registro de acciones de un proyecto: una línea JSON por petición confirmada o rechazada. Sirve para
  * auditar qué hizo cada quien y para que una petición repetida tras un cierre no se aplique dos veces.
  */
-class ActionLog(private val file: File, private val maxBytes: Long = 1_000_000, private val keepLines: Int = 400) {
+open class ActionLog(private val file: File, private val maxBytes: Long = 1_000_000, private val keepLines: Int = 400) {
     class KnownKey(val key: String, val revision: Long, val label: String)
 
     @Synchronized
-    fun committed(revision: Long, atMs: Long, origin: Origin, label: String, key: String?, ops: List<Op>, created: List<String>) = append(buildJsonObject {
+    open fun committed(revision: Long, atMs: Long, origin: Origin, label: String, key: String?, ops: List<Op>, created: List<String>) = append(buildJsonObject {
         put("rev", revision); put("at", atMs); put("origin", origin.name); put("label", label)
         key?.let { put("key", it) }
         put("ops", buildJsonArray { for (o in ops) add(buildJsonObject { put("id", o.id); put("args", o.args) }) })

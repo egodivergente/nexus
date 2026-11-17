@@ -29,13 +29,30 @@ object CutTools {
     /** Herramientas de la conversación de un montaje: la navegación nunca cambia su destino. */
     fun forProject(w: CutWorkspace, projectId: String): List<AgentTool> = boundCutTools(w, projectId)
 
-    /** Una línea para el contexto del turno cuando hay un montaje abierto; null si no lo hay. */
+    /**
+     * El contexto del turno cuando hay un montaje abierto; null si no lo hay. Lleva lo que hace falta para
+     * entender «aquí», «esto» y «lo último»: revisión, cabezal, selección con sus tiempos, lo que hay bajo el
+     * cabezal y el paso que desharía «Deshacer».
+     */
     fun context(w: CutWorkspace, projectId: String? = null): String? {
         val s = (if (projectId == null) w.current() else w.opened(projectId))?.state?.value ?: return null
         val p = s.project
-        return "Montaje abierto en Nexus Cut: «${p.name}» (project_id=${p.id}, revisión ${p.revision}, ${p.timeline.durationUs / 1000} ms, " +
-            "${p.timeline.allTracks.sumOf { it.clips.size }} clips, cabezal en ${s.view.playheadUs / 1000} ms (playhead_us=${s.view.playheadUs})" +
-            (if (s.view.selection.isEmpty()) "" else ", seleccionados: ${s.view.selection.joinToString()}") + "). Se edita con cut_edit; el detalle, con cut_read."
+        val t = p.timeline
+        fun ms(us: Long) = "${us / 1000} ms"
+        fun clipLine(trackId: String, c: com.vidadomu.nexus.cut.model.Clip) =
+            "${c.id} [${trackId}${c.name.takeIf { it.isNotBlank() }?.let { ", «${it.take(40)}»" } ?: ""}, ${c.kind.name.lowercase()}, ${c.timelineStartUs}–${c.endUs} us]"
+        val selected = s.view.selection.mapNotNull { id -> t.trackOfClip(id)?.let { tr -> tr.clip(id)?.let { clipLine(tr.id, it) } } }
+        val under = t.allTracks.flatMap { tr -> tr.clips.filter { it.contains(s.view.playheadUs) && it.id !in s.view.selection }.map { clipLine(tr.id, it) } }
+        return buildString {
+            append("Montaje abierto en Nexus Cut: «${p.name}» (project_id=${p.id}, revisión ${p.revision}, dura ${ms(t.durationUs)}, ")
+            append("${t.allTracks.sumOf { it.clips.size }} clips en ${t.allTracks.size} pistas, ${p.settings.width}×${p.settings.height}). ")
+            append("Cabezal en ${ms(s.view.playheadUs)} (playhead_us=${s.view.playheadUs}).")
+            if (selected.isNotEmpty()) append(" Seleccionados (${selected.size}): ${selected.take(6).joinToString("; ")}${if (selected.size > 6) "…" else ""}.")
+            else append(" No hay nada seleccionado.")
+            if (under.isNotEmpty()) append(" Bajo el cabezal: ${under.take(4).joinToString("; ")}.")
+            s.undoLabel?.let { append(" «Deshacer» desharía «$it» (${if (s.undoOrigin == Origin.AGENT) "del agente" else "del usuario"}).") }
+            append(" Para editar usa cut_edit con expected_revision=${p.revision}; el detalle, con cut_read.")
+        }
     }
 
     internal const val NO_SESSION = "No hay ningún montaje abierto. Indica project_id (cut_catalog lista los montajes) o crea uno con cut_create."
@@ -62,6 +79,16 @@ object CutTools {
         }
     }
 
+    /** El turno del orquestador agrupa los pasos del agente: así el usuario los revisa y revierte juntos. */
+    internal suspend fun turnGroup(): String? = kotlin.coroutines.coroutineContext[com.vidadomu.nexus.agent.core.llm.LlmTurnContext]?.turnId
+
+    internal fun revision(input: JsonObject): Long? {
+        val raw = input["expected_revision"] ?: return null
+        if (raw is kotlinx.serialization.json.JsonNull) return null
+        return (raw as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()?.takeIf { it >= 0 && it == Math.floor(it) }?.toLong()
+            ?: throw ToolInputException("«expected_revision» debe ser el número entero de revisión que leíste (p. ej. 12).")
+    }
+
     internal fun result(outcome: Outcome): ToolOutcome = when (outcome) {
         is Outcome.Done -> ok(outcome.toJson())
         is Outcome.Failed -> fail(outcome.error.message) {
@@ -82,9 +109,10 @@ private fun SchemaBuilder.opsField(description: String) = objectArray("ops", des
 
 class CutCatalogTool(private val w: CutWorkspace) : BaseTool(
     "cut_catalog", ToolCategory.READ,
-    "Explora lo que Nexus Cut (el editor de vídeo integrado) sabe hacer y qué montajes hay. Filtra por dominio o describe la intención con palabras («quitar silencios», «subtítulos», «color»); devuelve ids y resúmenes, no los contratos. Úsalo al empezar un trabajo de montaje.",
+    "Explora lo que Nexus Cut (el editor de vídeo integrado) sabe hacer y qué montajes hay. Filtra por dominio o describe la intención con palabras («quitar silencios», «subtítulos», «color»); devuelve ids y resúmenes, no los contratos. Si la respuesta dice truncated, filtra por dominio o pide más con limit. Úsalo al empezar un trabajo de montaje.",
     schema {
-        string("domain", "Dominio.", enum = listOf("project", "media", "timeline", "clip", "audio", "effects", "keyframe", "subtitle", "story", "ai", "render", "sync"))
+        // Solo los dominios que existen de verdad en este registro: un filtro que siempre devuelve vacío confunde.
+        string("domain", "Dominio.", enum = w.registry.domains.keys.sorted())
         string("query", "Intención o palabras clave.")
         string("kind", "Tipo de capacidad.", enum = listOf("read", "edit", "view", "job"))
         integer("limit", "Máximo de capacidades; por defecto 40.")
@@ -132,6 +160,7 @@ class CutReadTool(private val w: CutWorkspace) : BaseTool(
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
         val ops = CutTools.ops(input)
         CutTools.kinds(w, ops).forEachIndexed { i, k ->
+            if (k == CapabilityKind.VIEW) throw ToolInputException("«${ops[i].id}» mueve el cabezal o la selección del usuario: va por cut_edit (no entra en Deshacer).")
             if (k != null && k != CapabilityKind.READ) throw ToolInputException("«${ops[i].id}» no es una lectura: cambia el montaje y va por cut_edit.")
         }
         return CutTools.result(CutTools.session(w, input).execute(Request(ops, Origin.AGENT)))
@@ -145,7 +174,7 @@ class CutEditTool(private val w: CutWorkspace) : BaseTool(
         string("project_id", "Montaje; vacío = el abierto.")
         opsField("Operaciones de edición, en orden; cada una ve el resultado de la anterior.")
         string("label", "Nombre corto del paso que verá el usuario en Deshacer, p. ej. «Quitar pausas».")
-        boolean("dry_run", "Ensayar: valida y devuelve lo que cambiaría sin confirmarlo.")
+        boolean("dry_run", "Ensayar: valida y devuelve en would_change lo que cambiaría, sin aplicarlo. El usuario lo ve como propuesta con un botón para aplicarla.")
         integer("expected_revision", "Revisión que leíste; si el montaje ya cambió se rechaza para que vuelvas a leer.")
         string("idempotency_key", "Clave propia de esta edición: si repites la llamada no se aplica dos veces.")
     },
@@ -155,9 +184,11 @@ class CutEditTool(private val w: CutWorkspace) : BaseTool(
 
     override suspend fun execute(input: JsonObject, session: AgentSession): ToolOutcome {
         val ops = CutTools.ops(input)
-        if (CutTools.kinds(w, ops).any { it == CapabilityKind.JOB }) throw ToolInputException("Los trabajos largos (exportar, analizar) no van en una edición: tienen su propia herramienta.")
-        val revision = (input["expected_revision"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull()
-        return CutTools.result(CutTools.session(w, input).execute(Request(ops, Origin.AGENT, input.str("label"), input.bool("dry_run") ?: false, revision, input.str("idempotency_key"))))
+        if (CutTools.kinds(w, ops).any { it == CapabilityKind.JOB }) throw ToolInputException("Los trabajos largos (exportar, analizar) no van en una edición: en el editor se lanzan con cut_run.")
+        val revision = CutTools.revision(input)
+        return CutTools.result(CutTools.session(w, input).execute(Request(
+            ops, Origin.AGENT, input.str("label"), input.bool("dry_run") ?: false, revision, input.str("idempotency_key"), group = CutTools.turnGroup(),
+        )))
     }
 }
 

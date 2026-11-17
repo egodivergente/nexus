@@ -29,8 +29,36 @@ data class CutState(
     val undoLabel: String? = null,
     val canRedo: Boolean = false,
     val redoLabel: String? = null,
+    /** Quién hizo el paso que deshará «Deshacer» (para decir «Deshacer cambio del agente»). */
+    val undoOrigin: Origin? = null,
+    /** Grupo (turno del agente) del paso que deshará «Deshacer», si lo tiene. */
+    val undoGroup: String? = null,
+    val redoOrigin: Origin? = null,
 ) {
     val revision: Long get() = project.revision
+}
+
+/** Un paso del historial compartido, para enseñarlo (al usuario o al agente) sin exponer los cambios internos. */
+data class HistoryStep(val label: String, val origin: Origin, val group: String?, val changes: Int)
+
+/** El historial de la sesión, del paso más reciente al más antiguo. */
+data class History(val undo: List<HistoryStep>, val redo: List<HistoryStep>)
+
+/**
+ * Lo que queda de un grupo de pasos (un turno del agente) en el historial compartido.
+ * [laterSteps] son los pasos de otros que se hicieron después y que habría que deshacer antes.
+ */
+data class GroupStatus(
+    val group: String,
+    /** Pasos del grupo que siguen aplicados y se pueden deshacer. */
+    val undoable: Int,
+    /** Pasos del grupo ya deshechos que se pueden rehacer. */
+    val redoable: Int,
+    val laterSteps: Int,
+    val laterLabels: List<String>,
+    val labels: List<String>,
+) {
+    val onTop: Boolean get() = undoable > 0 && laterSteps == 0
 }
 
 /** Errores tipados y estables: el agente decide con el código, la persona lee el mensaje. */
@@ -90,6 +118,11 @@ data class Request(
     val expectedRevision: Long? = null,
     /** Repetir una petición con la misma clave no la aplica dos veces. */
     val idempotencyKey: String? = null,
+    /**
+     * Agrupa los pasos de un mismo turno del agente: cada petición sigue siendo un paso de «Deshacer», y
+     * además el grupo entero se puede revertir de una vez con [CutSession.undoGroup].
+     */
+    val group: String? = null,
 ) {
     constructor(op: Op, origin: Origin, label: String? = null, dryRun: Boolean = false) : this(listOf(op), origin, label, dryRun)
 }
@@ -116,6 +149,8 @@ sealed interface Outcome {
         val preview: Project? = null,
         /** La petición ya se había aplicado con esta clave de idempotencia; no se repitió. */
         val replayed: Boolean = false,
+        /** Antes y después legibles (duración, clips y posiciones de lo tocado): sirve para revisar un ensayo o comprobar un cambio. */
+        val summary: JsonObject? = null,
     ) : Outcome
 
     data class Failed(val error: CutError) : Outcome
@@ -134,6 +169,7 @@ sealed interface Outcome {
             if (touchedClips.isNotEmpty()) put("touched_clips", strings(touchedClips))
             focusUs?.let { put("focus_us", it) }
             if (dryRun || committed) put("changes", changeCount)
+            summary?.let { put(if (dryRun) "would_change" else "verified", it) }
             if (warnings.isNotEmpty()) put("warnings", strings(warnings))
             if (collateral.isNotEmpty()) put("collateral", buildJsonArray {
                 for (c in collateral) add(buildJsonObject { put("track_id", c.trackId); put("clip_id", c.clipId); put("what", c.what) })
@@ -154,9 +190,23 @@ sealed interface CutEvent {
     data class Committed(
         override val revision: Long, override val origin: Origin, val label: String, val ops: List<String>,
         val touchedClips: Set<String>, val focusUs: Long?, val warnings: List<String>,
+        val group: String? = null, val changeCount: Int = 0,
     ) : CutEvent
 
-    data class Undone(override val revision: Long, override val origin: Origin, val label: String) : CutEvent
-    data class Redone(override val revision: Long, override val origin: Origin, val label: String) : CutEvent
-    data class Rejected(override val revision: Long, override val origin: Origin, val error: CutError) : CutEvent
+    /** [count] pasos deshechos de una vez (más de uno al revertir un grupo). */
+    data class Undone(
+        override val revision: Long, override val origin: Origin, val label: String,
+        val count: Int = 1, val group: String? = null, val touchedClips: Set<String> = emptySet(),
+    ) : CutEvent
+    data class Redone(
+        override val revision: Long, override val origin: Origin, val label: String,
+        val count: Int = 1, val group: String? = null, val touchedClips: Set<String> = emptySet(),
+    ) : CutEvent
+    data class Rejected(override val revision: Long, override val origin: Origin, val error: CutError, val group: String? = null) : CutEvent
+
+    /** Ensayo del agente: lo que cambiaría, sin aplicarlo. La interfaz puede ofrecer aplicarlo tal cual. */
+    data class Proposed(
+        override val revision: Long, override val origin: Origin, val label: String, val request: Request,
+        val touchedClips: Set<String>, val focusUs: Long?, val changeCount: Int, val summary: JsonObject?,
+    ) : CutEvent
 }

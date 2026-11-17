@@ -43,7 +43,10 @@ class CutSession(
     private val io: CoroutineContext = Dispatchers.IO,
     private val historyLimit: Int = 500,
 ) {
-    private class Entry(val label: String, val origin: Origin, val changes: ChangeSet, val headBefore: Project?, val headAfter: Project?)
+    private class Entry(
+        val label: String, val origin: Origin, val changes: ChangeSet, val headBefore: Project?, val headAfter: Project?,
+        val group: String? = null,
+    )
 
     private val mutex = Mutex()
     private val undoStack = ArrayDeque<Entry>()
@@ -75,8 +78,10 @@ class CutSession(
             val c = registry[op.id]
                 ?: return reject(request, CutError(ErrorCode.UNKNOWN_CAPABILITY, "No existe la capacidad «${op.id}». Consulta el catálogo.", i, op.id))
             if (!registry.available(c)) {
-                return reject(request, CutError(ErrorCode.UNAVAILABLE, "«${op.id}» no está disponible aquí (requiere ${c.requires.joinToString()}).", i, op.id))
+                return reject(request, CutError(ErrorCode.UNAVAILABLE, "«${op.id}» no está disponible en este dispositivo ahora mismo (necesita ${c.requires.joinToString()}).", i, op.id))
             }
+            // Un argumento mal escrito no puede convertirse en una edición «sin efecto»: al agente se le dice cuál sobra.
+            if (request.origin == Origin.AGENT) unknownArgument(c, op)?.let { return reject(request, CutError(ErrorCode.INVALID_ARGUMENT, it, i, op.id)) }
             caps += c
         }
         val alone = caps.size == 1
@@ -116,6 +121,53 @@ class CutSession(
     suspend fun undo(origin: Origin): Outcome = mutex.withLock { travel(Request(Op("project.undo"), origin), undo = true) }
     suspend fun redo(origin: Origin): Outcome = mutex.withLock { travel(Request(Op("project.redo"), origin), undo = false) }
 
+    /**
+     * Revierte de una vez todos los pasos de [group] (un turno del agente) que siguen aplicados.
+     * Si después alguien hizo otros cambios, no los arrastra en silencio: falla con PRECONDITION_FAILED
+     * salvo que [includeLater] lo pida expresamente (la interfaz lo confirma antes con [groupStatus]).
+     * Todo queda en la pila de «Rehacer» paso a paso, así que también se puede rehacer.
+     */
+    suspend fun undoGroup(group: String, origin: Origin, includeLater: Boolean = false): Outcome = mutex.withLock {
+        val request = Request(listOf(Op("project.undo")), origin, group = group)
+        val current = _state.value
+        val first = undoStack.indexOfFirst { it.group == group }
+        if (first < 0) return@withLock reject(request, CutError(ErrorCode.PRECONDITION_FAILED, "Ya no queda nada de esos cambios por deshacer.", 0, "project.undo", current.revision))
+        val later = undoStack.subList(first, undoStack.size).filter { it.group != group }
+        if (later.isNotEmpty() && !includeLater) {
+            val what = if (later.size == 1) "Después se hizo otro cambio («${later[0].label}»)"
+                else "Después se hicieron ${later.size} cambios más (${later.takeLast(3).joinToString { "«${it.label}»" }})"
+            return@withLock reject(request, CutError(ErrorCode.PRECONDITION_FAILED,
+                "$what. Deshazlo antes o confirma deshacerlo también.", 0, "project.undo", current.revision))
+        }
+        val taken = undoStack.subList(first, undoStack.size).toList()
+        rewind(request, taken, undo = true, label = if (taken.size == taken.count { it.group == group }) groupLabel(taken) else "${taken.size} cambios")
+    }
+
+    /** Vuelve a aplicar los pasos de [group] que se deshicieron, si son lo siguiente en «Rehacer». */
+    suspend fun redoGroup(group: String, origin: Origin): Outcome = mutex.withLock {
+        val request = Request(listOf(Op("project.redo")), origin, group = group)
+        val current = _state.value
+        var n = 0
+        while (n < redoStack.size && redoStack[redoStack.size - 1 - n].group == group) n++
+        if (n == 0) return@withLock reject(request, CutError(ErrorCode.PRECONDITION_FAILED, "No hay cambios de ese grupo que rehacer ahora.", 0, "project.redo", current.revision))
+        val taken = redoStack.subList(redoStack.size - n, redoStack.size).toList()
+        rewind(request, taken, undo = false, label = groupLabel(taken))
+    }
+
+    /** Los últimos pasos de «Deshacer» y «Rehacer», del más reciente al más antiguo. */
+    fun history(limit: Int = 20): History = synchronized(undoStack) {
+        fun steps(d: ArrayDeque<Entry>) = d.asReversed().take(limit.coerceIn(1, historyLimit)).map { HistoryStep(it.label, it.origin, it.group, it.changes.changes.size) }
+        History(steps(undoStack), steps(redoStack))
+    }
+
+    /** Qué queda de un grupo en el historial: para mostrar «Deshacer cambios del agente» solo cuando es posible. */
+    fun groupStatus(group: String): GroupStatus = synchronized(undoStack) {
+        val first = undoStack.indexOfFirst { it.group == group }
+        val mine = undoStack.filter { it.group == group }
+        val later = if (first < 0) emptyList() else undoStack.subList(first, undoStack.size).filter { it.group != group }
+        GroupStatus(group, mine.size, redoStack.count { it.group == group }, later.size, later.map { it.label }, mine.map { it.label })
+    }
+
     // ------------------------------------------------------------------ vista de alta frecuencia
 
     /** El cabezal se mueve muchas veces por segundo al reproducir: no pasa por la transacción ni por el historial. */
@@ -152,7 +204,7 @@ class CutSession(
         val draft = Draft(before.project, before.view, ids)
         val results = ArrayList<JsonObject>(caps.size)
         for ((i, op) in request.ops.withIndex()) {
-            val fail = { code: ErrorCode, message: String -> reject(request, CutError(code, message, i, op.id, before.revision)) }
+            suspend fun fail(code: ErrorCode, message: String) = reject(request, CutError(code, message, i, op.id, before.revision))
             results += try {
                 when (val h = caps[i].handler) {
                     is Handler.Edit -> h.apply(draft, Args(op.args))
@@ -178,12 +230,18 @@ class CutSession(
             ?: if (request.origin == Origin.AGENT) "Edición del agente" else if (request.ops.size == 1) request.ops[0].id else "Edición múltiple"
         val touched = AgentFocus.touchedClips(changes, after.timeline)
         val focus = if (changes.isEmpty) null else AgentFocus.timeOf(changes, after.timeline)
+        val summary = if (changed) summarize(before.project, after, changes) else null
+        val changeCount = changes.changes.size + if (headChanged) 1 else 0
         fun done(revision: Long, committed: Boolean, preview: Project? = null) = Outcome.Done(
             revision = revision, committed = committed, dryRun = request.dryRun, label = label, results = results,
             createdIds = draft.created.toList(), warnings = draft.warnings.distinct(), collateral = draft.collateral.distinct(),
-            touchedClips = touched, focusUs = focus, changeCount = changes.changes.size + if (headChanged) 1 else 0, preview = preview,
+            touchedClips = touched, focusUs = focus, changeCount = changeCount, preview = preview, summary = summary,
         )
-        if (request.dryRun) return done(before.revision, committed = false, preview = after)
+        if (request.dryRun) {
+            if (changed) _events.tryEmit(CutEvent.Proposed(before.revision, request.origin, label,
+                request.copy(dryRun = false, expectedRevision = before.revision, idempotencyKey = null), touched, focus, changeCount, summary))
+            return done(before.revision, committed = false, preview = after)
+        }
         if (!changed) {
             // Solo cambió la vista (cabezal, selección): se ve al instante y no toca el historial.
             publish(before.project, draft.view, before.view)
@@ -191,14 +249,16 @@ class CutSession(
         }
         val committed = after.copy(revision = before.revision + 1, modifiedAtMs = clock())
         persist(committed)?.let { return reject(request, CutError(ErrorCode.INTERNAL, it, currentRevision = before.revision)) }
-        undoStack.addLast(Entry(label, request.origin, changes, head(before.project).takeIf { headChanged }, head(after).takeIf { headChanged }))
-        while (undoStack.size > historyLimit) undoStack.removeFirst()
-        redoStack.clear()
+        synchronized(undoStack) {
+            undoStack.addLast(Entry(label, request.origin, changes, head(before.project).takeIf { headChanged }, head(after).takeIf { headChanged }, request.group))
+            while (undoStack.size > historyLimit) undoStack.removeFirst()
+            redoStack.clear()
+        }
         publish(committed, draft.view, before.view)
-        log?.committed(committed.revision, committed.modifiedAtMs, request.origin, label, request.idempotencyKey, request.ops, draft.created)
         val outcome = done(committed.revision, committed = true)
         request.idempotencyKey?.let { replays[it] = outcome }
-        _events.tryEmit(CutEvent.Committed(committed.revision, request.origin, label, request.ops.map { it.id }, touched, focus, outcome.warnings))
+        _events.tryEmit(CutEvent.Committed(committed.revision, request.origin, label, request.ops.map { it.id }, touched, focus, outcome.warnings, request.group, changeCount))
+        logged { it.committed(committed.revision, committed.modifiedAtMs, request.origin, label, request.idempotencyKey, request.ops, draft.created) }
         return outcome
     }
 
@@ -207,22 +267,55 @@ class CutSession(
     private suspend fun travel(request: Request, undo: Boolean): Outcome {
         val current = _state.value
         val from = if (undo) undoStack else redoStack
-        val entry = from.removeLastOrNull()
+        val entry = from.lastOrNull()
             ?: return reject(request, CutError(ErrorCode.PRECONDITION_FAILED, if (undo) "No hay nada que deshacer." else "No hay nada que rehacer.", 0, request.ops[0].id, current.revision))
-        val timeline = (if (undo) entry.changes.inverse() else entry.changes).applyTo(current.project.timeline)
-        val base = (if (undo) entry.headBefore else entry.headAfter) ?: current.project
-        val project = base.copy(timeline = timeline, revision = current.revision + 1, modifiedAtMs = clock())
-        persist(project)?.let { from.addLast(entry); return reject(request, CutError(ErrorCode.INTERNAL, it, currentRevision = current.revision)) }
-        (if (undo) redoStack else undoStack).addLast(entry)
-        publish(project, current.view, current.view)
-        val label = (if (undo) "Deshacer: " else "Rehacer: ") + entry.label
-        log?.committed(project.revision, project.modifiedAtMs, request.origin, label, null, request.ops, emptyList())
-        _events.tryEmit(if (undo) CutEvent.Undone(project.revision, request.origin, entry.label) else CutEvent.Redone(project.revision, request.origin, entry.label))
-        val touched = AgentFocus.touchedClips(if (undo) entry.changes.inverse() else entry.changes, timeline)
-        return Outcome.Done(revision = project.revision, committed = true, dryRun = false, label = label,
-            results = listOf(JsonObject(mapOf("label" to JsonPrimitive(entry.label), "by" to JsonPrimitive(entry.origin.name.lowercase())))),
-            touchedClips = touched, changeCount = entry.changes.changes.size)
+        return rewind(request, listOf(entry), undo, entry.label)
     }
+
+    /**
+     * Deshace (o rehace) [entries], que son la cima de su pila en orden de aplicación, como UNA revisión
+     * guardada. Si no se puede guardar, las pilas quedan como estaban y no cambia nada.
+     */
+    private suspend fun rewind(request: Request, entries: List<Entry>, undo: Boolean, label: String): Outcome {
+        val current = _state.value
+        // [entries] va del fondo a la cima de su pila: se recorre desde la cima (lo último hecho se deshace primero,
+        // lo último deshecho se rehace primero) y así cada paso queda en la otra pila en el orden correcto.
+        val ordered = entries.asReversed()
+        var timeline = current.project.timeline
+        var base: Project? = null
+        val applied = ArrayList<ChangeSet>(ordered.size)
+        for (e in ordered) {
+            val cs = if (undo) e.changes.inverse() else e.changes
+            timeline = cs.applyTo(timeline)
+            applied += cs
+            (if (undo) e.headBefore else e.headAfter)?.let { base = it }
+        }
+        val project = (base ?: current.project).copy(timeline = timeline, revision = current.revision + 1, modifiedAtMs = clock())
+        persist(project)?.let { return reject(request, CutError(ErrorCode.INTERNAL, it, currentRevision = current.revision)) }
+        synchronized(undoStack) {
+            val from = if (undo) undoStack else redoStack
+            val to = if (undo) redoStack else undoStack
+            repeat(entries.size) { from.removeLast() }
+            for (e in ordered) to.addLast(e)
+        }
+        publish(project, current.view, current.view)
+        val title = (if (undo) "Deshacer: " else "Rehacer: ") + label
+        val touched = applied.flatMapTo(LinkedHashSet()) { AgentFocus.touchedClips(it, timeline) }
+        val changeCount = applied.sumOf { it.changes.size }
+        _events.tryEmit(
+            if (undo) CutEvent.Undone(project.revision, request.origin, label, entries.size, request.group, touched)
+            else CutEvent.Redone(project.revision, request.origin, label, entries.size, request.group, touched),
+        )
+        logged { it.committed(project.revision, project.modifiedAtMs, request.origin, title, null, request.ops, emptyList()) }
+        return Outcome.Done(revision = project.revision, committed = true, dryRun = false, label = title,
+            results = entries.map { e -> JsonObject(mapOf("label" to JsonPrimitive(e.label), "by" to JsonPrimitive(e.origin.name.lowercase()))) },
+            touchedClips = touched, changeCount = changeCount,
+            focusUs = applied.firstNotNullOfOrNull { if (it.isEmpty) null else AgentFocus.timeOf(it, timeline) })
+    }
+
+    private fun groupLabel(entries: List<Entry>): String =
+        if (entries.size == 1) entries[0].label else "${entries.size} cambios" + if (entries.all { it.origin == Origin.AGENT }) " del agente" else ""
+
 
     // ------------------------------------------------------------------ trabajos largos
 
@@ -255,11 +348,69 @@ class CutSession(
         }
     }
 
-    private fun reject(request: Request, error: CutError): Outcome.Failed {
+    private suspend fun reject(request: Request, error: CutError): Outcome.Failed {
         val revision = _state.value.revision
-        log?.rejected(revision, clock(), request.origin, error, request.ops)
-        _events.tryEmit(CutEvent.Rejected(revision, request.origin, error))
+        _events.tryEmit(CutEvent.Rejected(revision, request.origin, error, request.group))
+        logged { it.rejected(revision, clock(), request.origin, error, request.ops) }
         return Outcome.Failed(error)
+    }
+
+    /** El registro es E/S de disco: nunca en el hilo de quien llama (a menudo el principal) y nunca decide el resultado. */
+    private suspend fun logged(block: (ActionLog) -> Unit) {
+        val l = log ?: return
+        try {
+            withContext(io) { block(l) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Antes y después legibles de un cambio: duración, número de clips y posición de cada clip tocado. */
+    private fun summarize(before: Project, after: Project, changes: ChangeSet): JsonObject {
+        fun count(p: Project) = p.timeline.allTracks.sumOf { it.clips.size }
+        fun span(c: com.vidadomu.nexus.cut.model.Clip) = JsonObject(mapOf("start_us" to JsonPrimitive(c.timelineStartUs), "end_us" to JsonPrimitive(c.endUs)))
+        val rows = ArrayList<JsonObject>()
+        var more = 0
+        for (c in changes.changes) {
+            val row: Map<String, JsonElement> = when (c) {
+                is com.vidadomu.nexus.cut.timeline.Change.ClipAdded -> mapOf("clip_id" to JsonPrimitive(c.clip.id), "what" to JsonPrimitive("added"), "name" to JsonPrimitive(c.clip.name), "track_id" to JsonPrimitive(c.trackId), "after" to span(c.clip))
+                is com.vidadomu.nexus.cut.timeline.Change.ClipRemoved -> mapOf("clip_id" to JsonPrimitive(c.clip.id), "what" to JsonPrimitive("removed"), "name" to JsonPrimitive(c.clip.name), "track_id" to JsonPrimitive(c.trackId), "before" to span(c.clip))
+                is com.vidadomu.nexus.cut.timeline.Change.ClipUpdated -> mapOf("clip_id" to JsonPrimitive(c.after.id), "what" to JsonPrimitive("changed"), "name" to JsonPrimitive(c.after.name), "track_id" to JsonPrimitive(c.trackId), "before" to span(c.before), "after" to span(c.after))
+                else -> continue
+            }
+            if (rows.size < SUMMARY_ROWS) rows += JsonObject(row) else more++
+        }
+        return JsonObject(buildMap {
+            put("duration_us", JsonObject(mapOf("before" to JsonPrimitive(before.timeline.durationUs), "after" to JsonPrimitive(after.timeline.durationUs))))
+            put("clips", JsonObject(mapOf("before" to JsonPrimitive(count(before)), "after" to JsonPrimitive(count(after)))))
+            put("clip_changes", JsonArray(rows))
+            if (more > 0) put("more_clip_changes", JsonPrimitive(more))
+            if (head(before) != head(after)) put("project_settings_changed", JsonPrimitive(true))
+        })
+    }
+
+    /** Primer argumento que el contrato de [c] no declara, con una sugerencia si se parece a uno válido. */
+    private fun unknownArgument(c: Capability, op: Op): String? {
+        if ((c.input["additionalProperties"] as? JsonPrimitive)?.content != "false") return null
+        val known = (c.input["properties"] as? JsonObject)?.keys ?: return null
+        val extra = op.args.keys.firstOrNull { it !in known } ?: return null
+        val guess = known.minByOrNull { distance(it, extra) }?.takeIf { distance(it, extra) <= maxOf(2, extra.length / 2) || it.startsWith(extra) || extra.startsWith(it) }
+        return "«${op.id}» no tiene el argumento «$extra»" + (guess?.let { "; ¿querías «$it»?" } ?: "") +
+            if (known.isEmpty()) ". No admite argumentos." else ". Admite: ${known.joinToString()}."
+    }
+
+    private fun distance(a: String, b: String): Int {
+        val d = IntArray(b.length + 1) { it }
+        for (i in 1..a.length) {
+            var prev = d[0]; d[0] = i
+            for (j in 1..b.length) {
+                val t = d[j]
+                d[j] = minOf(d[j] + 1, d[j - 1] + 1, prev + if (a[i - 1] == b[j - 1]) 0 else 1)
+                prev = t
+            }
+        }
+        return d[b.length]
     }
 
     /**
@@ -275,6 +426,8 @@ class CutSession(
         project = project, view = view,
         canUndo = undoStack.isNotEmpty(), undoLabel = undoStack.lastOrNull()?.label,
         canRedo = redoStack.isNotEmpty(), redoLabel = redoStack.lastOrNull()?.label,
+        undoOrigin = undoStack.lastOrNull()?.origin, undoGroup = undoStack.lastOrNull()?.group,
+        redoOrigin = redoStack.lastOrNull()?.origin,
     )
 
     /** La vista nunca apunta a algo que ya no existe. */
@@ -290,6 +443,7 @@ class CutSession(
 
     companion object {
         const val ACTION_LOG = "actions.jsonl"
+        private const val SUMMARY_ROWS = 12
 
         /** Todo lo que no es línea de tiempo, normalizado para comparar y restaurar. */
         private fun head(p: Project): Project = p.copy(timeline = Timeline(), revision = 0, modifiedAtMs = 0)
