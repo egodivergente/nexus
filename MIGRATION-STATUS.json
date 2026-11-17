@@ -4,9 +4,9 @@
         "baseCommit": "7feb18d2",
         "versionCode": 221,
         "versionName": "1.9.185-agent-preview",
-        "buildId": "vidal-android-build:54749270-2f4f-4746-93c7-3d5f0055a93b",
+        "buildId": "vidal-android-build:353caa9b-864c-4f1e-b984-82217ada349e",
         "buildStatus": "SUCCEEDED",
-        "apkSha256": "36385e53de0abf5a135d6e67b367e01aa15b7e10e9b13d7af04e73b3a4de29d6",
+        "apkSha256": "bd3628a5ec08dc33edf420150d224496903cc7a6dcf37548887e81219ebbbf7f",
         "certificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
         "zipAlignment16KiB": true,
         "nativeLibrariesIdenticalToVc220": 6,
@@ -19,8 +19,8 @@
         },
         "pixelInstalledAsUpdate": true,
         "pixelDataFilesBeforeAfter": [
-            4188,
-            4188
+            4195,
+            4195
         ],
         "s25Installed": false,
         "verticalContentDp": {

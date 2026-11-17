@@ -2,11 +2,11 @@
 
 Rama `aki/cut-premium-20261117` sobre `merge/v219-streaming-20261117` (`7feb18d2`, vc220), que ya contiene
 `feat/nexus-cut-20261111` y `codex/cut-video-gestures-20261114`. AWS CodeBuild
-`vidal-android-build:54749270-2f4f-4746-93c7-3d5f0055a93b` SUCCEEDED (vc221k); firmado en AXELPC con la identidad
+`vidal-android-build:353caa9b-864c-4f1e-b984-82217ada349e` SUCCEEDED (vc221l); firmado en AXELPC con la identidad
 instalada (cert `8b75db0f…7127`), 16 KiB, 6/6 `.so` idénticas a vc220. APK SHA-256
-`36385e53de0abf5a135d6e67b367e01aa15b7e10e9b13d7af04e73b3a4de29d6`. Pruebas JVM: cut-core 133, agent-core 531
-(4 omitidas), app 72; 0 fallos. **Instalada solo en el Pixel 8 Pro** (08:30, `adb install -r -t` sobre vc221 de prueba;
-4188 archivos de datos antes y después, 0 desaparecidos). El S25 sigue en vc220. APK test-only: instalar con `-t`.
+`bd3628a5ec08dc33edf420150d224496903cc7a6dcf37548887e81219ebbbf7f`. Pruebas JVM: cut-core 133, agent-core 531
+(4 omitidas), app 72; 0 fallos. **Instalada solo en el Pixel 8 Pro** (09:31, `adb install -r -t` sobre vc221 de prueba;
+4195 archivos de datos antes y después, 0 desaparecidos). El S25 sigue en vc220. APK test-only: instalar con `-t`.
 
 Qué cambia: imagen + línea de tiempo pasan de 513 a 805 dp (51 → 81 %) en vertical y la imagen de 174 a 364 dp de
 alto en horizontal; ajustes y exportación en hojas; modo inmersivo; reordenación magnética; háptica por evento;
