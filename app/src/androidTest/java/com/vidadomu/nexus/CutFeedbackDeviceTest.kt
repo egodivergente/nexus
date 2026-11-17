@@ -167,8 +167,8 @@ class CutFeedbackDeviceTest {
             drag(timeline.exactCenterX(), timeline.top + 10f, 150f, 0f)
             waitFor { node("Pausa") != null }
             click("Pausa")
-            // The agent starts hidden behind its button. Opening it takes height from the editing area (the
-            // timeline alone while the split is automatic, image and timeline otherwise); hiding it gives it back.
+            // The agent starts hidden behind its button. Opening it takes height from the editing area, image
+            // plus timeline (with the automatic split, mostly from the timeline); hiding it gives it back.
             fun editing() = bounds(preview).height() + bounds("Línea de tiempo del montaje").height()
             val hidden = editing()
             click("Agente del montaje")
