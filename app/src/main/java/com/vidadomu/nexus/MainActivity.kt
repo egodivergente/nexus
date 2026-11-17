@@ -362,9 +362,13 @@ class MainActivity : ComponentActivity() {
                     onNavigateToOutput = { id -> navController.navigate("output/$id") },
                     settingsVisible = activeEntry?.destination?.route != Screen.Settings.route
                 ) {
+                // Nexus Cut is black edge to edge: in landscape the camera cutout band beside it must not
+                // show the theme background (seen on a Pixel 8 Pro as a pale strip next to the preview).
+                val inCut = activeEntry?.destination?.route?.startsWith("cut/") == true
                 Scaffold(
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     modifier = Modifier.fillMaxSize()
+                        .then(if (inCut) Modifier.background(androidx.compose.ui.graphics.Color.Black) else Modifier)
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
                         .imePadding().revealBarOnSwipeUp(),
                     containerColor = ScreenBackground,

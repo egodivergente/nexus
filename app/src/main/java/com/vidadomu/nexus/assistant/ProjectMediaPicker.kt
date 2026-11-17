@@ -57,7 +57,12 @@ internal fun rememberProjectMediaPicker(onResult: (List<Uri>) -> Unit): ProjectM
     rememberProjectMediaPicker(false, onResult)
 
 @Composable
-internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List<Uri>) -> Unit): ProjectMediaPicker {
+internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List<Uri>) -> Unit): ProjectMediaPicker =
+    rememberProjectMediaPicker(managementOnly, "Adjuntar", onResult)
+
+/** [useLabel]: verbo del botón final («Adjuntar» en el chat, «Añadir» en un montaje). */
+@Composable
+internal fun rememberProjectMediaPicker(managementOnly: Boolean, useLabel: String, onResult: (List<Uri>) -> Unit): ProjectMediaPicker {
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
     val runtime = remember(app) { AssistantRuntime.get(app) }
@@ -112,7 +117,7 @@ internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List
             mimeTypes = current.types, maximum = current.maximum, busy = busy,
             onDismiss = { if (!busy) visible = false },
             onImport = { documents.launch(current.types.toTypedArray()) },
-            managementOnly = managementOnly,
+            managementOnly = managementOnly, useLabel = useLabel,
             projects = index.projects.filter { !it.archived },
             onProjectChange = { project -> request = current.copy(projectId = project.id, projectName = project.name) },
             progress = operation.progress,
@@ -147,7 +152,7 @@ internal fun rememberProjectMediaPicker(managementOnly: Boolean, onResult: (List
 internal fun ProjectMediaPickerSheet(
     assets: List<Asset>, projectId: String?, projectName: String?, mimeTypes: List<String>, maximum: Int,
     busy: Boolean, onDismiss: () -> Unit, onImport: () -> Unit, onUse: (List<Asset>) -> Unit,
-    managementOnly: Boolean = false, progress: String? = null, onCancel: () -> Unit = {},
+    managementOnly: Boolean = false, useLabel: String = "Adjuntar", progress: String? = null, onCancel: () -> Unit = {},
     onDelete: (List<Asset>) -> Unit = {}, onExport: (List<Asset>) -> Unit = {},
     projects: List<Project> = emptyList(), onProjectChange: (Project) -> Unit = {},
 ) {
@@ -164,7 +169,8 @@ internal fun ProjectMediaPickerSheet(
             includeGenerated=managing, allProjects=recent && !managing)
             .let { if(recent && !managing) it.sortedByDescending {asset -> recentPrefs.getLong(asset.uri,asset.createdAt)} else it }
     }
-    val chosen = all.filter { it.id in selected }
+    // En el orden en que se marcaron: es el orden en que entran (en un montaje, el de la línea de tiempo).
+    val chosen = remember(all, selected) { val byId = all.associateBy { it.id }; selected.mapNotNull { byId[it] } }
     LaunchedEffect(all) { selected = selected.filter { id -> all.any { it.id == id } } }
     confirmDelete?.let { toDelete ->
         AlertDialog(onDismissRequest = { confirmDelete = null }, title = { Text("¿Borrar ${toDelete.size} de la biblioteca?") },
@@ -222,7 +228,7 @@ internal fun ProjectMediaPickerSheet(
                 if (!managing) item(key = "import") { ImportTile(enabled = !busy, onClick = onImport) }
                 items(filtered, key = { it.id }) { asset ->
                     val checked = asset.id in selected
-                    MediaTile(asset, checked, enabled = !busy && (managing || checked || maximum == 1 || selected.size < maximum)) { select ->
+                    MediaTile(asset, checked, order = if (!managing && selected.size > 1) selected.indexOf(asset.id) + 1 else 0, enabled = !busy && (managing || checked || maximum == 1 || selected.size < maximum)) { select ->
                         selected = if (!select) selected - asset.id else if (!managing && maximum == 1) listOf(asset.id) else selected + asset.id
                     }
                 }
@@ -243,7 +249,7 @@ internal fun ProjectMediaPickerSheet(
                     IconButton(onClick = { confirmDelete = chosen }, enabled = !busy) { Icon(Icons.Default.DeleteOutline, "Quitar ${chosen.size} de la biblioteca") }
                 }
                 Button(onClick = { onUse(chosen) }, enabled = chosen.isNotEmpty() && !busy, modifier = Modifier.weight(1f)) {
-                    Text(if (chosen.isEmpty()) "Marca fotos o archivos" else "Adjuntar · ${chosen.size}")
+                    Text(if (chosen.isEmpty()) "Marca fotos o archivos" else "$useLabel · ${chosen.size}")
                 }
             }
             Spacer(Modifier.height(NexusTokens.space8))
@@ -269,7 +275,7 @@ private fun ImportTile(enabled: Boolean, onClick: () -> Unit) {
  * línea: misma información con menos alto y sin casillas descolocadas.
  */
 @Composable
-private fun MediaTile(asset: Asset, checked: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
+private fun MediaTile(asset: Asset, checked: Boolean, order: Int = 0, enabled: Boolean, onToggle: (Boolean) -> Unit) {
     val context = LocalContext.current
     val mime = asset.mimeType.orEmpty()
     val video = mime.startsWith("video/")
@@ -293,7 +299,10 @@ private fun MediaTile(asset: Asset, checked: Boolean, enabled: Boolean, onToggle
             Box(Modifier.align(Alignment.TopEnd).padding(5.dp).size(20.dp).clip(androidx.compose.foundation.shape.CircleShape)
                 .background(if (checked) primary else androidx.compose.ui.graphics.Color.Black.copy(alpha = .35f))
                 .border(1.5.dp, androidx.compose.ui.graphics.Color.White, androidx.compose.foundation.shape.CircleShape), contentAlignment = Alignment.Center) {
-                if (checked) Icon(Icons.Default.Check, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                // Con varios marcados se ve el orden (1, 2, 3…) en vez de la marca.
+                if (checked && order > 0) Text("$order", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                else if (checked) Icon(Icons.Default.Check, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onPrimary)
             }
         }
         Text(asset.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,

@@ -10,6 +10,14 @@ internal data class Row(val track: Track, val top: Float, val height: Float) {
     val bottom: Float get() = top + height
 }
 
+/** Alto de la fila de una pista en píxeles enteros (lo usan el lienzo y las cabeceras: deben coincidir). */
+internal fun cutRowPx(track: Track, density: Float, rowScale: Float): Float = when {
+    track.collapsed -> Math.round(COLLAPSED_ROW_DP * density)
+    track.clips.isEmpty() -> Math.round(EMPTY_ROW_DP * density)
+    track.kind == TrackKind.VIDEO -> Math.round(VIDEO_ROW_DP * density * rowScale)
+    else -> Math.round(AUDIO_ROW_DP * density * rowScale)
+}.toFloat()
+
 internal enum class Zone { BODY, HEAD, TAIL, FADE_IN, FADE_OUT }
 
 internal data class Hit(val row: Row, val clip: Clip?, val zone: Zone)
@@ -26,6 +34,8 @@ internal class TimelineGeometry(
     val pxPerUs: Double,
     val scrollY: Float,
     val handlePx: Float,
+    /** Alto de una pista vacía; null = el mismo que si tuviera clips. */
+    val emptyRowPx: Float? = null,
 ) {
     val centerX: Float get() = widthPx / 2f
 
@@ -33,7 +43,12 @@ internal class TimelineGeometry(
         val out = ArrayList<Row>()
         var y = 0f
         for (t in timeline.videoTracks.asReversed() + timeline.audioTracks) {
-            val h = if (t.collapsed) collapsedRowPx else if (t.kind == TrackKind.VIDEO) videoRowPx else audioRowPx
+            val h = when {
+                t.collapsed -> collapsedRowPx
+                t.clips.isEmpty() && emptyRowPx != null -> emptyRowPx
+                t.kind == TrackKind.VIDEO -> videoRowPx
+                else -> audioRowPx
+            }
             out += Row(t, y, h)
             y += h
         }

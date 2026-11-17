@@ -30,7 +30,10 @@ internal fun CutEditorTheme(content: @Composable () -> Unit) {
         surfaceContainer = Color(0xFF1A1D21), surfaceContainerLow = Color(0xFF121416),
         surfaceContainerHigh = Color(0xFF24282D), surfaceContainerLowest = Color(0xFF0B0D0F),
     )
+    // La sala de montaje es siempre oscura: las barras («StudioChrome») toman su color de aquí y no del
+    // tema claro de la app (antes salían beis con texto blanco encima).
     CompositionLocalProvider(LocalNexusAppearance provides appearance,
+        com.vidadomu.nexus.ui.theme.LocalChromeColor provides scheme.surface,
         LocalNexusVisuals provides NexusThemeSpecs.visuals(NexusAppearance.OBSIDIAN).copy(
             promptBorder = scheme.outline, conversationSurface = scheme.primaryContainer,
             responseSurface = scheme.surface, sheetSurface = scheme.surfaceContainerLow,
@@ -45,7 +48,7 @@ internal fun CutEditorTheme(content: @Composable () -> Unit) {
  */
 @Immutable
 internal data class CutPalette(
-    val bg: Color, val panel: Color, val line: Color, val text: Color, val textDim: Color, val accent: Color, val playhead: Color,
+    val bg: Color, val panel: Color, val line: Color, val text: Color, val textDim: Color, val accent: Color, val onAccent: Color, val playhead: Color,
     val videoRow: Color, val audioRow: Color, val videoDark: Color, val audioDark: Color, val image: Color, val title: Color,
     val offline: Color, val wave: Color,
 )
@@ -63,6 +66,7 @@ internal fun rememberCutPalette(): CutPalette {
             text = Color.White,
             textDim = c.onSurfaceVariant,
             accent = c.primary,
+            onAccent = c.onPrimary,
             playhead = c.onSurface,
             videoRow = c.surfaceContainerLow,
             audioRow = c.surfaceContainerLowest,
