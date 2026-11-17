@@ -1,4 +1,47 @@
 ﻿{
+    "cutPremium20261117": {
+        "branch": "aki/cut-premium-20261117",
+        "baseCommit": "7feb18d2",
+        "versionCode": 221,
+        "versionName": "1.9.185-agent-preview",
+        "buildId": "vidal-android-build:54749270-2f4f-4746-93c7-3d5f0055a93b",
+        "buildStatus": "SUCCEEDED",
+        "apkSha256": "36385e53de0abf5a135d6e67b367e01aa15b7e10e9b13d7af04e73b3a4de29d6",
+        "certificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+        "zipAlignment16KiB": true,
+        "nativeLibrariesIdenticalToVc220": 6,
+        "jvmTests": {
+            "cutCore": 133,
+            "agentCore": 531,
+            "agentCoreSkipped": 4,
+            "app": 72,
+            "failures": 0
+        },
+        "pixelInstalledAsUpdate": true,
+        "pixelDataFilesBeforeAfter": [
+            4188,
+            4188
+        ],
+        "s25Installed": false,
+        "verticalContentDp": {
+            "before": 513,
+            "after": 805,
+            "screenDp": 997
+        },
+        "playStartSeconds": {
+            "preRolled": 0.13,
+            "cold": "0.8-1.0",
+            "vc221iCold": 1.57
+        },
+        "exportAvSyncMs": "+10..+44 (9 cortes, sin acumularse)",
+        "pending": [
+            "haptica en S25",
+            "distribucion en S25 real",
+            "agente con modelo real",
+            "tirones del primer segundo"
+        ],
+        "report": "docs/NEXUS-CUT-PREMIUM-20261117.md"
+    },
     "widgetSelectionInstall20261116": {
         "branch": "codex/widgets-v218-install-20261116",
         "sourceCommit": "312ce35684883b7894d4602e72060d29e0322ed4",

@@ -1,3 +1,20 @@
+# vc221 / 1.9.185-agent: Nexus Cut rediseñado — Pixel 8 Pro, NO instalada en el S25 — 17/11/2026
+
+Rama `aki/cut-premium-20261117` sobre `merge/v219-streaming-20261117` (`7feb18d2`, vc220), que ya contiene
+`feat/nexus-cut-20261111` y `codex/cut-video-gestures-20261114`. AWS CodeBuild
+`vidal-android-build:54749270-2f4f-4746-93c7-3d5f0055a93b` SUCCEEDED (vc221k); firmado en AXELPC con la identidad
+instalada (cert `8b75db0f…7127`), 16 KiB, 6/6 `.so` idénticas a vc220. APK SHA-256
+`36385e53de0abf5a135d6e67b367e01aa15b7e10e9b13d7af04e73b3a4de29d6`. Pruebas JVM: cut-core 133, agent-core 531
+(4 omitidas), app 72; 0 fallos. **Instalada solo en el Pixel 8 Pro** (08:30, `adb install -r -t` sobre vc221 de prueba;
+4188 archivos de datos antes y después, 0 desaparecidos). El S25 sigue en vc220. APK test-only: instalar con `-t`.
+
+Qué cambia: imagen + línea de tiempo pasan de 513 a 805 dp (51 → 81 %) en vertical y la imagen de 174 a 364 dp de
+alto en horizontal; ajustes y exportación en hojas; modo inmersivo; reordenación magnética; háptica por evento;
+agente en botón flotante con turnos comprobados, propuestas, deshacer/rehacer del turno y `audio.find_silences`;
+sincronía de audio por clip; Reproducir arranca en 0,13 s con el reproductor pre-preparado (antes 0,8–1,6 s).
+Pendiente: háptica en el S25, distribución en el S25 real, agente con modelo real, tirones del primer segundo de
+reproducción. Informe: `docs/NEXUS-CUT-PREMIUM-20261117.md`.
+
 # vc220 / 1.9.184-agent: burbuja en vivo acumulada — INSTALADA en S25 — 17/11/2026
 
 Rama `merge/v219-streaming-20261117` = `merge/v218-con-polish-20261116` (47d90d76, vc219 de Codex, instalada 01:14) +
