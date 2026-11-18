@@ -11,7 +11,8 @@ es el de `1dbe3073` (los 4 archivos de código que cambian entre ambos son, en e
 compilación es la vc221m (CodeBuild `b7267e10-5834-466b-8c74-e41ad629ff83`, commit `527491ff`, APK SHA-256
 `414fb0c671a50029e487db8a798af48c77ca71547db03495a1f4c7825f4b0ffc`): la vc221l más los nombres accesibles de las dos
 asas (§4, «Después de vc221l»); está compilada, probada en JVM y firmada, y es la instalada en el Pixel desde el 18/11
-a las 10:08 (arranca sin errores; las pruebas de este informe no se han repetido con ella). Las ramas `feat/nexus-cut-20261111` y
+a las 10:08 (arranca sin errores; con ella solo se han repetido las dos pruebas de dispositivo de Cut, que pasan:
+§4). Las ramas `feat/nexus-cut-20261111` y
 `codex/cut-video-gestures-20261114` y la copia Android de Codex (`nexus-story-sync-android-20261111`) ya
 están contenidas en esa base (comprobado con `git merge-base --is-ancestor`); su trabajo se conserva entero.
 
@@ -228,11 +229,36 @@ abandonado a medias levanta los dedos (`ACTION_CANCEL`). Verificación independi
 `00dfd523..527491ff`: 9 puntos correctos, dos de ellos con reservas: la cancelación del pellizco con dos dedos
 pulsados, que es el arreglo de `10d8caad`, y que, cuando la pantalla no es la integrada, la tarea de `MainActivity`
 sigue abierta un momento mientras se cierra. Que la prueba pase entera solo lo aclara una ejecución en dispositivo.
-**Sigue sin haber pasado en un dispositivo**: el Pixel está en uso por ese otro agente y no
-se toca mientras lo esté. Se esperó a que quedara libre de las 04:11 a las 06:11 del 18/11 (comprobación de solo
-lectura cada 7 minutos) y no lo estuvo; a las 06:11 seguía con la vc221l y la pantalla virtual ajena abierta. Al
-instalar la vc221m (10:08) tampoco se ejecutó: el otro agente seguía en el Pixel (la prueba inyecta toques) y la
-batería estaba al 15 % sin cargar (la prueba exporta dos vídeos y no se lanza por debajo del 25 %).
+Se esperó a que el Pixel quedara libre de las 04:11 a las 06:11 del 18/11 (comprobación de solo lectura cada 7
+minutos) y no lo estuvo; a las 06:11 seguía con la vc221l y la pantalla virtual ajena abierta. Al instalar la vc221m
+(10:08) tampoco se ejecutó: el otro agente seguía en el Pixel (la prueba inyecta toques) y la batería estaba al 15 %
+sin cargar.
+
+**Segunda ejecución en el Pixel (18/11 10:36, vc221m, APK de pruebas `c383c808…2ddd`): pasan las dos pruebas**
+(`OK (2 tests)`, 9,7 s, 0 ignoradas; `devtest/20261118-103602-…/`; APK de pruebas compilado de `10d8caad` en CodeBuild
+`88176ca5-54c2-4bab-b17c-e89a03783fca` y firmado con la misma identidad). Vidal dio la orden con el Pixel ya
+cargando. Según las notas de la sesión (`notas-de-la-sesion.txt`, en esa carpeta; lecturas no archivadas), a las 10:20
+el otro agente acababa de instalar su app y la probaba en su pantalla virtual (toques hasta las 10:25) y no se lanzó;
+desde las 10:29 ya no había pantalla virtual. Lo que mide el guion al empezar: el Commander de AXEL Hub delante en la
+pantalla integrada, 478 s sin eventos de entrada en el teléfono y batería al 25 %, cargando.
+`sequentialRendersProduceTwoCompleteMp4FilesWithAudio` exporta dos MP4 seguidos con vídeo y audio de un montaje propio
+de la prueba (426 kB cada uno, archivados). `previewGesturesAndAgentMinimizeDoNotEditTheMontage` abre «QA Cut premium»,
+localiza por su nombre el asa de la barra de transporte y la arrastra, amplía con dos dedos, pulsa «Ajustar»,
+reproduce, arrastra sobre la línea de tiempo, pausa, abre el agente, comprueba que su asa conserva el nombre y lo
+oculta; el montaje en memoria queda igual. Cuatro capturas de la propia prueba (`cut-feedback-workspace`, `-zoom`,
+`-agent-open`, `-agent-hidden`). No se ejecutó el tercer método de la clase
+(`copyAllAndMultipleMessagesWithoutTruncating`, del chat). Datos: los 40 archivos de Cut tienen el mismo hash antes y
+después; 4214 archivos de datos antes y 4215 después, 0 desaparecidos (según las notas, el nuevo es un blob de 528
+bytes en `files/device-sync/blobs/`); la app sigue siendo la vc221m; paquete de pruebas desinstalado; sin
+`FATAL EXCEPTION` en el registro filtrado (`AndroidRuntime:E`).
+Efectos de la ejecución: el cabezal guardado de «QA Cut premium» pasó de 13,08 s a 9,00 s (la prueba no lo restaura;
+el reparto no estaba guardado ni antes ni después); el proceso de Nexus se reinició al empezar y al acabar la
+instrumentación (pid 21856, 28256 durante la prueba, 28885 después); el servicio de accesibilidad «AXEL Commander»
+estaba enlazado antes y después (según las notas, con un registro de servicio nuevo: Android lo suelta mientras dura
+una prueba instrumentada); el guion dejó delante el launcher en vez del Commander al acabar (10:36:45) y se devolvió
+al frente a las 10:38 repitiendo el intent de su tarea (las mismas dos actividades, ninguna nueva;
+`restaurar-commander.json`). Con la pantalla ya encendida el guion no envía ninguna tecla (antes HOME, WAKEUP y SLEEP
+sin pantalla explícita) ni borra logcat.
 
 **Después de vc221l** (`2ce90114`, compilado como vc221m): las dos asas recuperan su nombre accesible («Tamaño de la
 previsualización y la línea de tiempo», «Tamaño del panel del agente»), el observador de toques del editor depende
@@ -243,8 +269,10 @@ las 10:08:57** por orden de Vidal, con la pantalla virtual del otro agente aún 
 ninguna pantalla): `adb install -r -t`, misma firma, `firstInstallTime` conservado, 4213 archivos de datos antes y
 después, 0 desaparecidos, archivos de Cut idénticos. Abierta después en la pantalla integrada sin toques ni teclas:
 el proceso arranca, la actividad queda en primer plano con la conversación guardada a la vista y no hay errores
-fatales en el registro. **Nada más de este informe se ha repetido con la vc221m**: ni los flujos del editor ni los
-nombres de las asas en pantalla.
+fatales en el registro. Con la vc221m solo se han repetido las dos pruebas de dispositivo (10:36, arriba), que
+comprueban los nombres de las dos asas en el árbol de accesibilidad y un recorrido del editor. **El resto de
+mediciones y recorridos de este informe son de la vc221l** y no se han repetido con la vc221m; siguen sin hacerse en
+ninguna versión la háptica y la distribución en el S25 y el agente con un modelo real.
 
 **Qué comprobar de la háptica en el S25** (pendiente de Vidal; no se ha sentido en ningún dispositivo). Con la
 vibración al tocar del sistema y la «Respuesta háptica» de Nexus activadas, cada fila debe notarse distinta de las
@@ -300,9 +328,13 @@ de crearlos.
 - Tercera, cuarta y quinta verificación independiente (solo lectura): la prueba de dispositivo (`00dfd523..527491ff`,
   9 de 9 con dos reservas, ver §4), la exactitud de este informe frente a sus evidencias (5 precisiones, corregidas
   en `e2eae553`) y esas correcciones (7 de 7).
+- Verificación independiente (solo lectura) de la segunda ejecución en el Pixel (18/11): la app instalada, el paquete
+  de pruebas desinstalado, la salida de la instrumentación, los hashes, los MP4, las capturas y el guion coinciden con
+  lo dicho; sus precisiones al texto (separar lo medido de lo anotado en la sesión, los tres pid, el método no
+  ejecutado) están aplicadas en §4 y no se han vuelto a verificar.
 - En la vc221l instalada las dos asas de reparto no tienen nombre de accesibilidad (conservan sus acciones, pero un
-  lector de pantalla puede no detenerse en ellas). Corregido en la vc221m, ya instalada; los nombres no se han
-  comprobado en pantalla ni con TalkBack.
+  lector de pantalla puede no detenerse en ellas). Corregido en la vc221m, ya instalada: la prueba de dispositivo
+  encuentra las dos asas por su nombre en el árbol de accesibilidad (18/11 10:36). No se ha probado con TalkBack.
 - Montajes de prueba creados en el proyecto «General» del Pixel: «QA Cut premium», «QA importar» y «QA orden», más
   cinco exportaciones «QA_Cut_premium-…» en la Biblioteca. No se ha borrado nada.
 
