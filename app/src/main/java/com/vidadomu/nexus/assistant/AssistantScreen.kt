@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -198,6 +199,8 @@ private fun AssistantScreenContent(
     var following by rememberSaveable(ui.conversationId) { mutableStateOf(draftPrefs.getInt("scroll:${ui.conversationId}",0)==0) }
     val initialScrollRequest=remember(ui.conversationId) {ui.scrollRequest}
     var automaticScroll by remember { mutableStateOf(false) }
+    // Height of the notice on show at the foot of the conversation (0 without one): room the list gives up at its end.
+    var noticeHeight by remember { mutableStateOf(0) }
     val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && (ui.plans[it.planId]?.state==PlanState.DISCARDED ||
         it.orderId?.let { id -> ui.orders[id]?.status } == com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED)}
     // Active and finished adjacent image/video orders share a live wall; failures keep their own actions.
@@ -255,7 +258,8 @@ private fun AssistantScreenContent(
             }
             val layout=listState.layoutInfo
             layout.visibleItemsInfo.lastOrNull()?.let { last ->
-                listState.scrollBy((last.offset+last.size-layout.viewportEndOffset).coerceAtLeast(0).toFloat())
+                // With a notice up, the end of the reading area is the notice's top edge, not the composer's.
+                listState.scrollBy((last.offset+last.size-layout.viewportEndOffset+noticeHeight).coerceAtLeast(0).toFloat())
             }
         }
         finally { automaticScroll = false }
@@ -286,6 +290,15 @@ private fun AssistantScreenContent(
         if (ui.scrollRequest != initialScrollRequest) { following = true; followLast() }
     }
     LaunchedEffect(ui.message) { ui.message?.let { snackbar.showSnackbar(it.second); vm.consumeMessage() } }
+    // A notice sits at the foot of the conversation, above the composer. The list gives up that room at its end, so the
+    // notice never covers the last message; a conversation that was at its end stays there.
+    LaunchedEffect(noticeHeight) {
+        if (noticeHeight > 0 && following) {
+            withFrameNanos { } // The list has to be measured with the new room before it can scroll into it.
+            automaticScroll = true
+            try { listState.scrollBy(noticeHeight.toFloat()) } finally { automaticScroll = false }
+        }
+    }
 
     if(showSettings) AssistantSettingsDialog(ui,vm,onDismiss={showSettings=false})
     LaunchedEffect(ui.projects, editingProjectId) { pruneProjectDrafts(projectDrafts, ui.projects, keep = editingProjectId) }
@@ -313,11 +326,8 @@ private fun AssistantScreenContent(
     ModalNavigationDrawer(drawerContent = { ConversationDrawer(ui, vm) { scope.launch { drawer.close() } } }, drawerState = drawer,
         gesturesEnabled = drawer.isOpen) {
     // Opaque ground: the animated aura of the app's theme stays behind the other tabs, not behind the conversation.
-    Scaffold(contentWindowInsets=com.vidadomu.nexus.ui.theme.NexusInsets.chromeOnly,containerColor=MaterialTheme.colorScheme.background,snackbarHost={SnackbarHost(snackbar) { data ->
-        Snackbar(data,modifier=Modifier.padding(NexusTokens.space12),shape=NexusTokens.card,
-            containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
-            actionColor=MaterialTheme.colorScheme.primary)
-    }},topBar={}) {pad ->
+    // The notices are not in the Scaffold's slot: there they floated over the composer. They sit at the foot of the conversation.
+    Scaffold(contentWindowInsets=com.vidadomu.nexus.ui.theme.NexusInsets.chromeOnly,containerColor=MaterialTheme.colorScheme.background,topBar={}) {pad ->
         Column(Modifier.fillMaxSize().padding(pad).consumeWindowInsets(pad).statusBarsPadding().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)) {
             val density = androidx.compose.ui.platform.LocalDensity.current
             val chatContext = LocalContext.current
@@ -383,8 +393,9 @@ private fun AssistantScreenContent(
             // The header is fixed above the list now, so nothing floats over the text and the list needs no fade mask.
             LazyColumn(Modifier.fillMaxSize(), state = listState,
                 contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = NexusTokens.space8,
-                    // Room for the tab-bar handle that sits on the composer's top edge, so it never covers the last line.
-                    bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {
+                    // Room for the tab-bar handle that sits on the composer's top edge, so it never covers the last line,
+                    // plus the notice on show, if any.
+                    bottom = 28.dp + with(density) { noticeHeight.toDp() }), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item {
                     EmptyHint(onSuggest = { suggestion ->
                         input = androidx.compose.ui.text.input.TextFieldValue(suggestion, androidx.compose.ui.text.TextRange(suggestion.length))
@@ -548,7 +559,8 @@ private fun AssistantScreenContent(
             }
             // Un único botón redondo para bajar, solo cuando no estás al final; los encargos tienen su propio panel.
             val cardIds = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id } }
-            Column(Modifier.align(Alignment.BottomEnd).padding(NexusTokens.space12), horizontalAlignment = Alignment.End,
+            // The scroll-down button rides above the notice on show instead of hiding under it.
+            Column(Modifier.align(Alignment.BottomEnd).padding(bottom = with(density) { noticeHeight.toDp() }).padding(NexusTokens.space12), horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 // «Ver encargos» moved to the header: only the scroll-down button floats over the reading area.
                 AnimatedVisibility(!following,
@@ -565,6 +577,13 @@ private fun AssistantScreenContent(
             // Long press on an empty spot of the chat: the same menu as the header's, where the finger is.
             openChatMenu(menuOpen, menuAt) { menuOpen = false }
             if (showAppearance) QuickAppearanceSheet({ showAppearance = false }, onOpenSettings)
+            // Notices at the foot of the conversation, right above the composer: the field, its controls and the stop
+            // button stay in sight and in reach while a notice is up.
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).onSizeChanged { noticeHeight = it.height }) { data ->
+                Snackbar(data,modifier=Modifier.padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space8),shape=NexusTokens.card,
+                    containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
+                    actionColor=MaterialTheme.colorScheme.primary)
+            }
             }
             if (ordersPanel) OrdersSheet(visibleItems.filterIsInstance<ChatItem.PlanCard>(), ui, onClose = { ordersPanel = false }) { id ->
                 ordersPanel = false; following = false
