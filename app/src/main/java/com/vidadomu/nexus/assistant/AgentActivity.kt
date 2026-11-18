@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -316,7 +315,7 @@ private fun StepDuration(step: AgentStep, modifier: Modifier = Modifier) {
     Text(AgentActivityText.duration(elapsed), modifier, style = style, color = color, maxLines = 1)
 }
 
-/** Command, input and outcome of one step: monospaced, selectable, and one tap to copy it all. */
+/** Command, input and outcome of one step: monospaced, selectable, wrapped to the width, and one tap to copy it all. */
 @Composable
 private fun StepDetail(step: AgentStep) {
     val colors = MaterialTheme.colorScheme
@@ -340,9 +339,9 @@ private fun StepDetail(step: AgentStep) {
             @Composable fun block(title: String?, text: String, tint: androidx.compose.ui.graphics.Color) {
                 title?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = colors.outline, modifier = Modifier.padding(top = NexusTokens.space8, bottom = 2.dp)) }
                 SelectionContainer {
-                    Text(text, style = mono, color = tint, softWrap = false,
-                        modifier = Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState())
-                            .padding(end = NexusTokens.space8))
+                    // Wrapped: an incident is a sentence to read whole, and a phone has no room to scroll it sideways.
+                    Text(text, style = mono, color = tint,
+                        modifier = Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()).padding(end = NexusTokens.space8))
                 }
             }
             step.command?.takeIf { it.isNotBlank() }?.let { block(null, it, colors.onSurface) }

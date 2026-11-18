@@ -1,6 +1,7 @@
 package com.vidadomu.nexus.agent.core
 
 import com.vidadomu.nexus.agent.core.agent.AgentOrchestrator
+import com.vidadomu.nexus.agent.core.agent.toolActivity
 import com.vidadomu.nexus.agent.core.config.AgentConfig
 import com.vidadomu.nexus.agent.core.config.AgentMode
 import com.vidadomu.nexus.agent.core.llm.LlmException
@@ -51,7 +52,7 @@ class AgentStepsTest {
 
         val steps = timeline(seen)
         assertEquals(listOf(AgentStepKind.THINK, AgentStepKind.TOOL, AgentStepKind.THINK), steps.map { it.kind })
-        assertEquals(listOf("Pensando la respuesta", "Usando list projects", "Analizando los resultados"), steps.map { it.label })
+        assertEquals(listOf("Pensando la respuesta", "Consultando tus proyectos", "Analizando los resultados"), steps.map { it.label })
         assertTrue(steps.all { it.status == AgentStepStatus.DONE && it.durationMs != null && it.startedAt > 0 })
         assertEquals(3, steps.map { it.id }.distinct().size)
         // Lo que dijo antes de usar la herramienta se puede desplegar; la respuesta final no se duplica en su paso.
@@ -136,5 +137,26 @@ class AgentStepsTest {
         assertEquals(step, json.decodeFromString(AgentStep.serializer(), json.encodeToString(AgentStep.serializer(), step)))
         val future = """{"id":"t:2","kind":"THINK","label":"Pensando","status":"DONE","campo_futuro":{"x":1}}"""
         assertEquals(AgentStepStatus.DONE, json.decodeFromString(AgentStep.serializer(), future).status)
+    }
+
+    @Test fun `las herramientas habituales se describen con palabras y una desconocida conserva su nombre`() {
+        val activity = ::toolActivity
+        assertEquals("Consultando tus proyectos", activity("list_projects"))
+        assertEquals("Buscando en tu Biblioteca", activity("search_assets"))
+        assertEquals("Preparando el encargo", activity("prepare_generation"))
+        assertEquals("Recuperando el seguimiento del encargo", activity("recover_generation"))
+        assertEquals("Editando el montaje", activity("cut_edit"))
+        assertEquals("Leyendo el guion", activity("read_story_project"))
+        assertEquals("Usando herramienta nueva", activity("herramienta_nueva"))
+        // Lo que se lee en la fila es una frase corta, sin guiones bajos ni nombres internos.
+        val known = listOf("list_projects", "create_project", "search_project_memory", "update_project_memory", "submit_generation",
+            "estimate_generation_cost", "get_generation_status", "cancel_generation", "read_library_text", "transcribe_media_asset",
+            "analyze_audio_asset", "propose_story_changes", "cut_read", "get_nexus_settings", "update_nexus_settings", "update_plan",
+            "suggest_replies", "compare_model_families", "create_generation_prompt", "atlas_get_balance", "inspect_media_asset")
+        for (tool in known) {
+            val label = activity(tool)
+            assertFalse(label.startsWith("Usando ") || '_' in label, "$tool sigue sin descripción: $label")
+            assertTrue(label.length <= 42, "$tool: «$label» no cabe en una línea")
+        }
     }
 }
