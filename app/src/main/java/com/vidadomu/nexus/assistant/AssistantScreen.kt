@@ -199,8 +199,11 @@ private fun AssistantScreenContent(
     var following by rememberSaveable(ui.conversationId) { mutableStateOf(draftPrefs.getInt("scroll:${ui.conversationId}",0)==0) }
     val initialScrollRequest=remember(ui.conversationId) {ui.scrollRequest}
     var automaticScroll by remember { mutableStateOf(false) }
-    // Height of the notice on show at the foot of the conversation (0 without one): room the list gives up at its end.
+    // Height in pixels of the notice on show at the foot of the conversation, and the room the list gives up for it at
+    // its end (0 without a notice). The room is animated: the conversation slides out of the notice's way and back.
     var noticeHeight by remember { mutableStateOf(0) }
+    val noticeRoom by androidx.compose.animation.core.animateIntAsState(
+        if (snackbar.currentSnackbarData != null) noticeHeight else 0, label = "noticeRoom")
     val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && (ui.plans[it.planId]?.state==PlanState.DISCARDED ||
         it.orderId?.let { id -> ui.orders[id]?.status } == com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED)}
     // Active and finished adjacent image/video orders share a live wall; failures keep their own actions.
@@ -259,7 +262,7 @@ private fun AssistantScreenContent(
             val layout=listState.layoutInfo
             layout.visibleItemsInfo.lastOrNull()?.let { last ->
                 // With a notice up, the end of the reading area is the notice's top edge, not the composer's.
-                listState.scrollBy((last.offset+last.size-layout.viewportEndOffset+noticeHeight).coerceAtLeast(0).toFloat())
+                listState.scrollBy((last.offset+last.size-layout.viewportEndOffset+noticeRoom).coerceAtLeast(0).toFloat())
             }
         }
         finally { automaticScroll = false }
@@ -292,11 +295,16 @@ private fun AssistantScreenContent(
     LaunchedEffect(ui.message) { ui.message?.let { snackbar.showSnackbar(it.second); vm.consumeMessage() } }
     // A notice sits at the foot of the conversation, above the composer. The list gives up that room at its end, so the
     // notice never covers the last message; a conversation that was at its end stays there.
-    LaunchedEffect(noticeHeight) {
-        if (noticeHeight > 0 && following) {
-            withFrameNanos { } // The list has to be measured with the new room before it can scroll into it.
-            automaticScroll = true
-            try { listState.scrollBy(noticeHeight.toFloat()) } finally { automaticScroll = false }
+    LaunchedEffect(listState) {
+        snapshotFlow { noticeRoom }.collect { room ->
+            if (room > 0 && following) {
+                withFrameNanos { } // The list has to be measured with the new room before it can scroll into it.
+                automaticScroll = true
+                // A finger on the list outranks this scroll and cancels it: the next step of the room tries again.
+                try { listState.scrollBy(room.toFloat()) }
+                catch (e: java.util.concurrent.CancellationException) { if (this@LaunchedEffect.coroutineContext[kotlinx.coroutines.Job]?.isActive != true) throw e }
+                finally { automaticScroll = false }
+            }
         }
     }
 
@@ -395,7 +403,7 @@ private fun AssistantScreenContent(
                 contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = NexusTokens.space8,
                     // Room for the tab-bar handle that sits on the composer's top edge, so it never covers the last line,
                     // plus the notice on show, if any.
-                    bottom = 28.dp + with(density) { noticeHeight.toDp() }), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {
+                    bottom = 28.dp + with(density) { noticeRoom.toDp() }), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item {
                     EmptyHint(onSuggest = { suggestion ->
                         input = androidx.compose.ui.text.input.TextFieldValue(suggestion, androidx.compose.ui.text.TextRange(suggestion.length))
@@ -560,7 +568,7 @@ private fun AssistantScreenContent(
             // Un único botón redondo para bajar, solo cuando no estás al final; los encargos tienen su propio panel.
             val cardIds = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id } }
             // The scroll-down button rides above the notice on show instead of hiding under it.
-            Column(Modifier.align(Alignment.BottomEnd).padding(bottom = with(density) { noticeHeight.toDp() }).padding(NexusTokens.space12), horizontalAlignment = Alignment.End,
+            Column(Modifier.align(Alignment.BottomEnd).padding(bottom = with(density) { noticeRoom.toDp() }).padding(NexusTokens.space12), horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                 // «Ver encargos» moved to the header: only the scroll-down button floats over the reading area.
                 AnimatedVisibility(!following,
