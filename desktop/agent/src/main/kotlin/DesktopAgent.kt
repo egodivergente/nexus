@@ -53,6 +53,8 @@ private class DesktopRuntime(private val root: File, private val data: File) {
     private var secrets = JsonObject(emptyMap())
     private var mode = AgentMode.COPILOT
     private val guard = SpendGuard()
+    /** Identidad de cliente de AXEL Commander en la carpeta de datos; sin ese archivo no hay herramientas remotas. */
+    private val link = com.axel.link.LinkClient(com.axel.link.FileLinkStore(File(data, "axel-link.json")))
     private var turnModels: List<ModelSummary>? = null
     private val turnSchemas = mutableMapOf<ModelRef, ModelSchema>()
     private val registry = object : ModelRegistry {
@@ -85,7 +87,9 @@ private class DesktopRuntime(private val root: File, private val data: File) {
         }), guard, GuardedExecutor(backend, guard), assets,
             GenerationHistorySource { limit -> json.decodeFromJsonElement(callback("history", JsonPrimitive(limit))) },
             adaptPrompt = { prompt, _, _ -> prompt },
-            nativeOperations = NativeOperations { operation, arguments, session -> runNative(operation, arguments, session) })
+            nativeOperations = NativeOperations { operation, arguments, session -> runNative(operation, arguments, session) },
+            // Equipos de AXEL Commander: el mismo cliente e identidad persistente que AXEL Hub y Nexus.
+            link = link)
     private suspend fun runNative(operation: String, arguments: JsonObject, session: AgentSession): JsonObject {
         val response = callback("native", obj("operation" to JsonPrimitive(operation), "input" to arguments,
             "assets" to encoded(assets.snapshot().assets), "projectId" to (session.activeProjectId?.let(::JsonPrimitive) ?: JsonNull))).jsonObject

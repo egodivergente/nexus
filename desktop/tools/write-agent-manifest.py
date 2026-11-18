@@ -14,9 +14,9 @@ def digest(path):
 
 def write():
     files = {}
-    for folder in ('agent-core/src', 'desktop/agent/src', 'desktop/agent/agent-skills'):
+    for folder in ('agent-core/src', 'axel-link/src', 'desktop/agent/src', 'desktop/agent/agent-skills'):
         for path in sorted((ROOT / folder).rglob('*')):
-            if path.is_file() and path.suffix in {'.kt', '.json', '.md', '.yaml', '.yml'}:
+            if path.is_file() and path.suffix in {'.kt', '.json', '.md', '.yaml', '.yml', '.ps1'}:
                 files[path.relative_to(ROOT).as_posix()] = digest(path)
     for name in ('desktop/agent/build.gradle.kts', 'desktop/agent/core/build.gradle.kts', 'desktop/agent/settings.gradle.kts'):
         files[name] = digest(ROOT / name)
