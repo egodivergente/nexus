@@ -53,6 +53,10 @@ class ToolDeps(
     val limits: () -> com.vidadomu.nexus.agent.core.config.AgentLimits = { com.vidadomu.nexus.agent.core.config.AgentLimits() },
     val costPreflight: com.vidadomu.nexus.agent.core.routing.comparison.GenerationCostPreflight =
         com.vidadomu.nexus.agent.core.routing.comparison.GenerationCostPreflight(),
+    /** Cliente compartido de AXEL Commander (`com.axel.link`); null si la app no lo monta. */
+    val link: com.axel.link.LinkClient? = null,
+    /** Dónde guarda la app una captura de pantalla remota para enseñarla en el chat. */
+    val remoteMedia: com.vidadomu.nexus.agent.core.agent.GeneratedMediaStore? = null,
 ) {
     val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt, probeFrameRate, costPreflight)
     val lifecycle = com.vidadomu.nexus.agent.core.agent.GenerationLifecycle(guard, executor, assets, clock, orders) { plan, message ->
