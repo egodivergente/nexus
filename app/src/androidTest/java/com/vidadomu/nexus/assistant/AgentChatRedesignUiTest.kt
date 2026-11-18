@@ -66,6 +66,7 @@ class AgentChatRedesignUiTest {
         compose.setContent { NexusTheme { AgentChatTheme { AgentActivitySaved("a1", steps) } } }
         val header = "Actividad del agente: 3 pasos · 8 s, 1 incidencia"
         compose.onNode(hasContentDescription(header) and hasStateDescription("Plegada")).assertIsDisplayed().assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp) // Dense to the eye, a full touch target to the finger.
         compose.onNodeWithText("Pensando").assertDoesNotExist()
         compose.onNodeWithContentDescription(header).performClick()
         compose.onNode(hasContentDescription(header) and hasStateDescription("Desplegada")).assertIsDisplayed()
@@ -74,6 +75,7 @@ class AgentChatRedesignUiTest {
         compose.onNode(hasText("Pensando") and hasText("1 s") and hasStateDescription("Completado")).assertIsDisplayed().assertHasNoClickAction()
         val issue = hasText("Buscando en tu Biblioteca") and hasText("search_assets text=faro project=x") and hasText("0,2 s")
         compose.onNode(issue and hasStateDescription("Con incidencia. Detalle plegado")).assertIsDisplayed().assertHasClickAction()
+            .assertHeightIsAtLeast(48.dp)
         compose.onNode(hasText("Mostrando los archivos encontrados") and hasText("6 s") and hasStateDescription("Completado. Detalle plegado")).assertIsDisplayed()
 
         compose.onNodeWithText("No existe el proyecto x.").assertDoesNotExist()
