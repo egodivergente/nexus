@@ -179,7 +179,7 @@ textos (`CutEditorTextTest`).
 
 **GitHub Actions** (`build-apk.yml`, en cada push): compilación, APK, pruebas unitarias y compilación de las pruebas
 de dispositivo, en verde en todos los pushes de la rama. El paso «Run presentation UI tests (offline fixtures)»
-(emulador; `AssistantPresentationUiTest` y `ChatRichContentDeviceTest`, que no tocan Cut) pasó en dos de seis:
+(emulador; `AssistantPresentationUiTest` y `ChatRichContentDeviceTest`, que no tocan Cut) pasó en tres de ocho:
 
 | Commit | Run | Paso de UI con emulador |
 |---|---|---|
@@ -189,17 +189,21 @@ de dispositivo, en verde en todos los pushes de la rama. El paso «Run presentat
 | `5dbc6f94` | 44052867770 | falla 1 de 11 |
 | `00dfd523` | 44053856007 | falla 1 de 11 |
 | `c80da997` | 44227657526 | pasa (11 de 11) |
+| `e2eae553` | 44233555774 | falla 1 de 11 |
+| `b9ab0698` | 44235350157 | pasa (11 de 11) |
 
-En los cuatro fallos (registros leídos) falla la misma prueba y solo esa:
+En los cinco fallos (registros leídos) falla la misma prueba y solo esa:
 `ChatRichContentDeviceTest.penDoesNotDrawUntilLongPressAndAnnotationsAreSelected` (`ComposeTimeoutException` tras
 5000 ms en la línea 113: el trazo del lápiz sobre el tablero de imágenes del chat no llega a guardarse a tiempo).
 `96a074bf`, `5dbc6f94` y `00dfd523` solo cambian `CutFeedbackDeviceTest.kt` y documentación respecto de `1dbe3073`,
-que pasó; `c80da997` (mismo código de la app que la vc221m) también pasa.
+que pasó; `c80da997` (mismo código de la app que la vc221m) también pasa. `e2eae553` y `b9ab0698` solo cambian este
+informe respecto de `c80da997`: el primero falla y el segundo pasa, así que el resultado cambia sin que cambie el código.
 La misma prueba falla de forma intermitente en otras 7 ramas ajenas a esta desde el 14/11 (8 de los 21 runs que
 llegaron a ese paso). Esta rama no toca el tablero del chat ni esa prueba, y el tablero no usa hápticos; lo único
 compartido que cambia fuera de Cut es `NexusHaptics.kt` (eventos nuevos y limitador) y el fondo negro de
-`MainActivity` en las rutas `cut/`. Con seis runs no se puede afirmar ni descartar que esta rama la haga fallar
-más a menudo. No se ha corregido aquí: es una prueba de otra línea de trabajo.
+`MainActivity` en las rutas `cut/`. Con ocho runs (5 fallos, frente a 8 de 21 en las demás ramas) no se puede afirmar
+ni descartar que esta rama la haga fallar más a menudo. No se ha corregido aquí: es una prueba de otra línea de trabajo.
+Los runs de los commits posteriores a `b9ab0698`, que solo cambian este informe, no se anotan.
 
 **Prueba en dispositivo heredada** (`CutFeedbackDeviceTest`, opcional: `-PnexusFeedbackDeviceTests=true` y
 `-e cutProjectId`): `previewGesturesAndAgentMinimizeDoNotEditTheMontage` buscaba etiquetas del editor anterior
@@ -222,7 +226,8 @@ abandonado a medias levanta los dedos (`ACTION_CANCEL`). Verificación independi
 pulsados, que es el arreglo de `10d8caad`, y que, cuando la pantalla no es la integrada, la tarea de `MainActivity`
 sigue abierta un momento mientras se cierra. Que la prueba pase entera solo lo aclara una ejecución en dispositivo.
 **Sigue sin haber pasado en un dispositivo**: el Pixel está en uso por ese otro agente y no
-se toca mientras lo esté.
+se toca mientras lo esté. Se esperó a que quedara libre de las 04:11 a las 06:11 del 18/11 (comprobación de solo
+lectura cada 7 minutos) y no lo estuvo; a las 06:11 seguía con la vc221l y la pantalla virtual ajena abierta.
 
 **Después de vc221l** (`2ce90114`, compilado como vc221m): las dos asas recuperan su nombre accesible («Tamaño de la
 previsualización y la línea de tiempo», «Tamaño del panel del agente»), el observador de toques del editor depende
