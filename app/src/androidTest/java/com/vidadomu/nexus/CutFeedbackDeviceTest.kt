@@ -1,6 +1,7 @@
 package com.vidadomu.nexus
 
 import android.app.Activity
+import android.app.ActivityOptions
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -9,7 +10,9 @@ import android.graphics.Rect
 import android.graphics.Bitmap
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.os.Build
 import android.os.SystemClock
+import android.view.Display
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -40,7 +43,18 @@ class CutFeedbackDeviceTest {
     private val app get() = inst.targetContext.applicationContext as NexusApplication
     private fun activity(): MainActivity {
         runBlocking { app.ready.await() }
-        return inst.startActivitySync(Intent(inst.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
+        // Always the phone's own screen. With someone else's virtual display focused (scrcpy --new-display) the system
+        // opens the activity there, while screenshots and injected touches still go to the built-in display.
+        val intent = Intent(inst.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val opened = (if (Build.VERSION.SDK_INT >= 28) inst.startActivitySync(intent, ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle())
+            else inst.startActivitySync(intent)) as MainActivity
+        @Suppress("DEPRECATION") val shownOn = opened.windowManager.defaultDisplay.displayId
+        if (shownOn != Display.DEFAULT_DISPLAY) { opened.finish(); fail("The activity opened on display $shownOn, not on the phone's screen") }
+        return opened
+    }
+    /** A gesture abandoned half way (another app came forward) must not leave a finger pressed on whatever is below. */
+    private inline fun orCancel(cancel: () -> Unit, rest: () -> Unit) {
+        try { rest() } catch (t: Throwable) { runCatching { cancel() }; throw t }
     }
     private fun waitFor(predicate: () -> Boolean) {
         val until = SystemClock.uptimeMillis() + 30_000
@@ -74,39 +88,45 @@ class CutFeedbackDeviceTest {
     private fun bounds(label: String) = Rect().also { requireNotNull(node(label)).getBoundsInScreen(it) }
     private fun tap(r: Rect) {
         val start = SystemClock.uptimeMillis()
-        for ((action, delay) in listOf(MotionEvent.ACTION_DOWN to 0L, MotionEvent.ACTION_UP to 60L)) {
-            requireForeground()
+        fun send(action: Int, delay: Long) {
             val e = MotionEvent.obtain(start, start + delay, action, r.exactCenterX(), r.exactCenterY(), 0)
             e.source = InputDevice.SOURCE_TOUCHSCREEN
-            assertTrue(inst.uiAutomation.injectInputEvent(e, true)); e.recycle()
+            try { assertTrue(inst.uiAutomation.injectInputEvent(e, true)) } finally { e.recycle() }
         }
+        requireForeground(); send(MotionEvent.ACTION_DOWN, 0)
+        orCancel({ send(MotionEvent.ACTION_CANCEL, 60) }) { requireForeground(); send(MotionEvent.ACTION_UP, 60) }
     }
     private fun drag(x: Float, y: Float, dx: Float, dy: Float) {
         val start = SystemClock.uptimeMillis()
-        for (i in 0..12) {
-            requireForeground()
-            val action = when (i) { 0 -> MotionEvent.ACTION_DOWN; 12 -> MotionEvent.ACTION_UP; else -> MotionEvent.ACTION_MOVE }
+        fun send(i: Int, action: Int) {
             val e = MotionEvent.obtain(start, start + i * 30, action, x + dx * i / 12, y + dy * i / 12, 0)
-            e.source = InputDevice.SOURCE_TOUCHSCREEN; assertTrue(inst.uiAutomation.injectInputEvent(e, true)); e.recycle()
+            e.source = InputDevice.SOURCE_TOUCHSCREEN
+            try { assertTrue(inst.uiAutomation.injectInputEvent(e, true)) } finally { e.recycle() }
+        }
+        requireForeground(); send(0, MotionEvent.ACTION_DOWN)
+        orCancel({ send(12, MotionEvent.ACTION_CANCEL) }) {
+            for (i in 1..12) { requireForeground(); send(i, if (i == 12) MotionEvent.ACTION_UP else MotionEvent.ACTION_MOVE) }
         }
         inst.waitForIdleSync()
     }
     private fun pinch(r: Rect) {
         val start = SystemClock.uptimeMillis()
         val props = Array(2) { i -> MotionEvent.PointerProperties().apply { id = i; toolType = MotionEvent.TOOL_TYPE_FINGER } }
-        fun send(action: Int, count: Int, span: Float, tick: Int) {
-            requireForeground()
+        fun send(action: Int, count: Int, span: Float, tick: Int, guarded: Boolean = true) {
+            if (guarded) requireForeground()
             val coordinates = Array(count) { i -> MotionEvent.PointerCoords().apply {
                 x = r.exactCenterX() + (if (i == 0) -span else span); y = r.exactCenterY(); pressure = 1f; size = 1f
             } }
             val e = MotionEvent.obtain(start, start + tick * 30, action, count, props, coordinates, 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
-            assertTrue(inst.uiAutomation.injectInputEvent(e, true)); e.recycle()
+            try { assertTrue(inst.uiAutomation.injectInputEvent(e, true)) } finally { e.recycle() }
         }
         send(MotionEvent.ACTION_DOWN, 1, 30f, 0)
-        send(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, 30f, 1)
-        for (i in 2..12) send(MotionEvent.ACTION_MOVE, 2, 30f + i * 8, i)
-        send(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, 126f, 13)
-        send(MotionEvent.ACTION_UP, 1, 126f, 14)
+        orCancel({ send(MotionEvent.ACTION_CANCEL, 1, 126f, 14, guarded = false) }) {
+            send(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, 30f, 1)
+            for (i in 2..12) send(MotionEvent.ACTION_MOVE, 2, 30f + i * 8, i)
+            send(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, 126f, 13)
+            send(MotionEvent.ACTION_UP, 1, 126f, 14)
+        }
         inst.waitForIdleSync()
     }
 
