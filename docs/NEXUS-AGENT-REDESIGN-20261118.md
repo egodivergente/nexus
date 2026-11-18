@@ -1,4 +1,4 @@
-# Rediseño de la pantalla del Agente — vc222 / 1.9.186-agent — 18/11/2026
+# Rediseño de la pantalla del Agente — vc224 / 1.9.188-agent — 18/11/2026
 
 Encargo de Vidal: rehacer la composición de la pantalla del Agente tomando como referencia otra APK suya
 (cabecera compacta, actividad del agente dentro de la conversación, mensajes planos, compositor de un bloque,
@@ -8,13 +8,13 @@ acabado carbón y mate). Rama `aki/agent-redesign-20261118` sobre `aki/cut-premi
 
 | Qué | Estado |
 | --- | --- |
-| Compilado | AWS CodeBuild `vidal-android-build:948e9108-31bd-459c-8308-6a599cc9bdbc` SUCCEEDED sobre `7678bd91` |
+| Compilado | AWS CodeBuild `vidal-android-build:419391f5-784e-4f85-bcea-f662bc3a6de8` SUCCEEDED sobre `3ab2340a` |
 | Pruebas JVM | agent-core 544 (4 omitidas), app 194, cut-core 133; 0 fallos, 0 errores |
 | Firmado | identidad instalada (cert `8b75db0f…7127`), v2+v3, 16 KiB, 6/6 `.so` idénticas a vc220 |
-| APK | `Nexus-Agent-1.9.186-agent-preview-vc222-preview.apk`, SHA-256 `f7234357739a79f321bb3ec9154b5a135180d0257d6a44594fd7707544b0b1f4` (test-only: instalar con `-t`) |
-| Instalado | **Instalada solo en el Pixel 8 Pro** (18/11 a las 13:24, `adb install -r -t` sobre la compilación anterior de la misma vc222; 4245 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma). |
-| S25 | sin tocar, sigue en vc220 |
-| Probado en dispositivo | Pixel 8 Pro: a mano con un guion local sin modelo, sobre la APK final; pruebas instrumentadas 6/6 sobre `926698f7`, no repetidas sobre el código final (ver «Pruebas»). Ningún turno con un modelo real. |
+| APK | `Nexus-Agent-1.9.188-agent-preview-vc224-preview.apk`, SHA-256 `3e98171d10c655cec10d8e20fbce81b4173f1a82b43f5ef4afca07835b735371` (test-only: instalar con `-t`) |
+| Instalado | **Instalada en el Pixel 8 Pro** (18/11 a las 14:50:24, `adb install -r -t` sobre la primera compilación de la misma vc224; 4258 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma). |
+| S25 | Sin instalar: sigue en la vc220. Vidal lo autorizó el 18/11, pero al ir a hacerlo el teléfono había salido de la wifi de casa: la copia previa de datos se cortó y no se instaló nada. Pendiente de que vuelva. |
+| Probado en dispositivo | Pixel 8 Pro: a mano con un guion local sin modelo (la pantalla, con la vc222; los avisos, con la vc224) y un turno con modelo real (AGY, Hidrógeno) sobre la APK final; pruebas instrumentadas 6/6 sobre `926698f7`, no repetidas sobre el código final (ver «Pruebas»). |
 
 ## Qué cambia
 
@@ -93,6 +93,17 @@ acabado carbón y mate). Rama `aki/agent-redesign-20261118` sobre `aki/cut-premi
 - El compositor sube con el teclado y la conversación se recoloca; con el teclado abierto se ocultan las
   pestañas.
 
+### 6. Avisos al pie de la conversación (vc224)
+
+- Los avisos emergentes (un turno que falla, la cola que no se envió, un borrador de memoria conservado) vivían en
+  el hueco de avisos de la pantalla y flotaban sobre el compositor: tapaban el campo y la fila de controles justo
+  cuando hacía falta detener o reintentar. Ahora salen dentro del área de la conversación, pegados a su borde
+  inferior, encima del compositor.
+- La lista cede al final el alto del aviso, así que el aviso tampoco tapa el último mensaje; una conversación que
+  estaba al final sigue al final. El hueco se abre y se cierra animado, y el botón «Bajar al final» sube con él.
+- Los avisos con acción («Reintentar», «Seguir editando») siguen a la vista hasta que se cierran, como antes;
+  mientras están, ocupan ese sitio de la zona de lectura.
+
 ## De paso
 
 - `Redactor`: uno de sus patrones (token suelto de 40 caracteres) no tiene grupo de captura y leer el grupo 1
@@ -108,7 +119,7 @@ acabado carbón y mate). Rama `aki/agent-redesign-20261118` sobre `aki/cut-premi
   vc220 del S25 ni a Windows.
 - Sin cambios en trabajos, adjuntos, proyectos ni en la firma.
 
-## Capturas (Pixel 8 Pro, tema Nocturne)
+## Capturas (Pixel 8 Pro; tema Nocturne salvo donde se indica)
 
 ![Conversación en reposo](images/agent-redesign-20261118/1-reposo.jpg)
 
@@ -134,6 +145,10 @@ Turno que falla: la actividad queda con su incidencia y la tarjeta ofrece Reinte
 
 Con un tema claro (Champagne Silk) la composición es la misma y el fondo sigue siendo el del tema.
 
+![Aviso al pie de la conversación (vc224, Champagne Silk)](images/agent-redesign-20261118/7-aviso.jpg)
+
+vc224: el aviso de un turno fallido sale al pie de la conversación, encima del compositor; la tarjeta del fallo queda entera por encima y el campo y los controles, libres.
+
 El Pixel tiene activado el texto en negrita del sistema (`font_weight_adjustment=300`): en las capturas la
 letra sale más gruesa que en un teléfono sin ese ajuste.
 
@@ -144,8 +159,9 @@ letra sale más gruesa que en un teléfono sin ese ajuste.
   `QueuedSendTest` (8).
 - Instrumentadas nuevas: `AgentChatRedesignUiTest` (6): cabecera en reposo y en ejecución, fila con incidencia y su
   detalle, actividad guardada plegada, compositor en ejecución con cola y detener, tarjeta con «Recuperar».
-  Ejecutadas en el Pixel 8 Pro el 18/11 a las 12:42 sobre `926698f7`, en un sandbox aparte (`com.vidadomu.nexus.minimalqa`, instalado y desinstalado; Nexus sin cambios): `OK (6 tests)`. **No se repitieron sobre el código final**: el APK de pruebas de `d593ec9f` compila (CodeBuild `7eba9c73-8e56-4324-b153-68d3d9efde8b`), pero a esa hora otro agente estaba usando el Pixel y la instrumentación le habría cortado su servicio de accesibilidad. Entre `926698f7` y el código final cambian las frases de las herramientas, el ajuste de línea del detalle y el alto de 48 dp de las filas; las dos comprobaciones de alto añadidas en `d593ec9f` no se han visto pasar en un dispositivo.
-- En el Pixel, a mano con un guion local: reposo, borrador con el teclado, ejecución completa (7 pasos, uno con incidencia devuelta por la herramienta real), actividad guardada plegada y desplegada, detalle de la incidencia, cola «Enviar al terminar» (el mensaje en espera salió solo al acabar), detener a mitad (paso cerrado como cancelado), error del modelo (tarjeta con Reintentar y Cambiar modelo) y error del modelo con un mensaje en espera (no se envió, siguió en el campo y Nexus avisó). Sin cierres inesperados. La cola que se envía sola y detener se probaron con la primera compilación de la vc222 (`bb9f68f7`); el resto, con la APK final.
+  Ejecutadas en el Pixel 8 Pro el 18/11 a las 12:42 sobre `926698f7`, en un sandbox aparte (`com.vidadomu.nexus.minimalqa`, instalado y desinstalado; Nexus sin cambios): `OK (6 tests)`. **No se repitieron sobre el código final**: el APK de pruebas de `d593ec9f` compila (CodeBuild `7eba9c73-8e56-4324-b153-68d3d9efde8b`), pero a esa hora otro agente estaba usando el Pixel y la instrumentación le habría cortado su servicio de accesibilidad. Entre `926698f7` y el código final cambian las frases de las herramientas, el ajuste de línea del detalle y el alto de 48 dp de las filas; las dos comprobaciones de alto añadidas en `d593ec9f` no se han visto pasar en un dispositivo. En la vc224 cambia además la colocación de los avisos (`AssistantScreen.kt`), que estas pruebas no cubren.
+- En el Pixel, a mano con un guion local: con la vc222 (`7678bd91`; desde entonces el código de la app solo cambia en los avisos): reposo, borrador con el teclado, ejecución completa (7 pasos, uno con incidencia devuelta por la herramienta real), actividad guardada plegada y desplegada, detalle de la incidencia, cola «Enviar al terminar» (el mensaje en espera salió solo al acabar), detener a mitad (paso cerrado como cancelado), error del modelo (tarjeta con Reintentar y Cambiar modelo) y error del modelo con un mensaje en espera (no se envió, siguió en el campo y Nexus avisó); la cola que se envía sola y detener, con la primera compilación de la vc222 (`bb9f68f7`). Con la vc224, los avisos: con el teclado abierto y un mensaje en espera, un turno que falla (primera compilación, `14ecc111`) deja los dos avisos encima del compositor sin tapar el campo ni los controles; con el teclado cerrado (APK final) el aviso queda al pie, la tarjeta del fallo entera por encima, la lista sube animada y, al cerrar el aviso, baja sin dejar hueco. Sin cierres inesperados.
+- Turno con un modelo real: uno, autorizado por Vidal, el 18/11 a las 15:08 en el Pixel con la APK final. Cerebro AGY, modelo Hidrógeno (`gemini-4-hydrogen-medium`), razonamiento «Medio». Pregunta de solo lectura: «Lista mis proyectos y dime cuantos hay». Respondió bien en 20 s (6 proyectos, con el activo marcado), sin error ni cierre. La cabecera pasó a «Pensando la respuesta», el campo a «Añade algo mientras trabaja» con el botón de detener, y al acabar la actividad quedó plegada («1 paso · 20 s») y la lista siguió el final. Límites de esta prueba: el modelo contestó sin llamar a ninguna herramienta (un solo paso de pensar) y la respuesta llegó de una vez, así que las filas de herramienta y el texto que va llegando siguen vistos solo con el guion local.
 
 ### Guion local sin modelo (`assistant/AgentChatQa.kt`)
 
@@ -180,13 +196,17 @@ numérica o de menos de 6 caracteres seguiría visible, y a cambio se oculta alg
 `token_type=Bearer`; si un envío en cola se niega con una nota en la conversación, puede salir además el aviso
 de la cola.
 
+El cambio de los avisos (vc224) pasó otras dos revisiones de solo lectura. La primera, sobre `14ecc111`: 9 de 9 puntos conformes; señaló que la lista daba un salto al aparecer y al desaparecer el aviso y que el alto medido podía quedarse viejo, y las dos cosas se corrigieron en `3ab2340a`. La segunda, sobre `3ab2340a`: 8 conformes y 1 con reserva. Dejó dos riesgos teóricos de gravedad media, sin cambiar: si el desplazamiento que hace sitio al aviso coincide con el que sigue a la respuesta, la lista podría dejar de seguir el final hasta que se toque «Bajar al final». No se ha reproducido en el Pixel, tampoco en el turno con modelo real. Menores, sin cambiar: si el dedo sujeta la lista cuando sale el aviso, la lista no se recoloca sola.
+
 ## Pendiente y límites
 
-- **Turno con un modelo real**: no se ha hecho ninguno (cada turno gasta cuota). La ejecución, la incidencia, la cola, detener y el error se probaron con el guion local; los eventos son los mismos que emite un turno real, pero las frases y los tiempos de un modelo de verdad no se han visto.
 - **«Recuperar» con un encargo real**: probado en JVM (`OrderBookTest`, `OrderCardLogicTest`) y en la prueba instrumentada de la tarjeta; no con un trabajo real pausado.
-- **S25**: sin instalar. Antes de hacerlo hay que decidir qué pasa con Cut premium, que va dentro de esta rama.
-- **Avisos emergentes**: siguen saliendo en la parte baja de la pantalla, encima del cuadro de entrada, como antes del rediseño (no se ha tocado). Con el compositor nuevo tapan el campo y la fila de controles; el de un turno fallido, que lleva «Reintentar», se queda hasta que se cierra. Se arregla colocándolos por encima del compositor.
+- **S25**: sin instalar (sigue en vc220). Autorizado por Vidal; pendiente de que el teléfono vuelva a la wifi de casa. Cut premium va dentro de esta rama. Esta rama, como la vc220, no lleva el arreglo del reintento de 5 h de la sincronización del guion.
+- **Turno real con herramientas**: el único turno con modelo real no usó ninguna (ver «Pruebas»). Un turno real largo, con varias herramientas, una incidencia o texto que llega poco a poco, no se ha visto.
+- **Instrumentadas**: pasaron sobre `926698f7` y no se han repetido sobre el código final (ver «Pruebas»).
+- **Avisos con acción**: el de un turno fallido lleva «Reintentar» y se queda hasta que se cierra; mientras está, ocupa el pie de la zona de lectura (la lista le hace sitio).
+- **Seguimiento del final con un aviso a la vista**: dos riesgos teóricos de la revisión, sin reproducir y sin cambiar (ver «Revisión independiente»).
 - **Selector de modelo**: solo cambia de modelo en el sitio con AGY y Codex; con los demás cerebros abre los ajustes.
 - **Tema claro**: conserva su fondo de papel; el carbón solo se aplica a los temas oscuros.
 - Hallazgos menores de la revisión que no se han tocado: ver la tabla de arriba.
-- En el Pixel queda la conversación de prueba «Busca planos del faro en mi Biblioteca» (proyecto General, con los turnos del guion local). Nexus no tiene borrado de conversaciones; se sincroniza por Drive como texto.
+- En el Pixel queda la conversación de prueba «Busca planos del faro en mi Biblioteca» (proyecto General), con los turnos del guion local y el turno real. Nexus no tiene borrado de conversaciones; se sincroniza por Drive como texto.

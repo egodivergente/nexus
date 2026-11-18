@@ -3,12 +3,12 @@
         "branch": "aki/agent-redesign-20261118",
         "baseCommit": "72207c98",
         "includes": "aki/cut-premium-20261117 (sin fusionar)",
-        "apkCommit": "7678bd91037546b8cf9f02114e6e8a81bff73cdc",
-        "versionCode": 222,
-        "versionName": "1.9.186-agent-preview",
-        "buildId": "vidal-android-build:948e9108-31bd-459c-8308-6a599cc9bdbc",
+        "apkCommit": "3ab2340a50a9511b3156f27669987c08d117607d",
+        "versionCode": 224,
+        "versionName": "1.9.188-agent-preview",
+        "buildId": "vidal-android-build:419391f5-784e-4f85-bcea-f662bc3a6de8",
         "buildStatus": "SUCCEEDED",
-        "apkSha256": "f7234357739a79f321bb3ec9154b5a135180d0257d6a44594fd7707544b0b1f4",
+        "apkSha256": "3e98171d10c655cec10d8e20fbce81b4173f1a82b43f5ef4afca07835b735371",
         "certificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
         "zipAlignment16KiB": true,
         "nativeLibrariesIdenticalToVc220": 6,
@@ -29,19 +29,32 @@
             "finalCommitTestApkBuild": "vidal-android-build:7eba9c73-8e56-4324-b153-68d3d9efde8b"
         },
         "pixelInstalledAsUpdate": true,
-        "pixelInstalledAt": "2026-11-18 13:24:24",
+        "pixelInstalledAt": "2026-11-18 14:50:24",
         "pixelDataFilesBeforeAfter": [
-            4245,
-            4245
+            4258,
+            4258
         ],
         "s25Installed": false,
-        "realModelTurnTested": false,
+        "s25InstalledAt": null,
+        "s25OpenedOrTested": false,
+        "realModelTurnTested": true,
+        "realModelTurn": {
+            "at": "2026-11-18 15:08",
+            "device": "Pixel 8 Pro",
+            "brain": "AGY",
+            "model": "gemini-4-hydrogen-medium",
+            "seconds": 20,
+            "steps": 1,
+            "toolCalls": 0,
+            "error": false
+        },
         "recoverTestedWithRealJob": false,
         "pending": [
-            "turno con modelo real",
             "Recuperar con un encargo real",
-            "instalar en S25",
-            "avisos emergentes encima del compositor"
+            "instalar en S25 (autorizado; teléfono fuera de casa)",
+            "abrir y repasar en el S25",
+            "turno real con herramientas",
+            "instrumentadas sobre el código final"
         ],
         "report": "docs/NEXUS-AGENT-REDESIGN-20261118.md"
     },
