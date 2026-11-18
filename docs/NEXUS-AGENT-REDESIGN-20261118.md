@@ -174,6 +174,12 @@ Lo que señaló y qué se hizo:
 Confirmó además que «Recuperar» no reenvía ni cobra, que el guion de pruebas no es alcanzable en una
 compilación de publicación y que las funciones previas del chat se conservan.
 
+Los arreglos pasaron después una segunda revisión de solo lectura: sin hallazgos graves ni medios. Menores, sin
+cambiar: en texto libre (no en el JSON de la entrada, donde el campo se oculta entero) una contraseña solo
+numérica o de menos de 6 caracteres seguiría visible, y a cambio se oculta algún texto inocuo como
+`token_type=Bearer`; si un envío en cola se niega con una nota en la conversación, puede salir además el aviso
+de la cola.
+
 ## Pendiente y límites
 
 - **Turno con un modelo real**: no se ha hecho ninguno (cada turno gasta cuota). La ejecución, la incidencia, la cola, detener y el error se probaron con el guion local; los eventos son los mismos que emite un turno real, pero las frases y los tiempos de un modelo de verdad no se han visto.
