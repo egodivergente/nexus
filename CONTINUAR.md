@@ -14,7 +14,7 @@ el seguimiento se pausó; compositor de un bloque (adjuntos, razonamiento, model
 «Enviar al terminar»; fondo carbón y superficies mates en los temas oscuros; avisos emergentes al pie de la
 conversación, encima del compositor (vc224).
 Probado: Pixel 8 Pro: a mano con un guion local sin modelo (la pantalla, con la vc222; los avisos, con la vc224) y un turno con modelo real (AGY, Hidrógeno) sobre la APK final; pruebas instrumentadas 6/6 sobre `926698f7`, no repetidas sobre el código final (ver «Pruebas»).
-Pendiente: «Recuperar» con un encargo real, instalar en el S25 (autorizado; el teléfono estaba fuera de casa), un turno real con herramientas (el hecho no usó ninguna), instrumentadas sobre el código final, dos riesgos teóricos del seguimiento del final con un aviso a la vista.
+Pendiente: «Recuperar» con un encargo real, instalar en el S25 (autorizado; el teléfono estaba fuera de casa), un turno real con herramientas (el que se hizo no usó ninguna), instrumentadas sobre el código final, dos riesgos teóricos del seguimiento del final con un aviso a la vista.
 Informe: `docs/NEXUS-AGENT-REDESIGN-20261118.md`.
 
 # vc221 / 1.9.185-agent: Nexus Cut rediseñado — Pixel 8 Pro, NO instalada en el S25 — 17/11/2026
