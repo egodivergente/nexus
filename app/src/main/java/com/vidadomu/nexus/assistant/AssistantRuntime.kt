@@ -480,6 +480,9 @@ class AssistantRuntime(private val app: NexusApplication) {
         probeFrameRate = { uri -> AgentMediaStore.frameRate(app, uri) },
         limits = { settings.limits() },
         adaptPrompt = { text, _, _ -> text }, // Prompt adaptation requires an explicit user edit/approval.
+        // Equipos de AXEL Commander: mismo cliente y misma identidad persistente que AXEL Hub y Nexus Desktop.
+        link = NexusLink.client(app),
+        remoteMedia = com.vidadomu.nexus.agent.core.agent.GeneratedMediaStore { media, session -> saveGeneratedImage(media, session) },
 
     )
 
@@ -526,7 +529,7 @@ class AssistantRuntime(private val app: NexusApplication) {
 
     /** [llmOverride]: debug builds answer one turn from a local script ([AgentChatQa]); tools and events are the real ones. */
     fun orchestrator(s: AssistantSettings = settings.load(), allowNativeImages: Boolean = true, llmOverride: LlmProvider? = null) = AgentOrchestrator(
-        llmOverride ?: llm(s, allowNativeImages), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
+        llmOverride ?: llm(s, allowNativeImages), s.toConfig(), NexusToolkit.all(deps.also { NexusLink.client(app) }), skills, assets, logger,
         // El límite de 4,5 MB por documento es de Bedrock; el puente (AGY, Codex) solo recibe texto y no tiene ese límite.
         documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {
             val agy = !s.offline && s.bridge

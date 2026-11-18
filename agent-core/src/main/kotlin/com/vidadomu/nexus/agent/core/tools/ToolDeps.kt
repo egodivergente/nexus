@@ -55,6 +55,10 @@ class ToolDeps(
         com.vidadomu.nexus.agent.core.routing.comparison.GenerationCostPreflight(),
     /** Montajes de Nexus Cut y sus sesiones vivas; null mientras la app no monte el editor. */
     val cut: com.vidadomu.nexus.cut.command.CutWorkspace? = null,
+    /** Cliente compartido de AXEL Commander (`com.axel.link`); null si la app no lo monta. */
+    val link: com.axel.link.LinkClient? = null,
+    /** Dónde guarda la app una captura de pantalla remota para enseñarla en el chat. */
+    val remoteMedia: com.vidadomu.nexus.agent.core.agent.GeneratedMediaStore? = null,
 ) {
     val plans = PlanBuilder(registry, cost, assets, clock, adaptPrompt, probeFrameRate, costPreflight)
     val lifecycle = com.vidadomu.nexus.agent.core.agent.GenerationLifecycle(guard, executor, assets, clock, orders) { plan, message ->

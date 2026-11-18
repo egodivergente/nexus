@@ -19,6 +19,8 @@ kotlin {
 dependencies {
     // Nexus Cut: el agente edita montajes por el mismo bus de comandos que la interfaz.
     api(project(":cut-core"))
+    // AXEL Link: cliente único de AXEL Commander, copia idéntica del módulo de AXEL Hub.
+    api(project(":axel-link"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
