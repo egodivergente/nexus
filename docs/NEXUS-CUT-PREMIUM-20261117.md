@@ -2,8 +2,11 @@
 
 Rama `aki/cut-premium-20261117`, sobre `merge/v219-streaming-20261117` (`7feb18d2`, vc220, la última instalada y
 verificada en el S25). vc221 / 1.9.185-agent-preview. Todas las pruebas de este informe se hicieron con la vc221l
-(AWS CodeBuild `vidal-android-build:353caa9b-864c-4f1e-b984-82217ada349e`, commit `1dbe3073`, APK SHA-256
-`bd3628a5ec08dc33edf420150d224496903cc7a6dcf37548887e81219ebbbf7f`), que es la instalada en el Pixel. La última
+(AWS CodeBuild `vidal-android-build:353caa9b-864c-4f1e-b984-82217ada349e`, APK SHA-256
+`bd3628a5ec08dc33edf420150d224496903cc7a6dcf37548887e81219ebbbf7f`), que es la instalada en el Pixel. Se compiló a
+las 09:17 del árbol de trabajo, 19 minutos antes de confirmarlo: su registro de origen dice `764bf6ed`, pero el código
+es el de `1dbe3073` (los 4 archivos de código que cambian entre ambos son, en el zip enviado a CodeBuild, los de
+`1dbe3073`; comprobado archivo a archivo). La última
 compilación es la vc221m (CodeBuild `b7267e10-5834-466b-8c74-e41ad629ff83`, commit `527491ff`, APK SHA-256
 `414fb0c671a50029e487db8a798af48c77ca71547db03495a1f4c7825f4b0ffc`): la vc221l más los nombres accesibles de las dos
 asas (§4, «Después de vc221l»); está compilada, probada en JVM y firmada, y aún no instalada. Las ramas `feat/nexus-cut-20261111` y
@@ -166,7 +169,8 @@ del montaje, propuesta, aplicar, «Comprobado», deshacer y rehacer el turno, de
 **Exportación** (`cut-premium-work/export/SINCRONIA.md`): H.264 1920×1080 30 fps + AAC 48 kHz estéreo; sincronía
 medida por destellos y pitidos de 1 kHz: +10…+44 ms sin acumularse con 9 cortes (origen +0…+18 ms).
 
-**Pruebas automáticas** (CodeBuild, cada build; mismas cifras en vc221l y vc221m): cut-core 133, agent-core 531
+**Pruebas automáticas** (CodeBuild, cada build; mismas cifras en vc221l y vc221m, contadas de los informes JUnit de
+cada una: `build/vc221l/junit-recuento.txt`, `build/vc221m/junit-recuento.txt`): cut-core 133, agent-core 531
 (4 omitidas, en vivo), app 72; 0 fallos. Nuevas: cálculo del tope de muestras de cada elemento de audio (`ItemFramesTest`), medidor de
 volumen (`LoudnessMeterTest`), fps del primer vídeo e importación sin empujar (`DeviceCapabilitiesTest`), reordenación
 por huecos (`LinkAndGroupTest`), turnos del agente (`CutSessionGroupsTest`, `BoundCutToolsTest`), silencios
@@ -175,7 +179,7 @@ textos (`CutEditorTextTest`).
 
 **GitHub Actions** (`build-apk.yml`, en cada push): compilación, APK, pruebas unitarias y compilación de las pruebas
 de dispositivo, en verde en todos los pushes de la rama. El paso «Run presentation UI tests (offline fixtures)»
-(emulador; `AssistantPresentationUiTest` y `ChatRichContentDeviceTest`, que no tocan Cut) pasó en uno de cinco:
+(emulador; `AssistantPresentationUiTest` y `ChatRichContentDeviceTest`, que no tocan Cut) pasó en dos de seis:
 
 | Commit | Run | Paso de UI con emulador |
 |---|---|---|
@@ -184,15 +188,17 @@ de dispositivo, en verde en todos los pushes de la rama. El paso «Run presentat
 | `96a074bf` | 44052299455 | falla 1 de 11 |
 | `5dbc6f94` | 44052867770 | falla 1 de 11 |
 | `00dfd523` | 44053856007 | falla 1 de 11 |
+| `c80da997` | 44227657526 | pasa (11 de 11) |
 
 En los cuatro fallos (registros leídos) falla la misma prueba y solo esa:
 `ChatRichContentDeviceTest.penDoesNotDrawUntilLongPressAndAnnotationsAreSelected` (`ComposeTimeoutException` tras
 5000 ms en la línea 113: el trazo del lápiz sobre el tablero de imágenes del chat no llega a guardarse a tiempo).
-Los tres últimos commits de la tabla solo cambian `CutFeedbackDeviceTest.kt` y documentación respecto del que pasó.
+`96a074bf`, `5dbc6f94` y `00dfd523` solo cambian `CutFeedbackDeviceTest.kt` y documentación respecto de `1dbe3073`,
+que pasó; `c80da997` (mismo código de la app que la vc221m) también pasa.
 La misma prueba falla de forma intermitente en otras 7 ramas ajenas a esta desde el 14/11 (8 de los 21 runs que
 llegaron a ese paso). Esta rama no toca el tablero del chat ni esa prueba, y el tablero no usa hápticos; lo único
 compartido que cambia fuera de Cut es `NexusHaptics.kt` (eventos nuevos y limitador) y el fondo negro de
-`MainActivity` en las rutas `cut/`. Con cinco runs no se puede afirmar ni descartar que esta rama la haga fallar
+`MainActivity` en las rutas `cut/`. Con seis runs no se puede afirmar ni descartar que esta rama la haga fallar
 más a menudo. No se ha corregido aquí: es una prueba de otra línea de trabajo.
 
 **Prueba en dispositivo heredada** (`CutFeedbackDeviceTest`, opcional: `-PnexusFeedbackDeviceTests=true` y
@@ -205,12 +211,17 @@ Primera ejecución en el Pixel (18/11 03:32, vc221l, APK de pruebas de `00dfd523
 y firmado con la misma identidad): **falló, por la propia prueba y no por el editor**. Otro agente tenía abierta y
 enfocada una pantalla virtual en el Pixel (scrcpy `--new-display`) y Android abrió allí la actividad; la prueba
 encontró los nodos del editor, pero la captura y los toques inyectados fueron a la pantalla integrada, donde estaba
-el launcher, y la guarda de primer plano la detuvo tras el primer toque. La app y sus datos quedaron intactos
-(4206 archivos, 0 desaparecidos; archivos de Cut y reparto guardado sin cambios; paquete de pruebas desinstalado).
+el launcher, y la guarda de primer plano la detuvo tras el primer toque. La causa se leyó en el registro de eventos
+del sistema en ese momento y no se guardó el volcado: lo archivado es el fallo de la guarda (`report.json`) y una
+nota con las líneas leídas (`devtest/20261118-033136-…/causa-registro-sistema.txt`). La app y sus datos quedaron
+intactos (4206 archivos antes y 4207 después, 0 desaparecidos; archivos de Cut y reparto guardado sin cambios;
+paquete de pruebas desinstalado).
 Corregido en `527491ff` y `10d8caad`: la prueba pide la pantalla integrada y falla si no la obtiene, y un gesto
 abandonado a medias levanta los dedos (`ACTION_CANCEL`). Verificación independiente de solo lectura de
-`00dfd523..527491ff`: 9 puntos correctos; su única reserva, la cancelación del pellizco con dos dedos pulsados, es el
-arreglo de `10d8caad`. **Sigue sin haber pasado en un dispositivo**: el Pixel está en uso por ese otro agente y no
+`00dfd523..527491ff`: 9 puntos correctos, dos de ellos con reservas: la cancelación del pellizco con dos dedos
+pulsados, que es el arreglo de `10d8caad`, y que, cuando la pantalla no es la integrada, la tarea de `MainActivity`
+sigue abierta un momento mientras se cierra. Que la prueba pase entera solo lo aclara una ejecución en dispositivo.
+**Sigue sin haber pasado en un dispositivo**: el Pixel está en uso por ese otro agente y no
 se toca mientras lo esté.
 
 **Después de vc221l** (`2ce90114`, compilado como vc221m): las dos asas recuperan su nombre accesible («Tamaño de la
