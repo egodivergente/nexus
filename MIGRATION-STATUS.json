@@ -1,4 +1,50 @@
 ﻿{
+    "agentRedesign20261118": {
+        "branch": "aki/agent-redesign-20261118",
+        "baseCommit": "72207c98",
+        "includes": "aki/cut-premium-20261117 (sin fusionar)",
+        "apkCommit": "7678bd91037546b8cf9f02114e6e8a81bff73cdc",
+        "versionCode": 222,
+        "versionName": "1.9.186-agent-preview",
+        "buildId": "vidal-android-build:948e9108-31bd-459c-8308-6a599cc9bdbc",
+        "buildStatus": "SUCCEEDED",
+        "apkSha256": "f7234357739a79f321bb3ec9154b5a135180d0257d6a44594fd7707544b0b1f4",
+        "certificateSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+        "zipAlignment16KiB": true,
+        "nativeLibrariesIdenticalToVc220": 6,
+        "jvmTests": {
+            "agentCore": 544,
+            "agentCoreSkipped": 4,
+            "app": 194,
+            "cutCore": 133,
+            "failures": 0
+        },
+        "deviceTests": {
+            "class": "AgentChatRedesignUiTest",
+            "passed": 6,
+            "failed": 0,
+            "device": "Pixel 8 Pro",
+            "commit": "926698f7",
+            "ranOnFinalCommit": false,
+            "finalCommitTestApkBuild": "vidal-android-build:7eba9c73-8e56-4324-b153-68d3d9efde8b"
+        },
+        "pixelInstalledAsUpdate": true,
+        "pixelInstalledAt": "2026-11-18 13:24:24",
+        "pixelDataFilesBeforeAfter": [
+            4245,
+            4245
+        ],
+        "s25Installed": false,
+        "realModelTurnTested": false,
+        "recoverTestedWithRealJob": false,
+        "pending": [
+            "turno con modelo real",
+            "Recuperar con un encargo real",
+            "instalar en S25",
+            "avisos emergentes encima del compositor"
+        ],
+        "report": "docs/NEXUS-AGENT-REDESIGN-20261118.md"
+    },
     "cutPremium20261117": {
         "branch": "aki/cut-premium-20261117",
         "baseCommit": "7feb18d2",
