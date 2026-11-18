@@ -343,6 +343,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             var lastBreakdown: String? = null
             // Only an answer that ended on its own sends what was queued; stopping it or an error keep the draft.
             var completed = false
+            var stopped = false
             try {
                 val run: suspend () -> com.vidadomu.nexus.agent.core.agent.TurnResult = {
                     turnOrchestrator.send(conv, listOf(carriedNote, clean.ifEmpty { "Te adjunto estos archivos." }, note).filter { it.isNotBlank() }.joinToString("\n\n"), atts) { ev -> onEvent(ev, chatId) }
@@ -372,6 +373,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 notice("La petición ha superado el tiempo de espera. Tus archivos se conservan; puedes reintentar.", error=true, chatId = chatId,
                     closing = AgentStepStatus.ISSUE to "Tiempo de espera superado.")
             } catch (e: CancellationException) {
+                stopped = true
                 notice("Cancelado.", chatId = chatId, closing = AgentStepStatus.CANCELLED to null)
                 throw e
             } catch (e: LlmException) {
@@ -401,7 +403,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     // El asistente puede haber entrado en otro proyecto (open_project / create_project).
                     val moved = conv.session.activeProjectId.takeIf { it != _ui.value.activeProjectId }
                     if (moved != null) selectProject(moved)
-                    else if (queued && completed) sendQueued(chatId)
+                    when (QueuedSend.afterTurn(queued, completed, stopped, onScreen = true, movedProject = moved != null)) {
+                        QueuedOutcome.SEND -> sendQueued(chatId)
+                        // Never dropped in silence: the draft is still there and the user is told it did not go out.
+                        QueuedOutcome.KEPT -> _ui.update { it.copy(message = msg(QueuedSend.keptMessage(moved != null))) }
+                        QueuedOutcome.NONE -> Unit
+                    }
                 }
             }
         }
@@ -435,10 +442,23 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val text = draftPrefs.getString(key, "").orEmpty()
         if (text.isBlank() && _ui.value.pendingAttachments.isEmpty()) return
         // Same path as the send button. If it cannot go out (limits, archived project…) the draft is left untouched.
+        val notices = _ui.value.message
         if (sendWithBoards(text)) {
             draftPrefs.edit().remove(key).remove("text").apply()
             _ui.update { it.copy(draftRevision = it.draftRevision + 1) }
+        } else if (_ui.value.message == notices) {
+            // The send path explains most refusals itself; when it says nothing, the queue does.
+            _ui.update { it.copy(message = msg(QueuedSend.keptMessage(movedProject = false))) }
         }
+    }
+
+    /** A message that looked sent and then could not go out returns to the field it was written in. */
+    private fun restoreDraft(chatId: String, text: String) {
+        if (text.isBlank()) return
+        val key = "conversation:$chatId"
+        if (!draftPrefs.getString(key, "").isNullOrBlank()) return // The user has already written something else there.
+        draftPrefs.edit().putString(key, text).apply()
+        if (_ui.value.conversationId == chatId) _ui.update { it.copy(draftRevision = it.draftRevision + 1) }
     }
 
     /** What is saved with the answer or notice that ends a turn: nothing left «running», secrets already redacted. */
@@ -653,6 +673,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val boards = _ui.value.items.filterIsInstance<ChatItem.Board>().mapNotNull { boardStore.load(it.boardId) }.filter { it.dirty }
         if (boards.isEmpty()) return send(text)
         val numbers = _ui.value.items.filterIsInstance<ChatItem.Board>().map { it.boardId }
+        // The caller clears the field as soon as this returns true; if the message then cannot go out, it comes back.
+        val chatId = _ui.value.conversationId
         _ui.update { it.copy(attaching = true) }
         viewModelScope.launch {
             val exported = try {
@@ -662,6 +684,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 _ui.update { it.copy(attaching = false) }
+                restoreDraft(chatId, text)
                 notice("No se pudo preparar el tablero: ${e.message?.take(160)}", error = true); return@launch
             }
             val added = exported.flatMap { it.files }.mapNotNull { uri ->
@@ -671,6 +694,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             _ui.update { it.copy(pendingAttachments = (it.pendingAttachments + added).distinctBy { a -> a.id }, attaching = false) }
             if (send(text, note = exported.joinToString("\n\n") { it.note }))
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { boards.forEach { boardStore.save(it.markSent()) } }
+            else restoreDraft(chatId, text)
         }
         return true
     }

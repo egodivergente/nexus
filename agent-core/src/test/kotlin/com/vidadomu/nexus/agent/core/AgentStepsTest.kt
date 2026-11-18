@@ -108,6 +108,30 @@ class AgentStepsTest {
         assertNull(AgentSteps.detail(buildJsonObject { }))
     }
 
+    @Test fun `la actividad no guarda credenciales aunque el campo no se llame api_key`() {
+        val input = Json.parseToJsonElement("""{"query":"faro","access_token":"ya29.a0AfH6SMBx","auth":{"password":"mi frase de paso","client_secret":"cs-123456"},
+            "headers":["Authorization: Bearer abcdefghijklmnop123456"],"max_tokens":4096,"page_token":null,"nota":"usa sk-proj-ABCDEFGHIJKLMNOPQRST y nada más"}""")
+        val detail = AgentSteps.detail(input)!!
+        for (secret in listOf("ya29.a0AfH6SMBx", "mi frase de paso", "cs-123456", "abcdefghijklmnop123456", "sk-proj-ABCDEFGHIJKLMNOPQRST"))
+            assertFalse(secret in detail, "$secret sigue en el detalle:\n$detail")
+        // Lo que no es un secreto se sigue leyendo.
+        assertTrue("\"query\": \"faro\"" in detail && "\"max_tokens\": 4096" in detail && "y nada más" in detail, detail)
+        val line = AgentSteps.command("call_api", input)
+        assertTrue("access_token=«oculto»" in line && "query=faro" in line && "max_tokens=4096" in line, line)
+        assertFalse("ya29" in line || "sk-proj" in line, line)
+        // Texto libre de un resultado o de un error: clave=valor, portador y formas conocidas de clave.
+        val text = AgentSteps.clip("fallo: refresh_token=1//0gAbCdEfGh; Bearer zzzzzzzzzzzzzzzz1234 en https://x.test/v?token=abcdef123456&n=2 con ghp_abcdefghijklmnopqrstuvwxyz0123")
+        for (secret in listOf("1//0gAbCdEfGh", "zzzzzzzzzzzzzzzz1234", "abcdef123456", "ghp_abcdefghijklmnopqrstuvwxyz0123")) assertFalse(secret in text, text)
+        assertTrue(text.startsWith("fallo: refresh_token=«oculto»"), text)
+        assertEquals(text, AgentSteps.scrub(text), "ocultar dos veces no cambia nada")
+        // Un secreto largo no se salva por quedar partido al acortar el argumento.
+        val cut = AgentSteps.command("x", buildJsonObject { put("nota", "la clave es " + "A1b2C3d4E5".repeat(4) + " fin") })
+        assertFalse("A1b2C3d4E5A1b2" in cut, cut)
+        // Un resultado enorme se recorta sin recorrerlo entero y dice su tamaño real.
+        val huge = AgentSteps.clip("{\"data\":\"" + "QUJD".repeat(60_000) + "\"}")
+        assertTrue(huge.length < AgentSteps.DETAIL_CHARS + 60 && huge.endsWith("(recortado: 240011 caracteres)"), huge.takeLast(60))
+    }
+
     @Test fun `el detalle se recorta y un error simple se ensena tal cual`() {
         val long = AgentSteps.clip("x".repeat(AgentSteps.DETAIL_CHARS + 500))
         assertTrue(long.startsWith("x".repeat(AgentSteps.DETAIL_CHARS)) && long.endsWith("(recortado: ${AgentSteps.DETAIL_CHARS + 500} caracteres)"))

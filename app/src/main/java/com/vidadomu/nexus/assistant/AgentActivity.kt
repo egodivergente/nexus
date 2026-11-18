@@ -222,7 +222,8 @@ internal fun AgentActivitySaved(id: String, steps: List<AgentStep>, modifier: Mo
                 contentDescription = "Actividad del agente: " + listOfNotNull(summary, issues).joinToString(", ")
                 stateDescription = if (open) "Desplegada" else "Plegada"
             }
-            .heightIn(min = 36.dp).padding(start = 1.dp, end = NexusTokens.space8),
+            // Dense to the eye, but a full touch target: it is the way into how the answer was reached.
+            .heightIn(min = NexusTokens.minimumTouch).padding(start = 1.dp, end = NexusTokens.space8),
             verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
                 when {
@@ -265,6 +266,8 @@ private fun AgentStepRow(step: AgentStep) {
             .then(if (step.hasDetail) Modifier.clickable(onClickLabel = if (open) "Ocultar el detalle" else "Ver el detalle", role = Role.Button) { open = !open }
                 else Modifier)
             .semantics(mergeDescendants = true) { stateDescription = if (step.hasDetail) "$state. Detalle " + (if (open) "desplegado" else "plegado") else state }
+            // Only the rows that open something need a full touch target; the rest stay as tight as the reference.
+            .then(if (step.hasDetail) Modifier.heightIn(min = NexusTokens.minimumTouch) else Modifier)
             .padding(vertical = 7.dp, horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
