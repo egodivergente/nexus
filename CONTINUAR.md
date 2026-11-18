@@ -13,7 +13,13 @@ alto en horizontal; ajustes y exportación en hojas; modo inmersivo; reordenaci�
 agente en botón flotante con turnos comprobados, propuestas, deshacer/rehacer del turno y `audio.find_silences`;
 sincronía de audio por clip; Reproducir arranca en 0,13 s con el reproductor pre-preparado (antes 0,8–1,6 s).
 Pendiente: háptica en el S25, distribución en el S25 real, agente con modelo real, tirones del primer segundo de
-reproducción, ejecutar en dispositivo `CutFeedbackDeviceTest` (actualizada al editor nuevo, sin ejecutar).
+reproducción, que `CutFeedbackDeviceTest` pase en un dispositivo (primera ejecución, 18/11: falló por la propia
+prueba al haber una pantalla virtual ajena en el Pixel; corregida en `527491ff`/`10d8caad`, sin repetir).
+vc221m (18/11, CodeBuild `b7267e10-5834-466b-8c74-e41ad629ff83`, commit `527491ff`, SHA-256
+`414fb0c671a50029e487db8a798af48c77ca71547db03495a1f4c7825f4b0ffc`): vc221l + nombres accesibles de las dos asas;
+mismas pruebas JVM en verde, firmada con la misma identidad, NO instalada (el Pixel lo usa otro agente).
+GitHub Actions: el único fallo de la rama es `ChatRichContentDeviceTest.penDoesNotDrawUntilLongPressAndAnnotationsAreSelected`
+(emulador, intermitente también en otras 7 ramas; no toca Cut).
 Informe: `docs/NEXUS-CUT-PREMIUM-20261117.md`.
 
 # vc220 / 1.9.184-agent: burbuja en vivo acumulada — INSTALADA en S25 — 17/11/2026

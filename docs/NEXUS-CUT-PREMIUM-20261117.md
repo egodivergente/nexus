@@ -1,9 +1,12 @@
 # Nexus Cut premium — auditoría, rediseño y validación (17/11/2026)
 
 Rama `aki/cut-premium-20261117`, sobre `merge/v219-streaming-20261117` (`7feb18d2`, vc220, la última instalada y
-verificada en el S25). vc221 / 1.9.185-agent-preview, build final vc221l (AWS CodeBuild
-`vidal-android-build:353caa9b-864c-4f1e-b984-82217ada349e`, APK SHA-256
-`bd3628a5ec08dc33edf420150d224496903cc7a6dcf37548887e81219ebbbf7f`). Las ramas `feat/nexus-cut-20261111` y
+verificada en el S25). vc221 / 1.9.185-agent-preview. Todas las pruebas de este informe se hicieron con la vc221l
+(AWS CodeBuild `vidal-android-build:353caa9b-864c-4f1e-b984-82217ada349e`, commit `1dbe3073`, APK SHA-256
+`bd3628a5ec08dc33edf420150d224496903cc7a6dcf37548887e81219ebbbf7f`), que es la instalada en el Pixel. La última
+compilación es la vc221m (CodeBuild `b7267e10-5834-466b-8c74-e41ad629ff83`, commit `527491ff`, APK SHA-256
+`414fb0c671a50029e487db8a798af48c77ca71547db03495a1f4c7825f4b0ffc`): la vc221l más los nombres accesibles de las dos
+asas (§4, «Después de vc221l»); está compilada, probada en JVM y firmada, y aún no instalada. Las ramas `feat/nexus-cut-20261111` y
 `codex/cut-video-gestures-20261114` y la copia Android de Codex (`nexus-story-sync-android-20261111`) ya
 están contenidas en esa base (comprobado con `git merge-base --is-ancestor`); su trabajo se conserva entero.
 
@@ -163,25 +166,59 @@ del montaje, propuesta, aplicar, «Comprobado», deshacer y rehacer el turno, de
 **Exportación** (`cut-premium-work/export/SINCRONIA.md`): H.264 1920×1080 30 fps + AAC 48 kHz estéreo; sincronía
 medida por destellos y pitidos de 1 kHz: +10…+44 ms sin acumularse con 9 cortes (origen +0…+18 ms).
 
-**Pruebas automáticas** (CodeBuild, cada build; vc221l): cut-core 133, agent-core 531 (4 omitidas, en vivo),
-app 72; 0 fallos. Nuevas: cálculo del tope de muestras de cada elemento de audio (`ItemFramesTest`), medidor de
+**Pruebas automáticas** (CodeBuild, cada build; mismas cifras en vc221l y vc221m): cut-core 133, agent-core 531
+(4 omitidas, en vivo), app 72; 0 fallos. Nuevas: cálculo del tope de muestras de cada elemento de audio (`ItemFramesTest`), medidor de
 volumen (`LoudnessMeterTest`), fps del primer vídeo e importación sin empujar (`DeviceCapabilitiesTest`), reordenación
 por huecos (`LinkAndGroupTest`), turnos del agente (`CutSessionGroupsTest`, `BoundCutToolsTest`), silencios
 (`AudioAnalysisTest`), reparto y pistas vacías (`CutInteractionStateTest`), regla (`CutRulerFormattingTest`) y
 textos (`CutEditorTextTest`).
 
-**GitHub Actions** (`build-apk.yml`, en cada push): sobre `764bf6ed` (run 44043579716), compilación, APK y pruebas
-unitarias en verde y fallo en «Run presentation UI tests (offline fixtures)», un paso con emulador que ejecuta
-`AssistantPresentationUiTest` y `ChatRichContentDeviceTest` (no tocan Cut). Sobre `1dbe3073` (run 44048242874, lo
-mismo más los arreglos de vc221l), todos los pasos en verde, también ese. La causa del primer fallo no se ha leído
-(los registros piden sesión de GitHub); el mismo paso fallaba ya en otras ramas anteriores a esta.
+**GitHub Actions** (`build-apk.yml`, en cada push): compilación, APK, pruebas unitarias y compilación de las pruebas
+de dispositivo, en verde en todos los pushes de la rama. El paso «Run presentation UI tests (offline fixtures)»
+(emulador; `AssistantPresentationUiTest` y `ChatRichContentDeviceTest`, que no tocan Cut) pasó en uno de cinco:
+
+| Commit | Run | Paso de UI con emulador |
+|---|---|---|
+| `764bf6ed` | 44043579716 | falla 1 de 11 |
+| `1dbe3073` | 44048242874 | pasa (11 de 11) |
+| `96a074bf` | 44052299455 | falla 1 de 11 |
+| `5dbc6f94` | 44052867770 | falla 1 de 11 |
+| `00dfd523` | 44053856007 | falla 1 de 11 |
+
+En los cuatro fallos (registros leídos) falla la misma prueba y solo esa:
+`ChatRichContentDeviceTest.penDoesNotDrawUntilLongPressAndAnnotationsAreSelected` (`ComposeTimeoutException` tras
+5000 ms en la línea 113: el trazo del lápiz sobre el tablero de imágenes del chat no llega a guardarse a tiempo).
+Los tres últimos commits de la tabla solo cambian `CutFeedbackDeviceTest.kt` y documentación respecto del que pasó.
+La misma prueba falla de forma intermitente en otras 7 ramas ajenas a esta desde el 14/11 (8 de los 21 runs que
+llegaron a ese paso). Esta rama no toca el tablero del chat ni esa prueba, y el tablero no usa hápticos; lo único
+compartido que cambia fuera de Cut es `NexusHaptics.kt` (eventos nuevos y limitador) y el fondo negro de
+`MainActivity` en las rutas `cut/`. Con cinco runs no se puede afirmar ni descartar que esta rama la haga fallar
+más a menudo. No se ha corregido aquí: es una prueba de otra línea de trabajo.
 
 **Prueba en dispositivo heredada** (`CutFeedbackDeviceTest`, opcional: `-PnexusFeedbackDeviceTests=true` y
 `-e cutProjectId`): `previewGesturesAndAgentMinimizeDoNotEditTheMontage` buscaba etiquetas del editor anterior
 («Minimizar agente», «Mostrar agente del montaje», el asa con nombre) y habría fallado. Está actualizada al editor
 nuevo: asa en la barra de transporte, agente oculto de entrada, comprobación sobre imagen + línea de tiempo y
-reparto guardado restaurado al acabar. Está contrastada con los volcados de accesibilidad tomados en el Pixel, pero
-**no se ha ejecutado en el dispositivo** (el Pixel quedó al 11 % de batería); Actions la compila, no la ejecuta.
+reparto guardado restaurado al acabar; localiza las dos asas por su nombre. Actions la compila, no la ejecuta.
+
+Primera ejecución en el Pixel (18/11 03:32, vc221l, APK de pruebas de `00dfd523` compilado en CodeBuild `751d3864…`
+y firmado con la misma identidad): **falló, por la propia prueba y no por el editor**. Otro agente tenía abierta y
+enfocada una pantalla virtual en el Pixel (scrcpy `--new-display`) y Android abrió allí la actividad; la prueba
+encontró los nodos del editor, pero la captura y los toques inyectados fueron a la pantalla integrada, donde estaba
+el launcher, y la guarda de primer plano la detuvo tras el primer toque. La app y sus datos quedaron intactos
+(4206 archivos, 0 desaparecidos; archivos de Cut y reparto guardado sin cambios; paquete de pruebas desinstalado).
+Corregido en `527491ff` y `10d8caad`: la prueba pide la pantalla integrada y falla si no la obtiene, y un gesto
+abandonado a medias levanta los dedos (`ACTION_CANCEL`). Verificación independiente de solo lectura de
+`00dfd523..527491ff`: 9 puntos correctos; su única reserva, la cancelación del pellizco con dos dedos pulsados, es el
+arreglo de `10d8caad`. **Sigue sin haber pasado en un dispositivo**: el Pixel está en uso por ese otro agente y no
+se toca mientras lo esté.
+
+**Después de vc221l** (`2ce90114`, compilado como vc221m): las dos asas recuperan su nombre accesible («Tamaño de la
+previsualización y la línea de tiempo», «Tamaño del panel del agente»), el observador de toques del editor depende
+del ViewModel (`pointerInput(vm)`) y el comentario de `PreviewController.setTouching` dice lo que hace. Mismas pruebas
+JVM en verde; APK firmada con la identidad instalada (cert SHA-256 `8b75db0f…7127`, firmas v2 y v3, 16 KiB, 6/6
+`.so` idénticas a vc220); respecto de la vc221l solo cambian 5 `.dex` y la firma. **No instalada todavía** por el
+mismo motivo: nada de este informe se ha repetido con la vc221m.
 
 ## 5. Límites conocidos
 
@@ -204,15 +241,12 @@ reparto guardado restaurado al acabar. Está contrastada con los volcados de acc
   no por ancho (pantalla dividida); el reproductor en espera mantiene sus decodificadores mientras el editor está
   quieto y solo los suelta al exportar, girar o salir.
 - Segunda verificación independiente (solo lectura) de `764bf6ed..1dbe3073`: 7 puntos correctos, ninguno incorrecto.
-  Hallazgos bajos sin corregir, para que el código publicado de la app siga siendo el de la APK instalada: con un
-  dedo puesto aún puede liberarse el reproductor si falla en espera, cambia la superficie o llega un LUT (el
-  comentario de `setTouching` promete más de lo que hace); el observador de toques usa `pointerInput(Unit)` y debería
-  depender del `vm`; el asa del agente en horizontal tiene una pequeña zona muerta en los extremos y su reparto por
+  De sus hallazgos bajos, corregidos en vc221m el comentario de `setTouching` y la clave del observador de toques.
+  Sin corregir: con un dedo puesto aún puede liberarse el reproductor en espera si falla, cambia la superficie o
+  llega un LUT; el asa del agente en horizontal tiene una pequeña zona muerta en los extremos y su reparto por
   defecto es 55 % (antes 55,6 %).
-- El asa que reparte imagen y línea de tiempo ya no tiene nombre de accesibilidad (antes «Tamaño de la
-  previsualización y la línea de tiempo»). Conserva sus tres acciones («Agrandar la línea de tiempo», «Agrandar la
-  imagen», «Reparto automático»), pero sin nombre un lector de pantalla puede no detenerse en ella. Sin corregir por
-  el mismo motivo; no se ha probado con TalkBack.
+- En la vc221l instalada las dos asas de reparto no tienen nombre de accesibilidad (conservan sus acciones, pero un
+  lector de pantalla puede no detenerse en ellas). Corregido en vc221m. No se ha probado con TalkBack.
 - Montajes de prueba creados en el proyecto «General» del Pixel: «QA Cut premium», «QA importar» y «QA orden», más
   cinco exportaciones «QA_Cut_premium-…» en la Biblioteca. No se ha borrado nada.
 
