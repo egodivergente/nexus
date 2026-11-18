@@ -19,3 +19,4 @@ rootProject.name = "Nexus"
 rootProject.buildFileName = "build-jvm.gradle.kts"
 include(":agent-core")
 include(":cut-core")
+include(":axel-link")

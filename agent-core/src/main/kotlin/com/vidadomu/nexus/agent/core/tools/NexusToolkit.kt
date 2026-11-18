@@ -8,5 +8,7 @@ object NexusToolkit {
         PrepareGenerationTool(d), PrepareOrdersTool(d), PrepareImageUpscaleTool(d), UpdatePlanTool(d), SubmitGenerationTool(d), GetGenerationStatusTool(d), CancelGenerationTool(d), GetUiStateTool(d), SuggestRepliesTool(),
         ListProjectsTool(d), CreateProjectTool(d), OpenProjectTool(d), GetProjectOverviewTool(d), SearchProjectMemoryTool(d), UpdateProjectMemoryTool(d), SearchAssetsTool(d), OpenResultsWallTool(d), InspectAssetTool(d), ListShotsTool(d),
         GenerationHistoryTool(d), AssociateAssetTool(d), MoveAssetTool(d), RenameAssetTool(d),
-    ) + StoryTools.all(d) + (d.cut?.let(CutTools::all) ?: emptyList()) + ProjectTransferTools.all(d) + (d.nativeOperations?.let(NativeOperationTools::all) ?: emptyList())
+    ) + StoryTools.all(d) + (d.cut?.let(CutTools::all) ?: emptyList()) + ProjectTransferTools.all(d) + (d.nativeOperations?.let(NativeOperationTools::all) ?: emptyList()) +
+        // Equipos de AXEL Commander: solo si este dispositivo ya tiene identidad de cliente.
+        (d.link?.takeIf(RemoteTools::available)?.let { RemoteTools.all(it, d.remoteMedia) } ?: emptyList())
 }
