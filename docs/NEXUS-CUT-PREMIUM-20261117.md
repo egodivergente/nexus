@@ -231,14 +231,40 @@ JVM en verde; APK firmada con la identidad instalada (cert SHA-256 `8b75db0f…7
 `.so` idénticas a vc220); respecto de la vc221l solo cambian 5 `.dex` y la firma. **No instalada todavía** por el
 mismo motivo: nada de este informe se ha repetido con la vc221m.
 
+**Qué comprobar de la háptica en el S25** (pendiente de Vidal; no se ha sentido en ningún dispositivo). Con la
+vibración al tocar del sistema y la «Respuesta háptica» de Nexus activadas, cada fila debe notarse distinta de las
+demás, salvo las tres de confirmación, que comparten el mismo efecto del sistema (`CONFIRM`):
+
+| Gesto en el editor | Evento (`NexusHaptics`) | Qué debe notarse |
+|---|---|---|
+| Tocar un clip, Reproducir, abrir Ajustes, Exportar o el agente | SELECTION | un toque corto y ligero |
+| Pulsación larga sobre un clip para moverlo | PICK_UP | un golpe más marcado al «cogerlo» |
+| Empezar a recortar un borde o un fundido | GESTURE_START | inicio de arrastre |
+| Con el imán activado, un borde o un clip llega al borde de otro clip, al cabezal o al inicio del montaje | SNAP | un solo toque al entrar en el imán, no mientras sigue pegado |
+| Arrastre que el montaje no admite (recorte sin más material, clip contra su vecino), zoom en su tope, cabezal que llega al inicio o al final del montaje al desplazar o lanzar | BOUNDARY | un clic seco, como mucho cada 0,25 s |
+| El cabezal cruza un corte al desplazar (con o sin imán); fotograma anterior o siguiente | GESTURE_TICK | un tic por corte o por fotograma (como mucho cada 70 ms), nunca un zumbido |
+| Soltar un recorte o un movimiento | GESTURE_END | cierre suave |
+| Dividir, «Inicio aquí», «Final aquí», Duplicar, Separar, Eliminar, Rehacer, aplicar una propuesta, exportación terminada | CONFIRMATION | confirmación |
+| Deshacer; «Deshacer turno» del agente | CANCEL_CONFIRMED | confirmación (el mismo efecto) |
+| Bloquear o silenciar una pista, «Varios», ripple e imán en Ajustes | TOGGLE_DECISIVE | confirmación (el mismo efecto) |
+| Una acción que falla; exportación con error | ERROR | rechazo, distinto de la confirmación |
+
+Con la vibración al tocar del sistema desactivada (así está el Pixel) o con «Respuesta háptica» apagada en los ajustes
+de Nexus no debe vibrar nada. Tabla contrastada con el código por un verificador independiente de solo lectura y
+corregida con sus observaciones; el modelo admite marcadores como destino del imán, pero el editor no tiene aún forma
+de crearlos.
+
 ## 5. Límites conocidos
 
 - La exportación conserva la cadencia del material de origen; los fps del montaje son la rejilla de edición. Con
   material mixto la salida puede tener cadencia variable.
 - Háptica: el lenguaje está implementado y revisado en código, pero no se ha sentido en ningún dispositivo. El Pixel
-  tiene la háptica del sistema desactivada (se respeta y no se ha cambiado) y en el S25 no se ha probado.
+  tiene la háptica del sistema desactivada (se respeta y no se ha cambiado) y en el S25 no se ha probado. La lista
+  de qué debe notarse en cada gesto está al final de §4.
 - Agente con un modelo real: no probado para no consumir cuota de proveedores. Los turnos, propuestas, deshacer y
   verificación se han comprobado con turnos locales (`CutChatQa`, solo DEBUG) que pasan por las mismas herramientas.
+  La prueba real está preparada (dos turnos con el modelo del Pixel, sin proveedores de pago por uso) y espera el
+  «Sí» de Vidal.
 - Durante el primer segundo de reproducción la cadencia aún es irregular (algún tirón de 0,3–0,4 s), también en
   frío: viene de cómo arranca el `CompositionPlayer` de Media3 y queda pendiente.
 - La distribución del S25 está simulada en el Pixel (ver arriba); falta verla en el propio S25.
@@ -256,6 +282,9 @@ mismo motivo: nada de este informe se ha repetido con la vc221m.
   Sin corregir: con un dedo puesto aún puede liberarse el reproductor en espera si falla, cambia la superficie o
   llega un LUT; el asa del agente en horizontal tiene una pequeña zona muerta en los extremos y su reparto por
   defecto es 55 % (antes 55,6 %).
+- Tercera, cuarta y quinta verificación independiente (solo lectura): la prueba de dispositivo (`00dfd523..527491ff`,
+  9 de 9 con dos reservas, ver §4), la exactitud de este informe frente a sus evidencias (5 precisiones, corregidas
+  en `e2eae553`) y esas correcciones (7 de 7).
 - En la vc221l instalada las dos asas de reparto no tienen nombre de accesibilidad (conservan sus acciones, pero un
   lector de pantalla puede no detenerse en ellas). Corregido en vc221m. No se ha probado con TalkBack.
 - Montajes de prueba creados en el proyecto «General» del Pixel: «QA Cut premium», «QA importar» y «QA orden», más
