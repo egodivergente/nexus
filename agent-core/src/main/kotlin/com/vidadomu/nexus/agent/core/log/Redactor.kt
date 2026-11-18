@@ -17,7 +17,8 @@ object Redactor {
 
     fun redact(text: String): String = patterns.fold(text) { acc, rx ->
         rx.replace(acc) { m ->
-            val g1 = m.groups[1]?.value
+            // Not every pattern captures a prefix: asking for a group that the pattern does not have throws.
+            val g1 = if (m.groups.size > 1) m.groups[1]?.value else null
             if (g1 != null && m.value.startsWith(g1) && g1.length < m.value.length && !g1.matches(Regex("AKIA|ASIA"))) "$g1«oculto»"
             else mask(m.value)
         }

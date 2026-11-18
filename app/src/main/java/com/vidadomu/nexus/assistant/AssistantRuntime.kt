@@ -524,8 +524,9 @@ class AssistantRuntime(private val app: NexusApplication) {
             else -> BedrockProxyProvider(s.endpoint, { settings.token() })
         }
 
-    fun orchestrator(s: AssistantSettings = settings.load(), allowNativeImages: Boolean = true) = AgentOrchestrator(
-        llm(s, allowNativeImages), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
+    /** [llmOverride]: debug builds answer one turn from a local script ([AgentChatQa]); tools and events are the real ones. */
+    fun orchestrator(s: AssistantSettings = settings.load(), allowNativeImages: Boolean = true, llmOverride: LlmProvider? = null) = AgentOrchestrator(
+        llmOverride ?: llm(s, allowNativeImages), s.toConfig(), NexusToolkit.all(deps), skills, assets, logger,
         // El límite de 4,5 MB por documento es de Bedrock; el puente (AGY, Codex) solo recibe texto y no tiene ese límite.
         documents = com.vidadomu.nexus.agent.core.agent.AttachmentDocumentLoader {
             val agy = !s.offline && s.bridge

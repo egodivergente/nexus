@@ -82,25 +82,51 @@ internal fun dictatedText(current: TextFieldValue, spoken: String): TextFieldVal
     return TextFieldValue(text, TextRange(text.length))
 }
 
+/**
+ * One block at the foot of the chat: the field on top and, under it, attachments, mode, model, microphone and the
+ * main action. While the agent works the field stays open («Añade algo mientras trabaja») and the stop button is
+ * always there; [onQueue] leaves the draft waiting to go out when the answer ends.
+ */
 @Composable
 internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (TextFieldValue) -> Unit,
     onAttach: () -> Unit, onSend: () -> Unit, onStop: () -> Unit, onRemove: (String) -> Unit,
     onReply: (String) -> Unit = {}, onAudio: ((android.net.Uri)->Unit)? = null, onReorder: ((String,Int)->Unit)? = null, onCamera: (() -> Unit)? = null,
     onShowLibrary: (() -> Unit)? = null, onHideLibrary: () -> Unit = {}, libraryExpanded: Boolean = false,
-    reasoningControl: @Composable () -> Unit = {}) {
+    reasoningControl: @Composable () -> Unit = {},
+    onQueue: (() -> Unit)? = null, onCancelQueue: () -> Unit = {}) {
     val completion = remember(text, ui.catalog) { completeModels(text, ui.catalog) }
     var inputFocused by remember(ui.conversationId) { mutableStateOf(false) }
-    // One resting row. References, completion and suggestions only grow it when they are useful.
-    Box(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space12,vertical=NexusTokens.space4)) {
+    val colors = MaterialTheme.colorScheme
+    val hasDraft = text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty()
+    val canSend = !ui.thinking && !ui.attaching && hasDraft
+    val canQueue = ui.thinking && onQueue != null && hasDraft && !ui.queuedSend
+    // Dictation inserts the text in the field without sending it; it stays available while the agent works.
+    val context = LocalContext.current
+    val dictate = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val spoken = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim()
+        if (result.resultCode == android.app.Activity.RESULT_OK && !spoken.isNullOrBlank()) onInput(dictatedText(text, spoken))
+    }
+    val dictateAction: ()->Unit = {
+        try {
+            dictate.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
+                putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Habla; podrás revisar el texto antes de enviarlo")
+            })
+        } catch (_: android.content.ActivityNotFoundException) {
+            android.widget.Toast.makeText(context, "Este móvil no tiene reconocimiento de voz disponible", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+    Box(Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = NexusTokens.space4, bottom = NexusTokens.space8)) {
       // Quick access handle: a small arrow on the composer's top edge instead of a floating dot in its own row
-      // Drawn after the composer so it sits above its border; its touch target is at least 48 dp high.
+      // Drawn after the composer so it sits above its edge; its touch target is at least 48 dp high.
       // The handle shows and hides the tab bar: one tap, or a swipe up/down that starts here, well above the system
       // gesture zone (a swipe from the screen edge collided with Samsung's Home/Recents). Recent files stay on a long
-      // press of the clip. When the bar is pinned the handle is not needed and is not drawn.
+      // press of the «+». When the bar is pinned the handle is not needed and is not drawn.
       val barShown = com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value
       val barPinned = com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned.value
       val grabber: @Composable BoxScope.() -> Unit = {
-          if (!barPinned) Box(Modifier.align(Alignment.TopCenter).offset(y = (-24).dp).size(width = 96.dp, height = 48.dp)
+          if (!barPinned) Box(Modifier.align(Alignment.TopCenter).offset(y = (-30).dp).size(width = 96.dp, height = 48.dp)
               .clip(NexusTokens.radiusLarge)
               .recentLibraryGesture(opening = !barShown) { com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value = !barShown }
               .clickable(onClickLabel = if (barShown) "Ocultar pestañas" else "Mostrar pestañas") {
@@ -108,39 +134,30 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
               .semantics { contentDescription = if (barShown) "Ocultar pestañas" else "Mostrar pestañas" },
               contentAlignment = Alignment.Center) {
               Icon(if (barShown) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                  contentDescription = null, modifier = Modifier.size(NexusTokens.iconMedium),
-                  tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                  contentDescription = null, modifier = Modifier.size(18.dp),
+                  tint = colors.outline)
           }
       }
-      Column {
-        StudioTactileCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = NexusTokens.radiusLarge,
-            containerColor = MaterialTheme.colorScheme.surface,
-            shadowElevation = 8.dp,
-            border = studioSpecularBorder(
-                accentTint = if (inputFocused) MaterialTheme.colorScheme.primary.copy(alpha = 0.45f) else null
-            ),
-        ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal=NexusTokens.space8,vertical=4.dp)) {
-            // The active model lives in the chat header now: the composer stays a single slim row.
+      Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp), color = colors.surfaceContainerHigh) {
+        Column(Modifier.fillMaxWidth()) {
             // Respuestas rápidas del agente: un toque las envía. Se ocultan mientras escribes o piensa.
             if(inputFocused && ui.replies.isNotEmpty() && !ui.thinking && text.text.isEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
-                contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space4)) {
+                contentPadding = PaddingValues(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space8)) {
                 items(ui.replies, key = { it.label }) { reply ->
                     AssistChip(onClick = { onReply(reply.text) }, label = { Text(reply.label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         modifier = Modifier.widthIn(max = 220.dp)) }, modifier = Modifier.semantics { contentDescription = "Responder: ${reply.text}" })
                 }
             }
             completion?.let { suggestions ->
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space4),
+                    contentPadding = PaddingValues(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space8)) {
                     items(suggestions.models, key = { it.ref.toString() }) { model ->
                         AssistChip(onClick = { onInput(insertModel(text, suggestions, model)) }, label = { Text(model.name, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) })
                     }
                 }
             }
             if(ui.pendingAttachments.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(NexusTokens.space8),
-                contentPadding = PaddingValues(horizontal = NexusTokens.space8, vertical = NexusTokens.space8)) {
+                contentPadding = PaddingValues(start = NexusTokens.space16, end = NexusTokens.space16, top = NexusTokens.space12)) {
                 items(ui.pendingAttachments, key = { it.id }) { att -> Box {
                     AttachmentTile(att) { onRemove(att.id) }
                     // Reordenar: dos botones pequeños sobre la propia miniatura (antes iban debajo, desalineados y sueltos).
@@ -155,73 +172,64 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
                     }
                 }}
             }
-            Row(verticalAlignment = Alignment.Bottom) {
+            // What is written while the agent works waits here, still editable, until the answer ends.
+            if (ui.queuedSend) Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = NexusTokens.space8, top = NexusTokens.space8)
+                .semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Schedule, null, Modifier.size(15.dp), tint = colors.primary)
+                Spacer(Modifier.width(6.dp))
+                Text("Se enviará cuando termine", Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                TextButton(onClick = onCancelQueue, contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.heightIn(min = 36.dp)) {
+                    Text("Cancelar", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            // Campo sin el alto mínimo de 56 dp de TextField: en reposo ocupa una línea encima de los controles.
+            val style = chatReadingStyles(MaterialTheme.typography).body.copy(color = colors.onSurface)
+            androidx.compose.foundation.text.BasicTextField(text, onInput, modifier = Modifier.fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = NexusTokens.space4)
+                .onFocusChanged { inputFocused = it.isFocused }
+                .semantics { contentDescription = "Mensaje para Nexus" },
+                textStyle = style, cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.primary),
+                minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 6,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() else if (canQueue) onQueue?.invoke() }),
+                decorationBox = { inner ->
+                    Box(Modifier.heightIn(min = 28.dp), contentAlignment = Alignment.CenterStart) {
+                        if (text.text.isEmpty()) Text(if (ui.thinking && onQueue != null) "Añade algo mientras trabaja" else "Escribe a Nexus…",
+                            style = style, color = colors.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        inner()
+                    }
+                })
+            Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space4, end = NexusTokens.space8, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 LibraryAttachmentButton(enabled = !ui.attaching, onAttach = onAttach,
-                    onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded, onCamera = onCamera,
-                    additionalOptions = reasoningControl)
-                val canSend = !ui.thinking && !ui.attaching && (text.text.isNotBlank() || ui.pendingAttachments.isNotEmpty())
-                // Campo sin el alto mínimo de 56 dp de TextField: una línea ocupa lo mismo que los iconos.
-                val style = chatReadingStyles(MaterialTheme.typography).body.copy(color = MaterialTheme.colorScheme.onSurface)
-                androidx.compose.foundation.text.BasicTextField(text, onInput, modifier = Modifier.weight(1f).heightIn(min = NexusTokens.minimumTouch)
-                    .onFocusChanged { inputFocused = it.isFocused }
-                    .semantics { contentDescription = "Mensaje para Nexus" },
-                    textStyle = style, cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
-                    minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 5,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if(canSend) onSend() }),
-                    decorationBox = { inner ->
-                        Box(Modifier.padding(vertical = NexusTokens.space8), contentAlignment = Alignment.CenterStart) {
-                            // Quién contestará: proveedor y modelo activos (AGY, Bedrock, un cerebro propio…).
-                            if (text.text.isEmpty()) Text("Escribe a Nexus…", style = style, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            inner()
-                        }
-                    })
-                if(ui.thinking) IconButton(onClick = onStop) { Icon(Icons.Default.Stop, "Parar respuesta", tint = MaterialTheme.colorScheme.error) }
-                else {
-                    // Micro y enviar siempre juntos a la derecha: el dictado se inserta en el campo SIN enviarlo.
-                    val context = LocalContext.current
-                    val dictate = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-                        val spoken = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.trim()
-                        if (result.resultCode == android.app.Activity.RESULT_OK && !spoken.isNullOrBlank()) onInput(dictatedText(text, spoken))
-                    }
-                    val dictateAction: ()->Unit = {
-                        try {
-                            dictate.launch(android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, "es-ES")
-                                putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Habla; podrás revisar el texto antes de enviarlo")
-                            })
-                        } catch (_: android.content.ActivityNotFoundException) {
-                            android.widget.Toast.makeText(context, "Este móvil no tiene reconocimiento de voz disponible", android.widget.Toast.LENGTH_LONG).show()
+                    onShowLibrary = onShowLibrary, libraryExpanded = libraryExpanded, onCamera = onCamera)
+                // Mode and model: the caller's pills. The last one takes what is left and shortens its name.
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) { reasoningControl() }
+                if(!ui.attaching) {
+                    if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
+                    else IconButton(onClick=dictateAction) {Icon(Icons.Outlined.Mic,"Dictar mensaje",tint=colors.onSurfaceVariant)}
+                }
+                if (ui.thinking) {
+                    if (canQueue) IconButton(onClick = { onQueue?.invoke() }, modifier = Modifier.size(NexusTokens.minimumTouch)) {
+                        Surface(Modifier.size(36.dp), shape = CircleShape, color = colors.surfaceContainerHighest) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.ArrowUpward, "Enviar al terminar", Modifier.size(20.dp), tint = colors.onSurface) }
                         }
                     }
-                    if(!ui.attaching) {
-                        if(onAudio!=null) AudioNoteControl(onAudio,dictateAction)
-                        else IconButton(onClick=dictateAction) {Icon(Icons.Outlined.Mic,"Dictar mensaje",tint=MaterialTheme.colorScheme.onSurfaceVariant)}
+                    // Always in reach while a turn runs, whatever is in the field.
+                    IconButton(onClick = onStop, modifier = Modifier.size(NexusTokens.minimumTouch)) {
+                        Surface(Modifier.size(42.dp), shape = CircleShape, color = colors.onSurface) {
+                            Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Stop, "Parar respuesta", Modifier.size(22.dp), tint = colors.surfaceContainerHigh) }
+                        }
                     }
-                    IconButton(onClick = onSend, enabled = canSend, modifier = Modifier.size(NexusTokens.minimumTouch)) {
-                        Surface(
-                            modifier = Modifier.size(38.dp),
-                            shape = CircleShape,
-                            color = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shadowElevation = if (canSend) 4.dp else 1.dp,
-                            border = studioSpecularBorder(
-                                accentTint = if (canSend) MaterialTheme.colorScheme.primary else null
-                            ),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Send,
-                                    "Enviar mensaje",
-                                    Modifier.size(NexusTokens.iconSmall),
-                                    tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                                )
-                            }
+                } else IconButton(onClick = onSend, enabled = canSend, modifier = Modifier.size(NexusTokens.minimumTouch)) {
+                    Surface(Modifier.size(42.dp), shape = CircleShape, color = if (canSend) colors.primary else colors.surfaceContainerHighest) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.ArrowUpward, "Enviar mensaje", Modifier.size(22.dp),
+                                tint = if (canSend) colors.onPrimary else colors.onSurfaceVariant.copy(alpha = 0.55f))
                         }
                     }
                 }
             }
-        }
         }
       }
       grabber()

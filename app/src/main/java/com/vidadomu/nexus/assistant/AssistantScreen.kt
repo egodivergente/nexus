@@ -109,6 +109,20 @@ fun AssistantScreen(
     onPickerDismiss: () -> Unit = {},
     vm: AssistantViewModel = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).assistantViewModel(),
 ) {
+    // Charcoal ground and matte surfaces for the whole Agent screen, its sheets and its drawer included.
+    AgentChatTheme { AssistantScreenContent(onOpenInCanvas, onNavigateToOutput, onOpenSettings, onOpenHistory, projectPicker, onPickerDismiss, vm) }
+}
+
+@Composable
+private fun AssistantScreenContent(
+    onOpenInCanvas: (CreateUiState) -> Unit,
+    onNavigateToOutput: (String) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenHistory: () -> Unit,
+    projectPicker: (@Composable () -> Unit)?,
+    onPickerDismiss: () -> Unit,
+    vm: AssistantViewModel,
+) {
     val ui by vm.ui.collectAsState()
     val storySelection by com.vidadomu.nexus.assistant.story.StorySelectionStore.selection.collectAsState()
     val storyIndex by vm.runtime.assets.changes.collectAsState()
@@ -257,7 +271,7 @@ fun AssistantScreen(
             if (following) followLast()
         }
     }
-    LaunchedEffect(ui.items.size, ui.thinking, ui.streamingText, ui.plans, ui.scrollRequest) {
+    LaunchedEffect(ui.items.size, ui.thinking, ui.streamingText, ui.plans, ui.scrollRequest, ui.steps.size) {
         if (following) followLast()
     }
     // Al enfocar el compositor (IME o teclado físico) el último mensaje queda justo encima del campo.
@@ -294,28 +308,66 @@ fun AssistantScreen(
             if(result==SnackbarResult.ActionPerformed) vm.retryTurn()
         }
     }
-    // Lienzo: al desplazar o escribir, la barra superior se reduce a una franja fina.
-    val scrolledAway by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 } }
-    val slimTop = scrolledAway || input.text.isNotEmpty()
     // Conversaciones a la izquierda: se abre arrastrando el dedo de izquierda a derecha sobre el chat.
     val drawer = rememberDrawerState(DrawerValue.Closed)
     ModalNavigationDrawer(drawerContent = { ConversationDrawer(ui, vm) { scope.launch { drawer.close() } } }, drawerState = drawer,
         gesturesEnabled = drawer.isOpen) {
-    Scaffold(contentWindowInsets=com.vidadomu.nexus.ui.theme.NexusInsets.chromeOnly,containerColor=ScreenBackground,snackbarHost={SnackbarHost(snackbar) { data ->
+    // Opaque ground: the animated aura of the app's theme stays behind the other tabs, not behind the conversation.
+    Scaffold(contentWindowInsets=com.vidadomu.nexus.ui.theme.NexusInsets.chromeOnly,containerColor=MaterialTheme.colorScheme.background,snackbarHost={SnackbarHost(snackbar) { data ->
         Snackbar(data,modifier=Modifier.padding(NexusTokens.space12),shape=NexusTokens.card,
             containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,contentColor=TextPrimary,
             actionColor=MaterialTheme.colorScheme.primary)
     }},topBar={}) {pad ->
         Column(Modifier.fillMaxSize().padding(pad).consumeWindowInsets(pad).statusBarsPadding().windowInsetsPadding(com.vidadomu.nexus.ui.theme.NexusInsets.bottomEdge)) {
-            if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
-                "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
             val density = androidx.compose.ui.platform.LocalDensity.current
             val chatContext = LocalContext.current
             val clipboard = LocalClipboardManager.current
             var menuOpen by remember { mutableStateOf(false) }
             var menuAt by remember { mutableStateOf(androidx.compose.ui.unit.DpOffset.Zero) }
+            var headerMenu by remember { mutableStateOf(false) }
             var showAppearance by remember { mutableStateOf(false) }
             val barPinned by com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned
+            // Compact header, fixed above the conversation: the title leads and the line under it says what the agent
+            // is really doing. The model selector lives in the composer; the menu and the settings stay here.
+            val headerHaptics = rememberNexusHaptics()
+            val activeProjectName = remember(ui.projects, ui.activeProjectId) {
+                ui.projects.firstOrNull { it.id == ui.activeProjectId }?.name?.takeIf { it.isNotBlank() } ?: "Nexus"
+            }
+            val activeModelShort = remember(ui.settings) {
+                shortModelName(agentLabel(ui.settings)).ifBlank { agentLabel(ui.settings) }
+            }
+            val titles = remember(chatContext) { ConversationTitles(chatContext) }
+            val firstRequest = ui.items.firstOrNull { it is ChatItem.User && it.text.isNotBlank() } as? ChatItem.User
+            // Read again when the drawer closes: that is where a conversation is renamed.
+            val headerTitle = remember(ui.conversationId, firstRequest?.text, drawer.isOpen) {
+                titles.display(ui.conversationId, firstRequest?.text?.replace(Regex("\\s+"), " ")?.take(180) ?: "Nueva conversación")
+            }
+            val conversationOrders = remember(visibleItems, ui.orders) {
+                visibleItems.filterIsInstance<ChatItem.PlanCard>().mapNotNull { card -> card.orderId?.let { ui.orders[it] } }
+            }
+            val openChatMenu: @Composable (Boolean, androidx.compose.ui.unit.DpOffset, () -> Unit) -> Unit = { expanded, at, dismiss ->
+                ChatContextMenu(ui, vm, expanded, at, dismiss, onProjects = { showProject = true }, onAppearance = { showAppearance = true },
+                    onSettings = onOpenSettings, barPinned = barPinned, onPinBar = { com.vidadomu.nexus.ui.theme.ChromeVisibility.setPinned(chatContext, it) },
+                    onCopyChat = {
+                        copyMessageIds = null; showChatCopy = true
+                    },
+                    onShareChat = { shareChat(chatContext, ui) },
+                    onImportImages = { boardPicker.launch(arrayOf("image/*"), Int.MAX_VALUE) },
+                    onOrders = if (conversationOrders.isNotEmpty()) ({ ordersPanel = true }) else null,
+                    onAssistantSettings = { showSettings = true })
+            }
+            AgentChatHeader(
+                title = headerTitle,
+                status = agentHeaderStatus(ui.thinking, ui.steps, ui.queuedSend, ui.workingIn != null, conversationOrders,
+                    ui.attaching, ui.carrying, ui.settings.offline, activeProjectName, activeModelShort),
+                onMenu = { scope.launch { drawer.open() } },
+                onTitle = { headerHaptics.perform(NexusHapticEvent.SELECTION); showProject = true },
+                onSettings = onOpenSettings,
+                onMore = { headerMenu = true },
+                moreMenu = { openChatMenu(headerMenu, androidx.compose.ui.unit.DpOffset.Zero) { headerMenu = false } },
+            )
+            if(ui.settings.offline) InlineNotice("Planificador local activo.",Modifier.padding(horizontal=NexusTokens.screenMargin),
+                "Elige modelos y prepara planes sin razonamiento del LLM.","Configurar LLM",{showSettings=true},isError=false)
             Box(Modifier.weight(1f).fillMaxWidth()
                 // Mantener pulsado un hueco del chat abre el menú de acciones rápidas, justo donde está el dedo.
                 // Both detectors fire at the same timeout; a short wait lets a message claim the press first, so a long
@@ -328,24 +380,11 @@ fun AssistantScreen(
                     }
                 }) }
                 .dragRightToOpen { scope.launch { drawer.open() } }) {
-            // Vidal 01-11 (vídeo, 00:26): el texto no se corta en seco a 56 dp; la lista llega hasta arriba y se
-            // desvanece con un degradado suave bajo los iconos flotantes. El primer mensaje sigue empezando debajo:
-            // el degradado acaba justo en 64 dp (donde empieza el contenido en reposo) para no atenuar el primer mensaje.
-            // Auditoria 05-11: bajo los iconos (hasta ~36 dp) el texto ya no se lee; de ahi a 64 dp aparece suave.
-            LazyColumn(Modifier.fillMaxSize()
-                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(
-                        0f to androidx.compose.ui.graphics.Color.Transparent,
-                        .66f to androidx.compose.ui.graphics.Color.Transparent,
-                        .82f to androidx.compose.ui.graphics.Color.Black.copy(alpha = .45f),
-                        1f to androidx.compose.ui.graphics.Color.Black,
-                        startY = 0f, endY = 76.dp.toPx()), blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
-                }, state = listState,
-                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = 72.dp,
-                    // Room for the floating «Ver encargos» / «Bajar al final» buttons so they never sit on the last card.
-                    bottom = 64.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
+            // The header is fixed above the list now, so nothing floats over the text and the list needs no fade mask.
+            LazyColumn(Modifier.fillMaxSize(), state = listState,
+                contentPadding = PaddingValues(start = NexusTokens.screenMargin, end = NexusTokens.screenMargin, top = NexusTokens.space8,
+                    // Room for the tab-bar handle that sits on the composer's top edge, so it never covers the last line.
+                    bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(NexusTokens.space16)) {
                 if (ui.items.isEmpty() && ui.streamingText.isBlank()) item {
                     EmptyHint(onSuggest = { suggestion ->
                         input = androidx.compose.ui.text.input.TextFieldValue(suggestion, androidx.compose.ui.text.TextRange(suggestion.length))
@@ -474,7 +513,9 @@ fun AssistantScreen(
                                 onOpenCanvas = { scope.launch { vm.canvasState(p.plan.id)?.let(onOpenInCanvas) } },
                                 onOpenOutput = { (p.jobId ?: order.jobId)?.let(onNavigateToOutput) },
                                 onRendered = { vm.cardRendered(order.id, it) },
-                                onOpenHistory = onOpenHistory)
+                                onOpenHistory = onOpenHistory,
+                                recoverable = order.id in ui.recoverable,
+                                onRecover = { vm.recoverOrder(order.id) })
                             }
                         } ?: ui.plans[item.planId]?.let { p ->
                             CompactGeneration(p, vm.outputs(p.jobId),
@@ -497,12 +538,13 @@ fun AssistantScreen(
                     }
                     }
                 }
+                // The turn in progress, in the conversation itself: its real steps first, then the text as it arrives.
+                if (ui.thinking) item(key = "agent_activity_live") { AgentActivityLive(ui.steps, ui.thinkingStartedAtElapsedMs) }
                 if (ui.streamingText.isNotBlank()) {
                     item(key = "streaming_assistant_preview") {
                         AssistantBubble(ChatItem.Assistant("streaming_assistant_preview", ui.streamingText, emptyList(), "STREAMING"), onOpenHistory)
                     }
                 }
-                if (ui.thinking) item(key = "thinking_indicator") { ThinkingIndicator(ui.activity, ui.thinkingStartedAtElapsedMs) }
             }
             // Un único botón redondo para bajar, solo cuando no estás al final; los encargos tienen su propio panel.
             val cardIds = remember(visibleItems) { visibleItems.filterIsInstance<ChatItem.PlanCard>().map { it.id } }
@@ -512,91 +554,16 @@ fun AssistantScreen(
                 AnimatedVisibility(!following,
                     enter = if (motion) fadeIn() + scaleIn() else androidx.compose.animation.EnterTransition.None,
                     exit = if (motion) fadeOut() + scaleOut() else androidx.compose.animation.ExitTransition.None) {
-                    SmallFloatingActionButton(onClick = { following = true; scope.launch { followLast() } }, shape = NexusTokens.pill,
-                        containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
-                        Icon(Icons.Default.KeyboardArrowDown, "Bajar al final")
+                    // Matte and small: it is a way back, not the main action of the screen.
+                    Surface(onClick = { following = true; scope.launch { followLast() } }, shape = androidx.compose.foundation.shape.CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface) {
+                        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { Icon(Icons.Default.KeyboardArrowDown, "Bajar al final", Modifier.size(22.dp)) }
                     }
                 }
             }
             projectPicker?.let { picker -> Surface(Modifier.matchParentSize(), color = MaterialTheme.colorScheme.background) { picker() } }
-            // The header icons float over the conversation; the list itself fades out under them (see the LazyColumn mask),
-            // so scrolled text never collides with them («Expandir» under the gear, revision video 1, 08:48) nor ends in a hard edge.
-            // Ajustes: un engranaje pequeño en la esquina. Las conversaciones están en el panel izquierdo (arrastrar a la derecha).
-            val headerHaptics = rememberNexusHaptics()
-            val activeProjectName = remember(ui.projects, ui.activeProjectId) {
-                ui.projects.firstOrNull { it.id == ui.activeProjectId }?.name?.takeIf { it.isNotBlank() } ?: "Nexus"
-            }
-            val activeModelShort = remember(ui.settings) {
-                shortModelName(agentLabel(ui.settings)).ifBlank { agentLabel(ui.settings) }
-            }
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                StudioCircleButton(
-                    onClick = { scope.launch { drawer.open() } },
-                    contentDescription = "Conversaciones",
-                ) {
-                    Icon(Icons.Default.Menu, contentDescription = null, modifier = Modifier.size(NexusTokens.iconMedium))
-                }
-                StudioTactileCard(
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .padding(horizontal = NexusTokens.space8),
-                    shape = NexusTokens.pill,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 4.dp,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clip(NexusTokens.pill)
-                            .clickable(role = androidx.compose.ui.semantics.Role.Button) {
-                                headerHaptics.perform(NexusHapticEvent.SELECTION)
-                                showProject = true
-                            }
-                            .padding(horizontal = NexusTokens.space12, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Box(
-                            Modifier
-                                .size(7.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(MaterialTheme.colorScheme.primary)
-                        )
-                        Text(
-                            text = if (activeModelShort.isNotBlank()) "$activeProjectName · $activeModelShort" else activeProjectName,
-                            style = MaterialTheme.typography.labelLarge,
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
-                        )
-                        Icon(
-                            Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Cambiar proyecto o modelo",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                StudioCircleButton(
-                    onClick = onOpenSettings,
-                    contentDescription = "Ajustes",
-                ) {
-                    Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(NexusTokens.iconMedium))
-                }
-            }
-            ChatContextMenu(ui, vm, menuOpen, menuAt, { menuOpen = false }, onProjects = { showProject = true }, onAppearance = { showAppearance = true },
-                onSettings = onOpenSettings, barPinned = barPinned, onPinBar = { com.vidadomu.nexus.ui.theme.ChromeVisibility.setPinned(chatContext, it) },
-                onCopyChat = {
-                    copyMessageIds = null; showChatCopy = true
-                },
-                onShareChat = { shareChat(chatContext, ui) },
-                onImportImages = { boardPicker.launch(arrayOf("image/*"), Int.MAX_VALUE) })
+            // Long press on an empty spot of the chat: the same menu as the header's, where the finger is.
+            openChatMenu(menuOpen, menuAt) { menuOpen = false }
             if (showAppearance) QuickAppearanceSheet({ showAppearance = false }, onOpenSettings)
             }
             if (ordersPanel) OrdersSheet(visibleItems.filterIsInstance<ChatItem.PlanCard>(), ui, onClose = { ordersPanel = false }) { id ->
@@ -632,7 +599,14 @@ fun AssistantScreen(
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launchDevice(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
                 onSend = { if(vm.sendWithBoards(input.text)) {haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
-                reasoningControl = { BridgeModelPicker(ui, vm); ReasoningPicker(ui, vm) })
+                // Mode and model sit in the composer, wired to the same settings as before.
+                reasoningControl = { ReasoningPicker(ui, vm); BridgeModelPicker(ui, vm) { showSettings = true } },
+                // «Añade algo mientras trabaja»: the draft and its attachments wait, editable, and go out when the answer ends.
+                onQueue = {
+                    if (vm.queueSend()) haptic.perform(NexusHapticEvent.SELECTION)
+                    else scope.launch { snackbar.showSnackbar("Ahora no se puede dejar en espera. Tu borrador sigue aquí.") }
+                },
+                onCancelQueue = vm::cancelQueuedSend)
             }
         }
     }
@@ -656,7 +630,10 @@ private fun CarriedContextCard(item: ChatItem.Context) {
     }
 }
 
-/** Modo de razonamiento junto al cuadro de texto, solo si el cerebro activo lo admite: Auto · Rápido · Mínimo · Bajo · Medio · Alto. */
+/**
+ * La píldora de modo del cuadro de entrada. Nexus trabaja en un único modo (Agente), así que lo que se elige aquí es
+ * cuánto razona, solo si el cerebro activo lo admite: Auto · Rápido · Mínimo · Bajo · Medio · Alto.
+ */
 @Composable
 private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     val brain = ui.settings.brain
@@ -664,7 +641,7 @@ private fun ReasoningPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     val codex = ui.settings.backend == AssistantSettings.BACKEND_CODEX
     // Sin soporte se muestra desactivado (no oculto) para que el control siga siendo reconocible.
     if (!reasoningAvailable(ui)) {
-        ReasoningIcon("No disponible", enabled = false, onClick = {})
+        ReasoningIcon("Agente", enabled = false, description = "Modo Agente. Este modelo no permite ajustar el razonamiento", onClick = {})
         return
     }
     var open by remember { mutableStateOf(false) }
@@ -704,14 +681,20 @@ private fun codexAutoHint(model: String): String =
 /** Como en Ajustes: los modelos de generaciones anteriores no se ofrecen salvo que sea el elegido. */
 private val LEGACY_BRIDGE_MODEL = Regex("4-[56]|claude-.*4-6|3\\.[67]-flash|gpt-5\\.")
 
-/** Modelo de AGY o Codex desde el menú «+», sin ir a Ajustes (Vidal 06-11). Los demás cerebros lo cambian en Ajustes. */
+/**
+ * El selector de modelo del cuadro de entrada. AGY y Codex cambian de modelo aquí mismo (Vidal 06-11); los demás
+ * cerebros abren con un toque los ajustes del asistente, que es donde se elige su modelo.
+ */
 @Composable
-private fun BridgeModelPicker(ui: AssistantUiState, vm: AssistantViewModel) {
+private fun BridgeModelPicker(ui: AssistantUiState, vm: AssistantViewModel, onOpenSettings: () -> Unit) {
     val s = ui.settings
     val all = when (s.backend) {
         AssistantSettings.BACKEND_ANTIGRAVITY -> AssistantSettings.ANTIGRAVITY_MODELS
         AssistantSettings.BACKEND_CODEX -> AssistantSettings.CODEX_MODELS
-        else -> return
+        else -> {
+            ModelMenuItem(shortModelName(agentLabel(s)).ifBlank { agentLabel(s) }.ifBlank { "Modelo" }, enabled = !ui.thinking, onClick = onOpenSettings)
+            return
+        }
     }
     // Las variantes de nivel de Argon e Hydrogen son un solo modelo cada uno; el nivel se elige en «Razonamiento».
     val selected = all.firstOrNull { it.first == s.modelId ||
@@ -720,13 +703,16 @@ private fun BridgeModelPicker(ui: AssistantUiState, vm: AssistantViewModel) {
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
     Box {
-        ModelMenuItem(selected?.second ?: s.modelId, enabled = !ui.thinking, onClick = { open = true })
+        ModelMenuItem(shortModelName(selected?.second ?: s.modelId).ifBlank { selected?.second ?: s.modelId }, enabled = !ui.thinking, onClick = { open = true })
         DropdownMenu(open, { open = false }) {
             options.forEach { (id, name) ->
                 DropdownMenuItem(text = { Text(name) },
                     trailingIcon = { if (selected?.first == id) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary) },
                     onClick = { open = false; vm.setBridgeModel(id)?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() } })
             }
+            HorizontalDivider()
+            DropdownMenuItem(text = { Text("Otro cerebro o modelo…") }, leadingIcon = { Icon(Icons.Default.Tune, null) },
+                onClick = { open = false; onOpenSettings() })
         }
     }
 }
@@ -1024,34 +1010,27 @@ internal fun UserBubble(item:ChatItem.User, onSelectMessages: () -> Unit = {}) {
     if (selection) MessageSelectionDialog(item.text) { selection = false }
     Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.End) {
         if(item.attachments.isNotEmpty()) LazyRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {items(item.attachments,key={it.id}) {AttachmentThumb(it)}}
-        // Tu mensaje: completo (nunca truncado), burbuja 3D táctil con brillo superior, sombra y menú discreto al tocar la hora.
-        val accent = MaterialTheme.colorScheme.primary
-        val tintOverlay = remember(accent) {
-            androidx.compose.ui.graphics.Brush.linearGradient(
-                listOf(accent.copy(alpha = .11f), accent.copy(alpha = .04f))
-            )
-        }
+        // Tu mensaje: completo (nunca truncado), a la derecha y sobre un fondo apenas distinto del lienzo; sin borde,
+        // brillo ni sombra. El menú discreto sigue al tocar la hora.
         val bubbleShape = androidx.compose.foundation.shape.RoundedCornerShape(
             topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 6.dp
         )
         val foldable = remember(item.text) { UserMessageFold.shouldFold(item.text) }
         var expanded by rememberSaveable(item.id) { mutableStateOf(false) }
-        StudioTactileCard(
+        Surface(
             modifier = Modifier
-                .fillMaxWidth(.94f)
+                .fillMaxWidth(.88f)
                 .wrapContentWidth(Alignment.End)
                 .padding(top = NexusTokens.space4),
             shape = bubbleShape,
-            containerColor = MaterialTheme.colorScheme.surface,
-            shadowElevation = 4.dp,
-            border = studioSpecularBorder(accentTint = accent.copy(alpha = 0.30f)),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
-            Box(Modifier.background(tintOverlay)) {
+            Box {
                 Column(Modifier.padding(horizontal = NexusTokens.space16, vertical = 10.dp)) {
                     androidx.compose.foundation.text.selection.SelectionContainer {
                         Text(
                             item.text,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = chatReadingStyles(MaterialTheme.typography).body,
                             color = TextPrimary,
                             maxLines = if (foldable && !expanded) UserMessageFold.PREVIEW_LINES else Int.MAX_VALUE,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -1185,20 +1164,15 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
     var selection by rememberSaveable(item.id) { mutableStateOf(false) }
     if (selection) MessageSelectionDialog(item.text) { selection = false }
-    var showSteps by rememberSaveable(item.id) {mutableStateOf(false)}
+    // How the answer was reached, kept with the message: the real steps of that turn, folded to one line. Messages
+    // saved before the timeline existed only kept the tool names; those are listed without times.
+    val savedSteps = remember(item.id, item.steps, item.toolCalls) { item.steps.ifEmpty { AgentActivityText.legacy(item.id, item.toolCalls) } }
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
+        if (item.stop != "STREAMING") AgentActivitySaved(item.id, savedSteps)
         if (item.text.isNotBlank()) {
-            // Tarjeta editorial limpia con relieve suave y lectura clara, sin ruido visual alrededor.
-            val replyShape = androidx.compose.foundation.shape.RoundedCornerShape(
-                topStart = 20.dp, topEnd = 20.dp, bottomStart = 6.dp, bottomEnd = 20.dp
-            )
-            StudioTactileCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = replyShape,
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                shadowElevation = 2.dp,
-            ) {
-                Box(Modifier.padding(horizontal = NexusTokens.space16, vertical = NexusTokens.space12)) {
+            // The answer reads on the ground itself: no card, edge or sheen around the text.
+            run {
+                Box(Modifier.fillMaxWidth().padding(start = 2.dp, end = NexusTokens.space4, top = 2.dp, bottom = 2.dp)) {
                     val streaming = item.stop == "STREAMING"
                     val responseText = remember(item.text, streaming) {
                         if (item.text.trim() in setOf("…", "...")) {
@@ -1220,7 +1194,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
         }
         if (item.text.isNotBlank() && item.stop != "STREAMING") {
             val responseHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
-            Box(Modifier.padding(start = NexusTokens.space4)) {
+            Box {
                 Row(
                     modifier = Modifier
                         .clip(NexusTokens.pill)
@@ -1228,7 +1202,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                             responseHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
                             actionsExpanded = true
                         }
-                        .padding(horizontal = NexusTokens.space8, vertical = 2.dp),
+                        .padding(start = 2.dp, end = NexusTokens.space8, top = 2.dp, bottom = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
@@ -1254,15 +1228,9 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                             context.startActivity(Intent.createChooser(intent, "Compartir respuesta"))
                         }.onFailure { Toast.makeText(context, "No se pudo compartir la respuesta", Toast.LENGTH_SHORT).show() }
                     })
-                    if (item.toolCalls.isNotEmpty()) DropdownMenuItem(
-                        text = { Text(if (showSteps) "Ocultar pasos" else "Ver pasos (${item.toolCalls.size})") },
-                        leadingIcon = { Icon(Icons.Default.Build, null) },
-                        onClick = { showSteps = !showSteps; actionsExpanded = false },
-                    )
                 }
             }
         }
-        if(showSteps && item.toolCalls.isNotEmpty()) Text(item.toolCalls.joinToString(" · "),style=MaterialTheme.typography.labelSmall,color=TextSecondary)
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) {
             val mediaState=androidx.compose.foundation.lazy.rememberLazyListState()
@@ -1359,6 +1327,9 @@ private fun NoticeRow(
     compact: Boolean = false,
 ) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
+    Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
+    // A turn that was stopped or failed keeps what it had done: the step with the incident is the explanation.
+    AgentActivitySaved(item.id + ":steps", item.steps, initiallyOpen = item.error && !compact)
     // Todo error ofrece una salida directa: repetir, cambiar de modelo, continuar en chat nuevo o revisar el historial.
     if (item.error) AgentErrorNotice(
         item.id, item.text,
@@ -1371,6 +1342,7 @@ private fun NoticeRow(
     else Column {
         Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
         if(history) HistoryLinkButton(onOpenHistory)
+    }
     }
 }
 /** Acceso directo a la pestaña Historial desde un aviso que la menciona. */
@@ -1962,32 +1934,3 @@ internal fun MediaPageDots(count: Int, current: Int) {
 /** Monotonic turn time: never depends on when a recycled LazyColumn indicator enters composition. */
 internal fun thinkingElapsedSeconds(nowElapsedMs: Long, startedAtElapsedMs: Long): Long =
     if (startedAtElapsedMs <= 0L) 0L else ((nowElapsedMs - startedAtElapsedMs).coerceAtLeast(0L) / 1000L)
-
-/** «Pensando…» shows time from the ViewModel's turn start, not time since the row was composed. */
-@Composable
-private fun ThinkingIndicator(activity: List<String> = emptyList(), startedAtElapsedMs: Long) {
-    val seconds by produceState(
-        initialValue = thinkingElapsedSeconds(android.os.SystemClock.elapsedRealtime(), startedAtElapsedMs),
-        key1 = startedAtElapsedMs,
-    ) {
-        while (true) {
-            value = thinkingElapsedSeconds(android.os.SystemClock.elapsedRealtime(), startedAtElapsedMs)
-            kotlinx.coroutines.delay(1000L)
-        }
-    }
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            Spacer(Modifier.width(NexusTokens.space8))
-            Text("Pensando… " + (if (seconds >= 60) "${seconds / 60} min ${seconds % 60} s" else "$seconds s"), color = TextMuted)
-        }
-        // Lo que está haciendo ahora mismo el agente (pasos reales: consultar modelos, leer la biblioteca…).
-        activity.takeLast(4).forEachIndexed { i, line ->
-            val last = i == activity.takeLast(4).lastIndex
-            Text((if (last) "› " else "✓ ") + line, style = MaterialTheme.typography.bodySmall,
-                color = if (last) MaterialTheme.colorScheme.onSurface else TextMuted, modifier = Modifier.padding(start = 26.dp, top = 2.dp))
-        }
-        if (seconds >= 30) Text("Tarda más de lo normal. Puedes pararlo con ■ y volver a intentarlo.",
-            style = MaterialTheme.typography.labelSmall, color = TextMuted, modifier = Modifier.padding(start = 26.dp, top = 2.dp))
-    }
-}

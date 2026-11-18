@@ -374,6 +374,10 @@ class MainActivity : ComponentActivity() {
                     containerColor = ScreenBackground,
                     bottomBar = {
                         if(!WindowInsets.isImeVisible && activeEntry?.destination?.route?.startsWith("cut/") != true) {
+                            // Under the Agent the tabs take its charcoal, matte finish, so the conversation, the
+                            // composer and the navigation read as one surface. Every other tab keeps the app's chrome.
+                            val agentOnScreen = activeEntry?.destination?.route == "workspace" && tabs.getOrNull(pager.currentPage) == Screen.Assistant
+                            com.vidadomu.nexus.assistant.AgentChatTheme(enabled = agentOnScreen) {
                             androidx.compose.foundation.layout.Column {
                                 val currentRoute = activeEntry?.destination?.route
                                 if (currentRoute?.startsWith("output") != true) {
@@ -389,6 +393,7 @@ class MainActivity : ComponentActivity() {
                                 }
                                 NexusBottomBar(navController = navController, selectedRoute=if(activeEntry?.destination?.route=="workspace") tabs[pager.currentPage].route else null,
                                     onSelect={screen->cutReturnTab=null;tabRequest=tabs.indexOf(screen).takeIf {it>=0};navController.popBackStack("workspace",false);com.vidadomu.nexus.ui.theme.ChromeVisibility.bottomBar.value=false})
+                            }
                             }
                         }
                     }

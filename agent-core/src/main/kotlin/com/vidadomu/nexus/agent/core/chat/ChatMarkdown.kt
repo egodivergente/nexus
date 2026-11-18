@@ -39,7 +39,9 @@ data class ListItem(val depth: Int, val number: String?, val spans: List<MdSpan>
 
 object ChatMarkdown {
     private val heading = Regex("^(#{1,6})\\s+(.*?)\\s*#*\\s*$")
-    private val bullet = Regex("^(\\s*)[-*+•]\\s+(.*)$")
+    private val bullet = Regex("^(\\s*)[-*+•·]\\s+(.*)$")
+    /** Punto suelto al empezar un elemento («- · texto», o lo que queda al ocultar un id): la lista ya pinta el suyo. */
+    private val strayBullet = Regex("^(?:[·•∙▪◦]\\s*)+")
     private val ordered = Regex("^(\\s*)(\\d{1,3})[.)]\\s+(.*)$")
     private val fence = Regex("^\\s*(```|~~~)\\s*([\\w+#.-]*)\\s*$")
     private val rule = Regex("^\\s*([-*_])(\\s*\\1){2,}\\s*$")
@@ -152,8 +154,8 @@ object ChatMarkdown {
             val o = if (b == null) ordered.matchEntire(line) else null
             if (b != null || o != null) {
                 flushPara(); flushQuote()
-                items += if (b != null) ListItem(depthOf(b.groupValues[1]), null, inline(b.groupValues[2]))
-                else ListItem(depthOf(o!!.groupValues[1]), o.groupValues[2], inline(o.groupValues[3]))
+                items += if (b != null) ListItem(depthOf(b.groupValues[1]), null, inline(b.groupValues[2].replaceFirst(strayBullet, "")))
+                else ListItem(depthOf(o!!.groupValues[1]), o.groupValues[2], inline(o.groupValues[3].replaceFirst(strayBullet, "")))
                 i++; continue
             }
             if (items.isNotEmpty()) {

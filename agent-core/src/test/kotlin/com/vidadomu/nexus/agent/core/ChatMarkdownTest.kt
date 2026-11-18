@@ -51,6 +51,15 @@ class ChatMarkdownTest {
         assertEquals(1, l.items[2].depth)
     }
 
+    @Test fun `un elemento de lista no lleva doble vineta`() {
+        // Captura de Vidal del 18-11: «● · Kling Pro». El punto sobrante llega del modelo o queda al ocultar un id.
+        val b = ChatMarkdown.parse("Encargos:\n- · Kling Pro, 5 s\n- • **Seedance** listo\n· Suelto con punto medio\n1. · Numerado\n- Normal · con punto dentro")
+        val l = assertIs<MdBlock.ListBlock>(b[1])
+        assertEquals(listOf("Kling Pro, 5 s", "Seedance listo", "Suelto con punto medio", "Numerado", "Normal · con punto dentro"), l.items.map { raw(it.spans) })
+        assertEquals(MdSpan("Seedance", bold = true), l.items[1].spans[0])
+        assertEquals(listOf(null, null, null, "1", null), l.items.map { it.number })
+    }
+
     @Test fun `bloque de codigo conserva el prompt literal`() {
         val p = "Cinematic dolly-in, **no bold here**, snake_case_ok"
         val b = ChatMarkdown.parse("Prompt:\n```prompt\n$p\n```\nListo")

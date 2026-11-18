@@ -10,6 +10,9 @@ import com.vidadomu.nexus.agent.core.registry.ModelRef
 import com.vidadomu.nexus.agent.core.spend.GenerationPlan
 import com.vidadomu.nexus.agent.core.spend.MediaRef
 import com.vidadomu.nexus.agent.core.spend.PlanState
+import com.vidadomu.nexus.core.model.GenerationJob
+import com.vidadomu.nexus.core.model.GenerationStatus
+import com.vidadomu.nexus.core.model.Modality
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -72,6 +75,67 @@ class OrderCardLogicTest {
         assertEquals(CardAction.ASK_AGENT, jobFailed.action)
         assertTrue(jobFailed.headline!!.contains("decide si cobra"))
         assertTrue(withFix.rendered.startsWith("Error · botón «Aplicar corrección»"))
+    }
+
+    @Test fun pausedTrackingOffersRecoverOnTheSameOrderInsteadOfAnError() {
+        val paused = order(OrderStatus.FAILED, fail(FailureKind.JOB_FAILED, "Seguimiento pausado tras 6 h sin respuesta."), jobId = "job_1")
+        val shown = presentOrder(paused, null, busy = false, assistantBusy = false, dirty = false, recoverable = true)
+        assertEquals(CardAction.RECOVER, shown.action)
+        assertEquals("Seguimiento pausado", shown.status)
+        assertEquals("Recuperar", shown.actionLabel)
+        assertTrue(shown.enabled)
+        assertFalse("una pausa del seguimiento no se pinta como error del encargo", shown.error)
+        assertTrue("dice que no se genera ni se cobra otro", shown.headline!!.contains("sin generar ni cobrar otro"))
+        assertEquals("Seguimiento pausado tras 6 h sin respuesta.", shown.detail)
+        assertEquals("Seguimiento pausado · botón «Recuperar»", shown.rendered)
+
+        val consulting = presentOrder(paused, null, busy = true, assistantBusy = false, dirty = false, recoverable = true)
+        assertEquals("Consultando al proveedor…", consulting.status)
+        assertEquals("Consultando…", consulting.actionLabel)
+        assertFalse("una segunda pulsación no lanza otra consulta", consulting.enabled)
+        assertTrue("recuperar no depende de que el agente esté libre: no pasa por él",
+            presentOrder(paused, null, busy = false, assistantBusy = true, dirty = false, recoverable = true).enabled)
+    }
+
+    @Test fun recoverNeverReplacesARealFailureNorAnyOtherState() {
+        val failed = order(OrderStatus.FAILED, fail(FailureKind.JOB_FAILED, "content policy"), jobId = "job_1")
+        val plain = presentOrder(failed, null, busy = false, assistantBusy = false, dirty = false)
+        assertEquals("Error", plain.status)
+        assertEquals(CardAction.ASK_AGENT, plain.action)
+        assertTrue(plain.error)
+        assertEquals(plain, presentOrder(failed, null, busy = false, assistantBusy = false, dirty = false, recoverable = false))
+        for (status in OrderStatus.values().filterNot { it == OrderStatus.FAILED }) {
+            val o = order(status, jobId = "job_1")
+            assertEquals("$status no cambia por ser recuperable", presentOrder(o, null, false, false, false),
+                presentOrder(o, null, false, false, false, recoverable = true))
+        }
+    }
+
+    @Test fun onlyAPausedJobThatTheProviderCanStillReportIsRecoverable() {
+        fun job(id: String, remote: String?, paused: Boolean, status: GenerationStatus = GenerationStatus.FAILED, provider: String = "atlas_cloud") =
+            GenerationJob(id, remote, provider, "modelo", Modality.VIDEO, "x",
+                parameters = if (paused) mapOf("__tracking_paused" to "true") else emptyMap(), status = status, startedAt = 0)
+        val paused = order(OrderStatus.FAILED, fail(FailureKind.JOB_FAILED, "Seguimiento pausado."), jobId = "j1")
+        val pausedJob = job("j1", "remote-1", paused = true)
+
+        assertEquals(setOf("ord_1"), recoverableOrders(listOf(paused), listOf(pausedJob)))
+        assertEquals("cada encargo se decide por su propio trabajo", setOf("ord_1"),
+            recoverableOrders(listOf(paused, paused.copy(id = "ord_2", jobId = "j2")), listOf(pausedJob, job("j2", "remote-2", paused = false))))
+
+        assertTrue("un fallo real del proveedor no se «recupera»", recoverableOrders(listOf(paused), listOf(job("j1", "remote-1", paused = false))).isEmpty())
+        assertTrue("sin identificador del proveedor no hay nada que consultar", recoverableOrders(listOf(paused), listOf(job("j1", null, paused = true))).isEmpty())
+        assertTrue("un identificador de cola local no es del proveedor", recoverableOrders(listOf(paused), listOf(job("j1", "queue_7", paused = true))).isEmpty())
+        assertTrue("el trabajo ya no está en el historial", recoverableOrders(listOf(paused), emptyList()).isEmpty())
+        assertTrue("un trabajo ya cancelado no se consulta", recoverableOrders(listOf(paused), listOf(job("j1", "remote-1", paused = true, status = GenerationStatus.CANCELLED))).isEmpty())
+        assertTrue("un proveedor retirado no se puede consultar",
+            recoverableOrders(listOf(paused), listOf(job("j1", "remote-1", paused = true, provider = com.vidadomu.nexus.provider.registry.RetiredProviders.GOOGLE_FLOW))).isEmpty())
+
+        assertTrue("rechazado antes de crear trabajo: no hay nada que recuperar",
+            recoverableOrders(listOf(order(OrderStatus.FAILED, fail(FailureKind.PROVIDER_REJECTED, "HTTP 400"), jobId = "j1")), listOf(pausedJob)).isEmpty())
+        assertTrue("un encargo sin trabajo no ofrece recuperar", recoverableOrders(listOf(paused.copy(jobId = null)), listOf(pausedJob)).isEmpty())
+        assertTrue("el fallo es de un intento anterior", recoverableOrders(listOf(paused.copy(attempt = 2)), listOf(pausedJob)).isEmpty())
+        for (status in OrderStatus.values().filterNot { it == OrderStatus.FAILED })
+            assertTrue("$status no ofrece recuperar", recoverableOrders(listOf(paused.copy(status = status)), listOf(pausedJob)).isEmpty())
     }
 
     @Test fun restorePreservesDifferentInstructionsAndParametersForSameMedia() {

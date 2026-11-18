@@ -42,6 +42,8 @@ sealed interface UiEvent {
     data class Info(val text: String) : UiEvent
     /** Paso que el agente está haciendo ahora (se muestra bajo «Pensando…»). */
     data class Activity(val text: String) : UiEvent
+    /** Paso real del turno con estado y duración; se repite con el mismo id al acabar (ver [AgentStep]). */
+    data class Step(val step: AgentStep) : UiEvent
     /** Texto parcial durante el streaming de un proveedor compatible (p. ej. Antigravity). */
     data class StreamingText(val text: String) : UiEvent
     /** Botones de respuesta de un toque bajo la última respuesta del agente. Pulsar uno envía [SuggestedReply.text] como mensaje del usuario. */

@@ -42,9 +42,17 @@ import androidx.compose.ui.unit.dp
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.stylusHover
 
+/**
+ * Matte finish for a screen that asks for it (the Agent chat): the shared studio pieces drop their sheen, rim and
+ * shadow there and keep them everywhere else.
+ */
+val LocalStudioFlat = androidx.compose.runtime.staticCompositionLocalOf { false }
+
 /** Borde especular 3D cálido/frío compartido: luz blanca suave arriba y contorno sutil abajo. */
 @Composable
 fun studioSpecularBorder(width: Dp = 1.dp, accentTint: Color? = null): BorderStroke {
+    // Matte screens keep only a faint tint where the edge carries meaning (an error, a focused field).
+    if (LocalStudioFlat.current) return BorderStroke(width, accentTint?.copy(alpha = accentTint.alpha * 0.55f) ?: Color.Transparent)
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val topRim = (accentTint ?: Color.White).copy(alpha = if (isDark) 0.20f else 0.88f)
     val bottomEdge = (accentTint ?: MaterialTheme.colorScheme.outlineVariant).copy(alpha = if (isDark) 0.42f else 0.65f)
@@ -61,6 +69,10 @@ fun StudioTactileCard(
     border: BorderStroke? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    if (LocalStudioFlat.current) {
+        Surface(modifier = modifier, shape = shape, color = containerColor, border = border) { Box(content = content) }
+        return
+    }
     val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val elevation = shadowElevation ?: if (isDark) 3.dp else 6.dp
     val sheenTop = Color.White.copy(alpha = if (isDark) 0.06f else 0.52f)
@@ -203,6 +215,15 @@ fun StudioSegmentedTabs(
 @Composable
 fun StudioChrome(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val chrome = com.vidadomu.nexus.ui.theme.LocalChromeColor.current
+    if (LocalStudioFlat.current) {
+        // One opaque tone and a hairline: no glow, rim or shadow between the conversation and the tabs.
+        Box(modifier.background(chrome)) {
+            content()
+            HorizontalDivider(Modifier.align(Alignment.TopCenter), thickness = NexusTokens.divider,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+        }
+        return
+    }
     val isDark = chrome.luminance() < 0.5f
     val topGlow = Color.White.copy(alpha = if (isDark) 0.06f else 0.36f)
     val rim = Color.White.copy(alpha = if (isDark) 0.14f else 0.72f)

@@ -288,6 +288,26 @@ class OrderBook(private val clock: () -> Long = System::currentTimeMillis) {
         }
     }
 
+    /**
+     * «Recuperar»: el seguimiento del trabajo se pausó y el encargo quedó como error, pero el trabajo sigue
+     * existiendo en el proveedor. Vuelve a «procesando» sobre el MISMO encargo, intento y trabajo: no reenvía,
+     * no crea otro encargo y no cobra. El estado real lo trae después el seguimiento con [jobUpdate].
+     * Devuelve false si el encargo no está en ese caso (y no cambia nada).
+     */
+    fun resumeTracking(orderId: String): Boolean {
+        var resumed = false
+        update(orderId) { o ->
+            val last = o.lastFailure
+            if (o.status != OrderStatus.FAILED || o.jobId.isNullOrBlank() || last == null ||
+                last.kind != FailureKind.JOB_FAILED || last.attempt != o.attempt) return@update o
+            resumed = true
+            // Se reutiliza ACCEPTED: las versiones anteriores leen este libro y no conocen tipos de evento nuevos.
+            log(o.id, OrderEventKind.ACCEPTED, Actor.USER, "Seguimiento recuperado (job ${o.jobId}); no se ha reenviado.")
+            o.copy(status = OrderStatus.PROCESSING, progress = null, failures = o.failures.dropLast(1))
+        }
+        return resumed
+    }
+
     fun discard(orderId: String, actor: Actor = Actor.USER) = update(orderId) { o ->
         if (o.status in setOf(OrderStatus.SUBMITTING, OrderStatus.PROCESSING, OrderStatus.UNCERTAIN)) throw IllegalOrderTransition("No se puede descartar un encargo enviado o pendiente de comprobar.")
         if (o.status == OrderStatus.DISCARDED) return@update o

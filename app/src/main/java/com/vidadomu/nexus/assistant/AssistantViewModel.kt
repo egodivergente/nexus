@@ -15,6 +15,9 @@ import com.vidadomu.nexus.agent.core.spend.GenerationPlan
 import com.vidadomu.nexus.agent.core.spend.PlanState
 import com.vidadomu.nexus.agent.core.spend.SpendViolation
 import com.vidadomu.nexus.agent.core.spend.SubmissionUncertain
+import com.vidadomu.nexus.agent.core.tools.AgentStep
+import com.vidadomu.nexus.agent.core.tools.AgentStepStatus
+import com.vidadomu.nexus.agent.core.tools.AgentSteps
 import com.vidadomu.nexus.agent.core.tools.Attachment
 import com.vidadomu.nexus.agent.core.tools.PlanBuild
 import com.vidadomu.nexus.agent.core.tools.PlanEdit
@@ -46,7 +49,9 @@ sealed interface ChatItem {
     data class Assistant(override val id: String, val text: String, val toolCalls: List<String>, val stop: String,
         val media: List<Attachment> = emptyList(), val at: Long = 0L, val tookMs: Long = 0L,
         /** Who answered («AGY · Gemini 3.8 Flash», «Bedrock · …»): the agent can change between messages. */
-        val by: String = "") : ChatItem
+        val by: String = "",
+        /** What the agent did to get here (model calls and tools, with their duration and outcome); empty in older chats. */
+        val steps: List<AgentStep> = emptyList()) : ChatItem
     /** Una tarjeta por encargo: [orderId] es persistente y [planId] apunta al plan vigente. */
     @kotlinx.serialization.Serializable
     data class PlanCard(override val id: String, val planId: String, val orderId: String? = null) : ChatItem
@@ -55,7 +60,9 @@ sealed interface ChatItem {
     @kotlinx.serialization.Serializable
     data class Notice(override val id: String, val text: String, val error: Boolean = false,
         /** Legacy notices have no event time: restoring them must not announce a fresh error. */
-        val at: Long = 0L) : ChatItem
+        val at: Long = 0L,
+        /** Activity of the turn this notice closed (a stopped or failed answer keeps what it had done). */
+        val steps: List<AgentStep> = emptyList()) : ChatItem
     /** Persisted by 1.8.2; opening history never changes the current mode. */
     @kotlinx.serialization.Serializable
     data class ModeSwitch(override val id: String, val text: String, val resolved: Boolean = false) : ChatItem
@@ -106,6 +113,12 @@ data class AssistantUiState(
     val streamingText: String = "",
     /** Pasos que el agente va haciendo en este turno (para «Pensando…»). */
     val activity: List<String> = emptyList(),
+    /** The same turn step by step, as the orchestrator reports it: what runs now, what ended and how long it took. */
+    val steps: List<AgentStep> = emptyList(),
+    /** «Añade algo mientras trabaja»: the draft (text and attachments) goes out as the next message when this answer ends. */
+    val queuedSend: Boolean = false,
+    /** Orders whose job is no longer tracked but still exists at the provider: their card offers «Recuperar». */
+    val recoverable: Set<String> = emptySet(),
     /** Respuestas rápidas de la última respuesta del agente; se borran al enviar cualquier mensaje. */
     val replies: List<com.vidadomu.nexus.agent.core.tools.SuggestedReply> = emptyList(),
     val scrollRequest: Long = 0,
@@ -212,7 +225,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     override fun onCleared() { removeOrderListener(); super.onCleared() }
 
-    private fun publishOrders() = _ui.update { it.copy(orders = (if (background != null) parkedOrders?.orders.orEmpty() else runtime.orders.all()).associateBy { o -> o.id }) }
+    private fun publishOrders() = _ui.update {
+        val orders = (if (background != null) parkedOrders?.orders.orEmpty() else runtime.orders.all()).associateBy { o -> o.id }
+        it.copy(orders = orders, recoverable = recoverableOrders(orders.values, app.generationRepository.allJobs.value))
+    }
 
     /** Applies [f] to conversation [chatId] wherever it is: on screen, or working in the background (saved as it goes). */
     private fun updateChat(chatId: String, f: (AssistantUiState) -> AssistantUiState) {
@@ -226,7 +242,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     /** The per-conversation part of [chat] put on screen, keeping what is global (catalog, settings, projects…). */
     private fun AssistantUiState.showing(chat: AssistantUiState) = copy(items = chat.items, plans = chat.plans, pendingAttachments = chat.pendingAttachments,
         thinking = chat.thinking, thinkingStartedAtElapsedMs = chat.thinkingStartedAtElapsedMs,
-        streamingText = chat.streamingText, activity = chat.activity, replies = chat.replies, conversationId = chat.conversationId,
+        streamingText = chat.streamingText, activity = chat.activity, steps = chat.steps, queuedSend = chat.queuedSend,
+        replies = chat.replies, conversationId = chat.conversationId,
         activeProjectId = chat.activeProjectId, workingIn = null, scrollRequest = scrollRequest + 1)
 
     private fun chatTitle(chat: AssistantUiState) = chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(40) ?: "Nueva conversación"
@@ -295,8 +312,10 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             ?.takeIf { it.projectId == _ui.value.activeProjectId }
         // A narrative approval is not authorization for a native image call outside SpendGuard.
         // Capture the runtime for this turn; a settings/navigation change cannot re-enable its native engine.
-        val turnOrchestrator = runtime.orchestrator(latestSettings, allowNativeImages = storySelectionForTurn == null)
-        orchestrator = turnOrchestrator
+        // Debug builds can answer one turn from a local script (no model, no cost) to exercise the real tools and events.
+        val scripted = AgentChatQa.take()
+        val turnOrchestrator = runtime.orchestrator(latestSettings, allowNativeImages = storySelectionForTurn == null && scripted == null, llmOverride = scripted)
+        if (scripted == null) orchestrator = turnOrchestrator
         if (latestSettings != _ui.value.settings) {
             // Native settings tools affect the next request without dropping conversation, plans or proposals.
             _ui.update { it.copy(settings = latestSettings) }
@@ -308,7 +327,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val carriedNote = carried.joinToString("\n\n") { "Contexto traído de la conversación «${it.from}» (resumen):\n${it.summary}" }
         val started = android.os.SystemClock.elapsedRealtime()
         _ui.update { it.copy(items = it.items.map { item -> if (item is ChatItem.Context && item in carried) item.copy(sent = true) else item } +
-            ChatItem.User(newId(), shown, atts, System.currentTimeMillis(), widgetAnswer = widgetAnswer), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, thinkingStartedAtElapsedMs = started, streamingText = "", activity = emptyList(), replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+            ChatItem.User(newId(), shown, atts, System.currentTimeMillis(), widgetAnswer = widgetAnswer), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, thinkingStartedAtElapsedMs = started, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -322,6 +341,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         turnChat = chatId
         turnJob = viewModelScope.launch {
             var lastBreakdown: String? = null
+            // Only an answer that ended on its own sends what was queued; stopping it or an error keep the draft.
+            var completed = false
             try {
                 val run: suspend () -> com.vidadomu.nexus.agent.core.agent.TurnResult = {
                     turnOrchestrator.send(conv, listOf(carriedNote, clean.ifEmpty { "Te adjunto estos archivos." }, note).filter { it.isNotBlank() }.joinToString("\n\n"), atts) { ev -> onEvent(ev, chatId) }
@@ -337,46 +358,92 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     lastBreakdown = turnBreakdown(r)
                 }
                 if (r.text.isNotBlank() || r.toolCalls.isNotEmpty()) {
+                    // The activity travels with the answer: it is what «reabrir la conversación» shows again.
                     updateChat(chatId) { it.copy(items = it.items + ChatItem.Assistant(newId(), r.text.trim(), r.toolCalls, r.stop,
                         conv.session.renderedMedia.values.toList(), System.currentTimeMillis(), android.os.SystemClock.elapsedRealtime() - started,
-                        agentLabel(_ui.value.settings)), streamingText = "") }
+                        agentLabel(_ui.value.settings), endedSteps(it.steps, AgentStepStatus.DONE)), streamingText = "", steps = emptyList()) }
                 }
                 // Lo que el agente no corrigió por sí mismo se muestra con el estado verificado.
                 r.verifiedNotes.forEach { notice(it, error = false, chatId = chatId) }
                 if (r.stop == "MAX_ROUNDS") notice("He parado: demasiados pasos seguidos en un solo mensaje. Dime cómo seguir.", error = false, chatId = chatId)
+                completed = true
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 failedTurn = clean to atts
-                notice("La petición ha superado el tiempo de espera. Tus archivos se conservan; puedes reintentar.", error=true, chatId = chatId)
+                notice("La petición ha superado el tiempo de espera. Tus archivos se conservan; puedes reintentar.", error=true, chatId = chatId,
+                    closing = AgentStepStatus.ISSUE to "Tiempo de espera superado.")
             } catch (e: CancellationException) {
-                notice("Cancelado.", chatId = chatId)
+                notice("Cancelado.", chatId = chatId, closing = AgentStepStatus.CANCELLED to null)
                 throw e
             } catch (e: LlmException) {
                 failedTurn = clean to atts
-                notice(Redactor.redact(e.message ?: "El asistente no respondió."), error = true, chatId = chatId)
+                notice(Redactor.redact(e.message ?: "El asistente no respondió."), error = true, chatId = chatId, closing = AgentStepStatus.ISSUE to null)
             } catch (e: Exception) {
                 failedTurn = clean to atts
-                notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true, chatId = chatId)
+                notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true, chatId = chatId,
+                    closing = AgentStepStatus.ISSUE to null)
             } finally {
                 turnChat = null
+                var queued = false
                 updateChat(chatId) { state ->
+                    queued = state.queuedSend
                     // Solo las tarjetas NUEVAS de este turno van tras la respuesta; las existentes
                     // se actualizan en su sitio y no saltan de posición.
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
                         card.id !in itemsBefore && state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
                     }
-                    state.copy(thinking = false, thinkingStartedAtElapsedMs = 0L, streamingText = "", activity = emptyList(), lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
+                    state.copy(thinking = false, thinkingStartedAtElapsedMs = 0L, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false,
+                        lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
                         lastTurnBreakdown = lastBreakdown, items = state.items.filterNot { it in cards } + cards)
                 }
                 refreshProjects()
                 if (background?.conversationId == chatId) finishBackground()
-                // El asistente puede haber entrado en otro proyecto (open_project / create_project).
-                else if (_ui.value.conversationId == chatId) conv.session.activeProjectId.takeIf { it != _ui.value.activeProjectId }?.let { selectProject(it) }
+                else if (_ui.value.conversationId == chatId) {
+                    // El asistente puede haber entrado en otro proyecto (open_project / create_project).
+                    val moved = conv.session.activeProjectId.takeIf { it != _ui.value.activeProjectId }
+                    if (moved != null) selectProject(moved)
+                    else if (queued && completed) sendQueued(chatId)
+                }
             }
         }
         return true
     }
 
     fun stop() { turnJob?.cancel() }
+
+    private val draftPrefs get() = app.getSharedPreferences("assistant_draft_v1", 0)
+
+    /** True while the agent answers the conversation on screen: what the user writes now can wait for it. */
+    private fun answeringHere() = _ui.value.thinking && turnChat == _ui.value.conversationId && turnJob?.isActive == true
+
+    /**
+     * «Añade algo mientras trabaja»: nothing is sent now and the running answer is not interrupted. The draft stays
+     * editable in the composer and goes out, with its attachments, as the next message when the answer ends.
+     */
+    fun queueSend(): Boolean {
+        val state = _ui.value
+        if (!answeringHere()) return false
+        if (draftPrefs.getString("conversation:${state.conversationId}", "").isNullOrBlank() && state.pendingAttachments.isEmpty()) return false
+        _ui.update { it.copy(queuedSend = true) }
+        return true
+    }
+
+    fun cancelQueuedSend() = _ui.update { it.copy(queuedSend = false) }
+
+    private fun sendQueued(chatId: String) {
+        if (_ui.value.conversationId != chatId) return
+        val key = "conversation:$chatId"
+        val text = draftPrefs.getString(key, "").orEmpty()
+        if (text.isBlank() && _ui.value.pendingAttachments.isEmpty()) return
+        // Same path as the send button. If it cannot go out (limits, archived project…) the draft is left untouched.
+        if (sendWithBoards(text)) {
+            draftPrefs.edit().remove(key).remove("text").apply()
+            _ui.update { it.copy(draftRevision = it.draftRevision + 1) }
+        }
+    }
+
+    /** What is saved with the answer or notice that ends a turn: nothing left «running», secrets already redacted. */
+    private fun endedSteps(steps: List<AgentStep>, status: AgentStepStatus, reason: String? = null): List<AgentStep> =
+        AgentSteps.forStorage(AgentSteps.close(steps, status, System.currentTimeMillis(), reason))
 
     /**
      * Muestra [plan] en la tarjeta de su encargo. Si la tarjeta existe se actualiza EN SU SITIO
@@ -413,6 +480,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             is UiEvent.ResultsWall -> if (_ui.value.conversationId == chatId) _ui.update { it.copy(resultsWall = ev.media) }
             is UiEvent.Info -> notice(ev.text, chatId = chatId)
             is UiEvent.Activity -> updateChat(chatId) { it.copy(activity = (if (it.activity.lastOrNull() == ev.text) it.activity else it.activity + ev.text).takeLast(8)) }
+            is UiEvent.Step -> updateChat(chatId) { it.copy(steps = AgentSteps.upsert(it.steps, ev.step)) }
             is UiEvent.StreamingText -> updateChat(chatId) { it.copy(streamingText = ev.text) }
             is UiEvent.Replies -> updateChat(chatId) { it.copy(replies = ev.replies) }
         }
@@ -479,7 +547,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 synced.clear()
                 if(background != null) parkedOrders = com.vidadomu.nexus.agent.core.orders.OrderBookState()
                 else runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
-                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = listOfNotNull(carry), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, thinkingStartedAtElapsedMs = 0L, streamingText = "", replies = emptyList(),
+                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = listOfNotNull(carry), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, thinkingStartedAtElapsedMs = 0L, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, replies = emptyList(),
                     workingIn = background?.conversationId, scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
                 publishOrders()
@@ -1038,6 +1106,45 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         send("Corrige el encargo ${order.modelName} (${order.id}): falló con «${order.lastFailure?.message?.take(300) ?: "error sin detalle"}». Corrígelo en la misma tarjeta, sin crear otra.")
     }
 
+    /**
+     * «Recuperar»: pregunta al proveedor por el trabajo que este encargo YA tiene. No reenvía, no crea otro encargo
+     * y no cobra. Primero se consulta; solo con una respuesta verificada el encargo vuelve a «Procesando» y toma el
+     * estado real. Si la consulta falla, el encargo se queda como estaba (pausado) y se puede volver a intentar.
+     */
+    fun recoverOrder(orderId: String) {
+        val order = runtime.orders.get(orderId) ?: return
+        val jobId = order.jobId ?: return
+        if (_ui.value.plans[order.planId]?.busy == true) return
+        setPlan(order.planId) { it.copy(busy = true) }
+        viewModelScope.launch {
+            try {
+                val job = app.generationRepository.getJob(jobId)
+                val blocked = when {
+                    job == null -> "El trabajo ya no está en el historial local."
+                    com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(job.providerId) -> com.vidadomu.nexus.provider.registry.RetiredProviders.TRACKING_MESSAGE
+                    !NexusNativeOperations.canQueryExisting(job) -> "No hay identificador del proveedor que consultar. Compruébalo en el proveedor antes de repetir."
+                    else -> null
+                }
+                if (blocked != null) { _ui.update { it.copy(message = msg(blocked)) }; return@launch }
+                val result = app.generationRepository.pollJob(jobId, refreshFailed = true)
+                val latest = result.getOrNull()
+                if (latest == null) {
+                    _ui.update { it.copy(message = msg("No se pudo consultar al proveedor. El encargo sigue pausado y no se ha reenviado.")) }
+                    return@launch
+                }
+                // From here to onJobs nothing suspends: the order cannot be seen «processing» with the old paused job.
+                if (!runtime.orders.resumeTracking(orderId)) return@launch
+                reportedJobStates.removeAll { it.startsWith("$jobId:") }
+                synced.remove(jobId)
+                if (latest.status in NexusNativeOperations.ACTIVE) com.vidadomu.nexus.core.work.GenerationPollingWorker.enqueue(app, jobId)
+                onJobs(app.generationRepository.allJobs.value)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                _ui.update { it.copy(message = msg("No se pudo recuperar: ${Redactor.redact(e.message?.take(160).orEmpty())}")) }
+            } finally { setPlan(order.planId) { it.copy(busy = false) } }
+        }
+    }
+
     /** La tarjeta declara lo que ha pintado; el agente lo ve tal cual en su contexto. */
     fun cardRendered(orderId: String, shown: String) {
         runCatching { runtime.orders.rendered(orderId, shown) }
@@ -1194,6 +1301,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val completed = jobs.count { it.status == GenerationStatus.COMPLETED }
         if (completedSeen >= 0 && completed > completedSeen) viewModelScope.launch { runCatching { runtime.importHistory() }; refreshProjects() }
         completedSeen = completed
+        recoverableOrders(_ui.value.orders.values, jobs).let { now -> if (now != _ui.value.recoverable) _ui.update { it.copy(recoverable = now) } }
         for(job in jobs) {
             val planId = job.parameters[NexusGenerationBackend.PLAN_KEY] ?: continue
             syncOrder(planId, job)
@@ -1372,12 +1480,32 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun consumeMessage() = _ui.update { it.copy(message = null) }
 
-    private fun notice(text: String, error: Boolean = false, chatId: String = _ui.value.conversationId) =
-        updateChat(chatId) { it.copy(items = it.items + ChatItem.Notice(newId(), text, error, at = System.currentTimeMillis())) }
+    /** [closing]: this notice ends the turn; its steps are closed with that status (and reason) and saved with it. */
+    private fun notice(text: String, error: Boolean = false, chatId: String = _ui.value.conversationId,
+        closing: Pair<AgentStepStatus, String?>? = null) =
+        updateChat(chatId) { state ->
+            val steps = closing?.let { (status, reason) -> endedSteps(state.steps, status, reason) }.orEmpty()
+            state.copy(items = state.items + ChatItem.Notice(newId(), text, error, at = System.currentTimeMillis(), steps = steps),
+                steps = if (closing != null) emptyList() else state.steps)
+        }
 
     private fun msg(text: String) = (++msgSeq) to text
 
     private fun newId() = UUID.randomUUID().toString()
+}
+
+/**
+ * Encargos que ofrecen «Recuperar»: fallaron solo porque se dejó de consultar su trabajo (seguimiento pausado) y el
+ * proveedor aún lo puede informar. Sale del trabajo real guardado, no del texto del error.
+ */
+internal fun recoverableOrders(orders: Collection<com.vidadomu.nexus.agent.core.orders.Order>,
+    jobs: List<com.vidadomu.nexus.core.model.GenerationJob>): Set<String> {
+    val failed = orders.filter { it.status == com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED && !it.jobId.isNullOrBlank() &&
+        it.lastFailure?.let { f -> f.kind == com.vidadomu.nexus.agent.core.orders.FailureKind.JOB_FAILED && f.attempt == it.attempt } == true }
+    if (failed.isEmpty()) return emptySet()
+    val paused = jobs.filter { it.parameters["__tracking_paused"] == "true" && NexusNativeOperations.canQueryExisting(it) &&
+        !com.vidadomu.nexus.provider.registry.RetiredProviders.isRetired(it.providerId) }.map { it.id }.toSet()
+    return failed.filter { it.jobId in paused }.map { it.id }.toSet()
 }
 
 /** Desglose legible del tiempo de un turno; null si no hubo llamadas al modelo medidas. */

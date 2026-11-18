@@ -38,7 +38,7 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.TextSecondary
 
 /** La ÚNICA acción principal que ofrece una tarjeta según el estado verificado de su encargo. */
-internal enum class CardAction { GENERATE, SENDING, NONE, VIEW_RESULT, APPLY_FIX, RETRY, ASK_AGENT, CHECK_HISTORY, REVIEW }
+internal enum class CardAction { GENERATE, SENDING, NONE, VIEW_RESULT, APPLY_FIX, RETRY, ASK_AGENT, CHECK_HISTORY, REVIEW, RECOVER }
 
 internal data class CardPresentation(
     val status: String,
@@ -56,7 +56,12 @@ internal data class CardPresentation(
 
 private val TRANSIENT = Regex("(?i)timeout|tiempo de espera|network|red|conexi[oó]n|unavailable|429|rate limit|503|502")
 
-internal fun presentOrder(order: Order, costLabel: String?, busy: Boolean, assistantBusy: Boolean, dirty: Boolean): CardPresentation {
+/**
+ * [recoverable]: Nexus dejó de seguir el trabajo (seguimiento pausado) pero el encargo sigue existiendo en el
+ * proveedor. La tarjeta ofrece «Recuperar», que consulta ese mismo trabajo; nunca envía ni cobra otro.
+ */
+internal fun presentOrder(order: Order, costLabel: String?, busy: Boolean, assistantBusy: Boolean, dirty: Boolean,
+    recoverable: Boolean = false): CardPresentation {
     val failure = order.lastFailure
     return when (order.status) {
         OrderStatus.DRAFT -> CardPresentation("Borrador", CardAction.REVIEW, "Revisar datos", true,
@@ -67,7 +72,11 @@ internal fun presentOrder(order: Order, costLabel: String?, busy: Boolean, assis
         OrderStatus.SUBMITTING -> CardPresentation("Enviando…", CardAction.SENDING, "Enviando…", false)
         OrderStatus.PROCESSING -> CardPresentation("Procesando" + (measuredOrderProgress(order)?.let { " · ${(it * 100).roundToInt()} %" } ?: ""), CardAction.NONE, null, false)
         OrderStatus.COMPLETED -> CardPresentation("Completado", CardAction.VIEW_RESULT, "Ver resultado", true)
-        OrderStatus.FAILED -> {
+        OrderStatus.FAILED -> if (recoverable) CardPresentation(if (busy) "Consultando al proveedor…" else "Seguimiento pausado",
+            CardAction.RECOVER, if (busy) "Consultando…" else "Recuperar", !busy,
+            headline = "El proveedor puede seguir trabajando en este encargo. Recuperar consulta ese mismo trabajo, sin generar ni cobrar otro.",
+            detail = failure?.message)
+        else {
             val message = failure?.message ?: "El proveedor devolvió un error sin detalle."
             val charged = if (failure?.kind == FailureKind.JOB_FAILED) " El proveedor decide si cobra un trabajo fallido." else " No se ha cobrado: no se creó ningún trabajo."
             val (action, label) = when {
@@ -116,6 +125,8 @@ internal fun OrderCard(
     presentation: AssistantPresentation = AssistantPresentation(),
     onRemove: () -> Unit = onDiscard,
     onPrepareRetry: () -> Unit = { onEdit(PlanEdit()) },
+    recoverable: Boolean = false,
+    onRecover: () -> Unit = {},
 ) {
     val app = LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currency = app.currencyManager
@@ -127,7 +138,7 @@ internal fun OrderCard(
     LaunchedEffect(plan.prompt) { prompt = plan.prompt }
     val dirty = prompt != plan.prompt
     val cost = remember(plan.estimate, currencyState) { plan.estimate?.amountUsd?.let(currency::formatCost) }
-    val shown = presentOrder(order, cost, p.busy, assistantBusy, dirty)
+    val shown = presentOrder(order, cost, p.busy, assistantBusy, dirty, recoverable)
     // Lo que de verdad se pinta: con resultados, miniaturas en lugar del botón.
     val rendered = if (order.status == OrderStatus.COMPLETED && outputs.isNotEmpty()) "${shown.status} · ${outputs.size} resultado(s) visibles como miniatura" else shown.rendered
     LaunchedEffect(order.id, rendered) { onRendered(rendered) }
@@ -136,7 +147,9 @@ internal fun OrderCard(
 
     var menu by remember { mutableStateOf(false) }
     val running = order.status in setOf(OrderStatus.SUBMITTING, OrderStatus.PROCESSING)
-    Card(modifier.fillMaxWidth().animateContentSize().semantics { contentDescription = "Encargo ${plan.modelName}"; stateDescription = shown.status }, shape = NexusTokens.card) {
+    // Matte and flat: the card is told apart by its tone, with the state and the one available action inside it.
+    Surface(modifier.fillMaxWidth().animateContentSize().semantics { contentDescription = "Encargo ${plan.modelName}"; stateDescription = shown.status },
+        shape = NexusTokens.card, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column(Modifier.padding(start = NexusTokens.space12, end = NexusTokens.space4, top = NexusTokens.space8, bottom = NexusTokens.space8),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
             // Cabecera en una línea: qué, quién factura, cuánto, estado y controles secundarios plegados.
@@ -210,6 +223,7 @@ internal fun OrderCard(
                 if (running) {
                     GenerationActivity(order, animated = presentation.animateGeneration, compact = presentation.cardSize == AssistantCardSize.COMPACT)
                 }
+                if (shown.action == CardAction.RECOVER && p.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 shown.headline?.takeIf { !compact || expanded }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = if (shown.error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                     maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis) }
                 shown.detail?.takeIf { it.isNotBlank() && (!compact || expanded) }?.let {
@@ -251,6 +265,10 @@ internal fun OrderCard(
                         CardAction.VIEW_RESULT -> onOpenOutput
                         CardAction.CHECK_HISTORY -> onOpenHistory
                         CardAction.REVIEW -> ({ expanded = true })
+                        CardAction.RECOVER -> ({
+                            haptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
+                            onRecover()
+                        })
                         CardAction.SENDING, CardAction.NONE -> ({})
                     }
                     Button(onClick = click, enabled = shown.enabled, shape = NexusTokens.field, modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
@@ -291,8 +309,9 @@ private fun ResultThumb(uri: String, modality: String, onOpen: () -> Unit, size:
 @Composable
 private fun StatusPill(text: String, error: Boolean) {
     val colors = MaterialTheme.colorScheme
-    Surface(shape = NexusTokens.filter, color = if (error) colors.errorContainer else colors.secondaryContainer,
-        contentColor = if (error) colors.onErrorContainer else colors.onSecondaryContainer) {
+    // Quiet by default; only an error takes colour.
+    Surface(shape = NexusTokens.filter, color = if (error) colors.errorContainer else colors.surfaceContainerHighest,
+        contentColor = if (error) colors.onErrorContainer else colors.onSurfaceVariant) {
         Text(text, Modifier.padding(horizontal = 10.dp, vertical = NexusTokens.space4), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -224,9 +224,12 @@ private fun drawerTitle(titles: ConversationTitles, chat: AssistantChatEntry): S
 /** Long press on an empty spot of the chat: the actions one reaches for most, as a small floating menu. */
 @Composable internal fun ChatContextMenu(ui: AssistantUiState, vm: AssistantViewModel, expanded: Boolean, offset: DpOffset,
     onDismiss: () -> Unit, onProjects: () -> Unit, onAppearance: () -> Unit, onSettings: () -> Unit, barPinned: Boolean, onPinBar: (Boolean) -> Unit,
-    onCopyChat: () -> Unit, onShareChat: () -> Unit, onImportImages: () -> Unit) {
+    onCopyChat: () -> Unit, onShareChat: () -> Unit, onImportImages: () -> Unit,
+    onOrders: (() -> Unit)? = null, onAssistantSettings: (() -> Unit)? = null) {
     DropdownMenu(expanded=expanded,onDismissRequest=onDismiss,offset=offset) {
         DropdownMenuItem(text={Text("Nueva conversación")},leadingIcon={Icon(Icons.Default.Add,null)},onClick={onDismiss();vm.newConversation()})
+        // The orders of this conversation, as a list that jumps to each card.
+        onOrders?.let { open -> DropdownMenuItem(text={Text("Encargos de esta conversación")},leadingIcon={Icon(Icons.Default.Checklist,null)},onClick={onDismiss();open()}) }
         DropdownMenuItem(text={Text("Importar imágenes")},leadingIcon={Icon(Icons.Default.AddPhotoAlternate,null)},onClick={onDismiss();onImportImages()})
         DropdownMenuItem(text={Text("Cambiar de proyecto")},leadingIcon={Icon(Icons.Default.FolderOpen,null)},onClick={onDismiss();onProjects()})
         HorizontalDivider()
@@ -237,6 +240,7 @@ private fun drawerTitle(titles: ConversationTitles, chat: AssistantChatEntry): S
         DropdownMenuItem(text={Text("Apariencia: colores y tamaño de letra")},leadingIcon={Icon(Icons.Default.Palette,null)},onClick={onDismiss();onAppearance()})
         DropdownMenuItem(text={Text(if(barPinned) "Esconder la barra de pestañas" else "Dejar la barra de pestañas siempre visible")},
             leadingIcon={Icon(Icons.Default.ViewDay,null)},onClick={onDismiss();onPinBar(!barPinned)})
+        onAssistantSettings?.let { open -> DropdownMenuItem(text={Text("Cerebro y modelo del agente")},leadingIcon={Icon(Icons.Default.Tune,null)},onClick={onDismiss();open()}) }
         DropdownMenuItem(text={Text("Todos los ajustes")},leadingIcon={Icon(Icons.Default.Settings,null)},onClick={onDismiss();onSettings()})
     }
 }

@@ -63,6 +63,7 @@ class NexusAgentProvider:ContentProvider() {
             }
         }
         if (method == "cut_chat_qa") return com.vidadomu.nexus.cut.CutChatQa.handle(app, input)
+        if (method == "agent_chat_qa") return com.vidadomu.nexus.assistant.AgentChatQa.handle(input)
         if(method=="agent_model_availability") {
             require(input.keys==setOf("modelId")) {"La consulta solo admite modelId."}
             return com.vidadomu.nexus.assistant.agentModelAvailability(app,input["modelId"]!!.jsonPrimitive.content)

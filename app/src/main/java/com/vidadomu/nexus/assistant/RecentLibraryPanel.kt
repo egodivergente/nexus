@@ -14,8 +14,8 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -62,7 +62,7 @@ internal fun Modifier.recentLibraryGesture(opening: Boolean, onChange: () -> Uni
 internal fun LibraryAttachmentButton(
     enabled: Boolean, onAttach: () -> Unit, onShowLibrary: (() -> Unit)?, libraryExpanded: Boolean,
     onCamera: (() -> Unit)? = null, onLive: (() -> Unit)? = null,
-    additionalOptions: @Composable () -> Unit = {},
+    additionalOptions: (@Composable () -> Unit)? = null,
 ) {
     // Un solo «+»: abre el menú con archivos, cámara, Biblioteca y conversación por voz.
     // Vidal 01-11 (vídeo, 02:26): cada opción hace una sola cosa. «Archivo o galería» abre directamente el selector
@@ -74,7 +74,7 @@ internal fun LibraryAttachmentButton(
             .combinedClickable(enabled = enabled, role = Role.Button,
                 onLongClickLabel = "Mostrar archivos recientes", onLongClick = onShowLibrary, onClick = { menu = true }),
             contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Add, null, Modifier.size(NexusTokens.iconMedium),
+            Icon(Icons.Default.Add, null, Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f))
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
@@ -82,43 +82,51 @@ internal fun LibraryAttachmentButton(
             onCamera?.let { DropdownMenuItem(text = { Text("Hacer una foto") }, leadingIcon = { Icon(Icons.Default.PhotoCamera, null) }, onClick = { menu = false; it() }) }
             onShowLibrary?.let { DropdownMenuItem(text = { Text("Biblioteca") }, leadingIcon = { Icon(Icons.Default.PhotoLibrary, null) }, onClick = { menu = false; it() }) }
             onLive?.let { DropdownMenuItem(text = { Text("Conversación por voz") }, leadingIcon = { Icon(Icons.Default.GraphicEq, null) }, onClick = { menu = false; it() }) }
-            HorizontalDivider()
-            additionalOptions()
+            additionalOptions?.let { more -> HorizontalDivider(); more() }
         }
     }
 }
 
+/**
+ * The composer's mode pill. Nexus works in a single mode, Agente, so what it sets is how hard the agent thinks.
+ * It carries the accent while it can be changed and stays visible, greyed, when it cannot.
+ */
 @Composable
-internal fun ReasoningIcon(current: String, enabled: Boolean, onClick: () -> Unit) {
-    // A contextual setting in the add menu; it never reserves another row in the composer.
-    DropdownMenuItem(onClick = onClick, enabled = enabled,
-        modifier = Modifier.heightIn(min = NexusTokens.minimumTouch)
-            .semantics {
-                contentDescription = "Modo de razonamiento: $current"
-                stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
-            },
-        // Vidal 01-11 (vídeo, 02:13): el velocímetro parecía un cronómetro. Un icono de «pensar» y una línea que dice qué hace.
-        text = { Column {
-            Text("Razonamiento: $current", style = MaterialTheme.typography.bodyMedium)
-            Text("Cuánto piensa antes de responder", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } },
-        leadingIcon = { Icon(Icons.Default.Psychology, null, Modifier.size(NexusTokens.iconMedium)) })
+internal fun ReasoningIcon(current: String, enabled: Boolean, description: String = "Modo de razonamiento: $current", onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(onClick = onClick, enabled = enabled, shape = androidx.compose.foundation.shape.CircleShape,
+        color = if (enabled) colors.primaryContainer else colors.surfaceContainerHighest,
+        contentColor = if (enabled) colors.onPrimaryContainer else colors.onSurfaceVariant.copy(alpha = .7f),
+        modifier = Modifier.semantics {
+            contentDescription = description
+            stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
+        }) {
+        Row(Modifier.padding(start = 11.dp, end = 7.dp, top = 7.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Bolt, null, Modifier.size(17.dp))
+            Spacer(Modifier.width(5.dp))
+            Text(current, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+            Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(16.dp))
+        }
+    }
 }
 
+/** The composer's model selector: the short name of who answers, flat, with the same arrow as the mode pill. */
 @Composable
 internal fun ModelMenuItem(current: String, enabled: Boolean, onClick: () -> Unit) {
-    // Vidal 06-11: el modelo de AGY y Codex se cambia aquí, junto a «Razonamiento», sin ir a Ajustes.
-    DropdownMenuItem(onClick = onClick, enabled = enabled,
-        modifier = Modifier.heightIn(min = NexusTokens.minimumTouch)
-            .semantics {
-                contentDescription = "Modelo: $current"
-                stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
-            },
-        text = { Column {
-            Text("Modelo: $current", style = MaterialTheme.typography.bodyMedium)
-            Text("Qué modelo contesta", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } },
-        leadingIcon = { Icon(Icons.Default.AutoAwesome, null, Modifier.size(NexusTokens.iconMedium)) })
+    val colors = MaterialTheme.colorScheme
+    Surface(onClick = onClick, enabled = enabled, shape = androidx.compose.foundation.shape.CircleShape,
+        color = androidx.compose.ui.graphics.Color.Transparent,
+        contentColor = if (enabled) colors.onSurfaceVariant else colors.onSurfaceVariant.copy(alpha = .6f),
+        modifier = Modifier.semantics {
+            contentDescription = "Modelo: $current"
+            stateDescription = if (enabled) current else "$current. No se puede cambiar ahora"
+        }) {
+        Row(Modifier.padding(start = 10.dp, end = 6.dp, top = 7.dp, bottom = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(current, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false))
+            Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(16.dp))
+        }
+    }
 }
 
 @Composable
@@ -128,10 +136,9 @@ internal fun RecentLibraryPanel(expanded: Boolean, onClose: () -> Unit, content:
     AnimatedVisibility(expanded,
         enter = if (motion) expandVertically(tween(180), expandFrom = Alignment.Bottom) + fadeIn() else EnterTransition.None,
         exit = if (motion) shrinkVertically(tween(180), shrinkTowards = Alignment.Bottom) + fadeOut() else ExitTransition.None) {
-        // A floating card with the composer's margins, corners and shadow, not a full-width dark slab over the chat.
-        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = NexusTokens.card, shadowElevation = 8.dp,
-            border = androidx.compose.foundation.BorderStroke(.5.dp, MaterialTheme.colorScheme.outlineVariant),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12).padding(top = NexusTokens.space4)) {
+        // A matte card with the composer's margins and tone, not a full-width dark slab over the chat.
+        Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).padding(top = NexusTokens.space4)) {
             Column(Modifier.fillMaxWidth().recentLibraryGesture(opening = false, onChange = onClose)
                 .padding(bottom = NexusTokens.space8)) {
                 Row(Modifier.fillMaxWidth().padding(start = NexusTokens.space16), verticalAlignment = Alignment.CenterVertically) {

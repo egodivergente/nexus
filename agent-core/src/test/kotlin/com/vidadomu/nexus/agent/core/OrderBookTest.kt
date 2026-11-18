@@ -13,6 +13,7 @@ import com.vidadomu.nexus.agent.core.spend.MediaRef
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -42,6 +43,52 @@ class OrderBookTest {
         assertEquals(OrderStatus.COMPLETED, done.status)
         assertEquals(1, book.all().size, "nunca se crea un segundo encargo")
         assertFailsWith<IllegalOrderTransition> { book.upsertPlan(plan("p2"), done.id) }
+    }
+
+    @Test fun `recuperar reanuda el seguimiento del mismo encargo sin reenviar`() {
+        val book = OrderBook { now++ }
+        val o = book.upsertPlan(plan("p1"))
+        book.beginSubmit(o.id, o.fingerprint)
+        book.accepted(o.id, "job_1")
+        book.jobUpdate(o.id, "FAILED", error = "Seguimiento pausado tras 5 h sin respuesta.")
+        val paused = book.get(o.id)!!
+        assertEquals(OrderStatus.FAILED, paused.status)
+        // Un FAILED repetido ya no hace nada: por eso hace falta una transición propia.
+        book.jobUpdate(o.id, "COMPLETED", outputs = listOf("file:///out.mp4"))
+        assertEquals(OrderStatus.FAILED, book.get(o.id)!!.status)
+
+        assertTrue(book.resumeTracking(o.id))
+        val resumed = book.get(o.id)!!
+        assertEquals(OrderStatus.PROCESSING, resumed.status)
+        assertEquals("job_1", resumed.jobId)
+        assertEquals(paused.attempt, resumed.attempt, "no es un intento nuevo")
+        assertEquals(paused.planId, resumed.planId)
+        assertNull(resumed.lastFailure, "el aviso de pausa deja de ser el error vigente")
+        assertEquals(1, book.all().size)
+        assertTrue(book.events().last().detail.startsWith("Seguimiento recuperado"))
+        assertEquals(OrderEventKind.ACCEPTED, book.events().last().kind, "sin tipos de evento nuevos: lo leen versiones anteriores")
+        assertFailsWith<DuplicateSubmission> { book.beginSubmit(o.id, o.fingerprint) }
+
+        book.jobUpdate(o.id, "COMPLETED", outputs = listOf("file:///out.mp4"))
+        assertEquals(OrderStatus.COMPLETED, book.get(o.id)!!.status)
+        assertEquals(listOf("file:///out.mp4"), book.get(o.id)!!.outputs)
+    }
+
+    @Test fun `recuperar no toca encargos que no estan en pausa de seguimiento`() {
+        val book = OrderBook { now++ }
+        val waiting = book.upsertPlan(plan("p1"))
+        assertFalse(book.resumeTracking(waiting.id), "pendiente de confirmar")
+        book.beginSubmit(waiting.id, waiting.fingerprint)
+        book.rejected(waiting.id, FailureKind.PROVIDER_REJECTED, "resolution is required")
+        assertFalse(book.resumeTracking(waiting.id), "rechazado sin trabajo creado")
+        assertEquals(OrderStatus.FAILED, book.get(waiting.id)!!.status)
+
+        val cancelled = book.upsertPlan(plan("p2", prompt = "otro", media = emptyList()))
+        book.beginSubmit(cancelled.id, cancelled.fingerprint)
+        book.accepted(cancelled.id, "job_2")
+        book.jobUpdate(cancelled.id, "CANCELLED")
+        assertFalse(book.resumeTracking(cancelled.id), "cancelado por el usuario")
+        assertFailsWith<IllegalArgumentException> { book.resumeTracking("ord_inexistente") }
     }
 
     @Test fun `una segunda pulsacion no envia dos veces`() {

@@ -98,4 +98,10 @@ class CodecRedactorTest {
         assertFalse(out.contains("sk-live-999999"))
         assertTrue(out.contains("AKIA"))
     }
+
+    @Test fun `un token suelto de 40 caracteres se oculta sin romper el redactor`() {
+        // The 40-character pattern has no capture group: reading group 1 used to throw and abort whoever was logging.
+        val token = "0123456789abcdef0123456789abcdef01234567"
+        assertEquals("commit 0123…«oculto» listo", Redactor.redact("commit $token listo"))
+    }
 }
