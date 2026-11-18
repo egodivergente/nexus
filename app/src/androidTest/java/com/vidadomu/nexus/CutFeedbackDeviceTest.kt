@@ -112,6 +112,7 @@ class CutFeedbackDeviceTest {
     private fun pinch(r: Rect) {
         val start = SystemClock.uptimeMillis()
         val props = Array(2) { i -> MotionEvent.PointerProperties().apply { id = i; toolType = MotionEvent.TOOL_TYPE_FINGER } }
+        var fingers = 0 // Pointers still down after the last event the device accepted.
         fun send(action: Int, count: Int, span: Float, tick: Int, guarded: Boolean = true) {
             if (guarded) requireForeground()
             val coordinates = Array(count) { i -> MotionEvent.PointerCoords().apply {
@@ -119,9 +120,14 @@ class CutFeedbackDeviceTest {
             } }
             val e = MotionEvent.obtain(start, start + tick * 30, action, count, props, coordinates, 0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0)
             try { assertTrue(inst.uiAutomation.injectInputEvent(e, true)) } finally { e.recycle() }
+            fingers = when (action and MotionEvent.ACTION_MASK) {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> 0
+                MotionEvent.ACTION_POINTER_UP -> count - 1
+                else -> count
+            }
         }
         send(MotionEvent.ACTION_DOWN, 1, 30f, 0)
-        orCancel({ send(MotionEvent.ACTION_CANCEL, 1, 126f, 14, guarded = false) }) {
+        orCancel({ if (fingers > 0) send(MotionEvent.ACTION_CANCEL, fingers, 126f, 14, guarded = false) }) {
             send(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, 30f, 1)
             for (i in 2..12) send(MotionEvent.ACTION_MOVE, 2, 30f + i * 8, i)
             send(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, 126f, 13)
