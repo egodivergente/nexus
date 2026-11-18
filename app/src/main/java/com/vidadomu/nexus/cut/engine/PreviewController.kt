@@ -369,8 +369,11 @@ class PreviewController(private val context: Context, private val scope: Corouti
     }
 
     /**
-     * A finger is on the editor (any gesture: drag, trim, pinch, scroll, long press). Nothing is built or
-     * released meanwhile; the quiet time starts again when the last finger lifts.
+     * A finger is on the editor (any gesture: drag, trim, pinch, scroll, long press). No standby player is
+     * built meanwhile, and the stale one is not swapped; the quiet time starts again when the last finger
+     * lifts. A standby player can still be released under the finger when it can no longer be used: it
+     * failed while waiting, the surface changed, a LUT finished loading, an export started or the app left
+     * the foreground.
      */
     fun setTouching(value: Boolean) {
         if (value == touching) return

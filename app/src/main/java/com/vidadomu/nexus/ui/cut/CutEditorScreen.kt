@@ -586,6 +586,8 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
                 })
             }
             .semantics {
+                // Con nombre, un lector de pantalla se detiene en el asa y ofrece sus acciones.
+                contentDescription = "Tamaño de la previsualización y la línea de tiempo"
                 customActions = listOf(
                     CustomAccessibilityAction("Agrandar la línea de tiempo") { timelineFraction = CutViewPrefs.clampFraction(current() + .08f); save(); true },
                     CustomAccessibilityAction("Agrandar la imagen") { timelineFraction = CutViewPrefs.clampFraction(current() - .08f); save(); true },
@@ -775,7 +777,7 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
             Modifier.fillMaxSize()
                 // Solo observa (pase inicial, sin consumir): cualquier dedo en el editor aplaza la preparación de
                 // la reproducción, que ocupa el hilo principal, hasta que se levanta.
-                .pointerInput(Unit) {
+                .pointerInput(vm) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         vm.onTouching(true)

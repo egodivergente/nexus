@@ -66,6 +66,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -121,6 +122,7 @@ internal fun CutChatPanel(
             Box(Modifier.fillMaxWidth().height(if (compact) 34.dp else 42.dp)
                 .pointerInput(Unit) { detectVerticalDragGestures { change, amount -> change.consume(); resize(amount) } }
                 .semantics {
+                    contentDescription = "Tamaño del panel del agente"
                     customActions = listOf(
                         CustomAccessibilityAction("Agrandar el panel del agente") { resize(-64f); true },
                         CustomAccessibilityAction("Reducir el panel del agente") { resize(64f); true })

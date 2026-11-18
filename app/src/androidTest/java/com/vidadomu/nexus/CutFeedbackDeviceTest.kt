@@ -148,13 +148,14 @@ class CutFeedbackDeviceTest {
             waitFor { node(preview) != null }
             screenshot("workspace")
             val before = bounds(preview)
-            // The transport bar between image and timeline is the resize handle. Drag it by the gap between
-            // the playhead clock and the frame-step buttons, which are not part of the handle.
+            // The transport bar between image and timeline is the resize handle, and keeps its accessible name.
+            // Drag it by the gap between the playhead clock and the frame-step buttons, which are not part of it.
+            val handle = bounds("Tamaño de la previsualización y la línea de tiempo")
             val clock = Rect().also { r ->
                 requireNotNull(nodes().firstOrNull { it.contentDescription?.toString()?.startsWith("Cabezal en") == true }).getBoundsInScreen(r)
             }
             val handleX = (clock.right + bounds("Fotograma anterior").left) / 2f
-            val handleY = (before.bottom + bounds("Línea de tiempo del montaje").top) / 2f
+            val handleY = handle.exactCenterY()
             // Move the split away from its nearer limit: a split saved at its minimum leaves no room to grow the image.
             val grow = bounds("Línea de tiempo del montaje").height() * 2 > before.height()
             drag(handleX, handleY, 0f, if (grow) 100f else -100f)
@@ -175,6 +176,7 @@ class CutFeedbackDeviceTest {
             val hidden = editing()
             click("Agente del montaje")
             waitFor { node("Ocultar el agente") != null && editing() < hidden }
+            assertNotNull("The agent panel handle lost its accessible name", node("Tamaño del panel del agente"))
             val withAgent = editing()
             screenshot("agent-open")
             click("Ocultar el agente")
