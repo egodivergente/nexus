@@ -3,13 +3,15 @@
 Rama `aki/cut-premium-20261117`, sobre `merge/v219-streaming-20261117` (`7feb18d2`, vc220, la última instalada y
 verificada en el S25). vc221 / 1.9.185-agent-preview. Todas las pruebas de este informe se hicieron con la vc221l
 (AWS CodeBuild `vidal-android-build:353caa9b-864c-4f1e-b984-82217ada349e`, APK SHA-256
-`bd3628a5ec08dc33edf420150d224496903cc7a6dcf37548887e81219ebbbf7f`), que es la instalada en el Pixel. Se compiló a
+`bd3628a5ec08dc33edf420150d224496903cc7a6dcf37548887e81219ebbbf7f`), la instalada en el Pixel hasta el 18/11 a las
+10:08. Se compiló a
 las 09:17 del árbol de trabajo, 19 minutos antes de confirmarlo: su registro de origen dice `764bf6ed`, pero el código
 es el de `1dbe3073` (los 4 archivos de código que cambian entre ambos son, en el zip enviado a CodeBuild, los de
 `1dbe3073`; comprobado archivo a archivo). La última
 compilación es la vc221m (CodeBuild `b7267e10-5834-466b-8c74-e41ad629ff83`, commit `527491ff`, APK SHA-256
 `414fb0c671a50029e487db8a798af48c77ca71547db03495a1f4c7825f4b0ffc`): la vc221l más los nombres accesibles de las dos
-asas (§4, «Después de vc221l»); está compilada, probada en JVM y firmada, y aún no instalada. Las ramas `feat/nexus-cut-20261111` y
+asas (§4, «Después de vc221l»); está compilada, probada en JVM y firmada, y es la instalada en el Pixel desde el 18/11
+a las 10:08 (arranca sin errores; las pruebas de este informe no se han repetido con ella). Las ramas `feat/nexus-cut-20261111` y
 `codex/cut-video-gestures-20261114` y la copia Android de Codex (`nexus-story-sync-android-20261111`) ya
 están contenidas en esa base (comprobado con `git merge-base --is-ancestor`); su trabajo se conserva entero.
 
@@ -155,7 +157,8 @@ Sincronía idéntica a vc221f: +10…+44 ms sin acumularse con 9 cortes (`cut-pr
 
 **Instalación** (cada build en el Pixel): actualización `adb install -r -t` sobre la variante instalada, misma firma
 (cert SHA-256 `8b75db0f…7127`), `firstInstallTime` conservado, copia de los datos antes y recuento después
-(vc221l: 4195 archivos antes y después, 0 desaparecidos, archivos de Cut idénticos).
+(vc221l: 4195 archivos antes y después, 0 desaparecidos, archivos de Cut idénticos; vc221m: 4213 antes y después,
+0 desaparecidos, archivos de Cut idénticos).
 
 **Flujos comprobados en el Pixel** (capturas en `cut-premium-work/after/`, no versionadas): crear y reabrir montajes;
 importar vídeo, imagen y audio (orden de marcado, fps del primer vídeo, la música no se mueve); seleccionar,
@@ -227,14 +230,21 @@ pulsados, que es el arreglo de `10d8caad`, y que, cuando la pantalla no es la in
 sigue abierta un momento mientras se cierra. Que la prueba pase entera solo lo aclara una ejecución en dispositivo.
 **Sigue sin haber pasado en un dispositivo**: el Pixel está en uso por ese otro agente y no
 se toca mientras lo esté. Se esperó a que quedara libre de las 04:11 a las 06:11 del 18/11 (comprobación de solo
-lectura cada 7 minutos) y no lo estuvo; a las 06:11 seguía con la vc221l y la pantalla virtual ajena abierta.
+lectura cada 7 minutos) y no lo estuvo; a las 06:11 seguía con la vc221l y la pantalla virtual ajena abierta. Al
+instalar la vc221m (10:08) tampoco se ejecutó: el otro agente seguía en el Pixel (la prueba inyecta toques) y la
+batería estaba al 15 % sin cargar (la prueba exporta dos vídeos y no se lanza por debajo del 25 %).
 
 **Después de vc221l** (`2ce90114`, compilado como vc221m): las dos asas recuperan su nombre accesible («Tamaño de la
 previsualización y la línea de tiempo», «Tamaño del panel del agente»), el observador de toques del editor depende
 del ViewModel (`pointerInput(vm)`) y el comentario de `PreviewController.setTouching` dice lo que hace. Mismas pruebas
 JVM en verde; APK firmada con la identidad instalada (cert SHA-256 `8b75db0f…7127`, firmas v2 y v3, 16 KiB, 6/6
-`.so` idénticas a vc220); respecto de la vc221l solo cambian 5 `.dex` y la firma. **No instalada todavía** por el
-mismo motivo: nada de este informe se ha repetido con la vc221m.
+`.so` idénticas a vc220); respecto de la vc221l solo cambian 5 `.dex` y la firma. **Instalada en el Pixel el 18/11 a
+las 10:08:57** por orden de Vidal, con la pantalla virtual del otro agente aún abierta (la instalación no toca
+ninguna pantalla): `adb install -r -t`, misma firma, `firstInstallTime` conservado, 4213 archivos de datos antes y
+después, 0 desaparecidos, archivos de Cut idénticos. Abierta después en la pantalla integrada sin toques ni teclas:
+el proceso arranca, la actividad queda en primer plano con la conversación guardada a la vista y no hay errores
+fatales en el registro. **Nada más de este informe se ha repetido con la vc221m**: ni los flujos del editor ni los
+nombres de las asas en pantalla.
 
 **Qué comprobar de la háptica en el S25** (pendiente de Vidal; no se ha sentido en ningún dispositivo). Con la
 vibración al tocar del sistema y la «Respuesta háptica» de Nexus activadas, cada fila debe notarse distinta de las
@@ -291,7 +301,8 @@ de crearlos.
   9 de 9 con dos reservas, ver §4), la exactitud de este informe frente a sus evidencias (5 precisiones, corregidas
   en `e2eae553`) y esas correcciones (7 de 7).
 - En la vc221l instalada las dos asas de reparto no tienen nombre de accesibilidad (conservan sus acciones, pero un
-  lector de pantalla puede no detenerse en ellas). Corregido en vc221m. No se ha probado con TalkBack.
+  lector de pantalla puede no detenerse en ellas). Corregido en la vc221m, ya instalada; los nombres no se han
+  comprobado en pantalla ni con TalkBack.
 - Montajes de prueba creados en el proyecto «General» del Pixel: «QA Cut premium», «QA importar» y «QA orden», más
   cinco exportaciones «QA_Cut_premium-…» en la Biblioteca. No se ha borrado nada.
 
