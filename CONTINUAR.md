@@ -1,10 +1,12 @@
-# vc224 / 1.9.188-agent: pantalla del Agente rediseñada — Pixel 8 Pro — 18/11/2026
+# vc224 / 1.9.188-agent: pantalla del Agente rediseñada — Pixel 8 Pro; el S25, dentro de la vc225 — 18/11/2026
 
 Rama `aki/agent-redesign-20261118` sobre `aki/cut-premium-20261117` (`72207c98`, vc221m): incluye Cut premium, que sigue
 sin fusionar. AWS CodeBuild `vidal-android-build:419391f5-784e-4f85-bcea-f662bc3a6de8` SUCCEEDED sobre `3ab2340a`; firmado en AXELPC con la
 identidad instalada (cert `8b75db0f…7127`), v2+v3, 16 KiB, 6/6 `.so` idénticas a vc220. APK SHA-256
 `3e98171d10c655cec10d8e20fbce81b4173f1a82b43f5ef4afca07835b735371`. Pruebas JVM: agent-core 544 (4 omitidas), app 194, cut-core 133;
-0 fallos. **Instalada en el Pixel 8 Pro** (18/11 a las 14:50:24, `adb install -r -t` sobre la primera compilación de la misma vc224; 4258 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma). El S25 sigue en vc220: instalación autorizada por Vidal, pendiente de que el teléfono vuelva a la wifi de casa. APK test-only: instalar con `-t`.
+0 fallos. **Instalada en el Pixel 8 Pro** (18/11 a las 14:50:24, `adb install -r -t` sobre la primera compilación de la misma vc224; 4258 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma). Desde el 18/11 a las 23:35 el Pixel lleva encima la vc225 de AXEL Link (ver la fila del S25), puesta por ese hilo. El S25 lleva desde el 19/11 a las 01:39 la vc225 de AXEL Link (`aki/axel-link-agent-20261118`, `589d960a`), que contiene esta rama; la instaló ese hilo sobre la vc220 y aquí solo se comprobó por adb versión, hash y firma, sin abrirla ni probarla. La vc224 como tal no se instaló en el S25. APK test-only: instalar con `-t`; la variante
+instalable tocándola (`…-vc224-instalable.apk`, misma vc224 sin esa marca, sin instalar ni probar) tiene SHA-256
+`257ac2601285635e3f48fa175a814959d77f97b1364c976d7a509547bf0c846e`.
 
 Qué cambia: cabecera compacta (título de la conversación y, debajo, el estado real del agente con un punto); la
 actividad del agente dentro de la conversación (cada espera al modelo y cada herramienta es una fila con icono, frase y
@@ -14,7 +16,7 @@ el seguimiento se pausó; compositor de un bloque (adjuntos, razonamiento, model
 «Enviar al terminar»; fondo carbón y superficies mates en los temas oscuros; avisos emergentes al pie de la
 conversación, encima del compositor (vc224).
 Probado: Pixel 8 Pro: a mano con un guion local sin modelo (la pantalla, con la vc222; los avisos, con la vc224) y un turno con modelo real (AGY, Hidrógeno) sobre la APK final; pruebas instrumentadas 6/6 sobre `926698f7`, no repetidas sobre el código final (ver «Pruebas»).
-Pendiente: «Recuperar» con un encargo real, instalar en el S25 (autorizado; el teléfono estaba fuera de casa), un turno real con herramientas (el que se hizo no usó ninguna), instrumentadas sobre el código final, dos riesgos teóricos del seguimiento del final con un aviso a la vista.
+Pendiente: «Recuperar» con un encargo real, abrir y repasar en el S25 (lleva la vc225, que contiene esta rama; sin probar en él), un turno real con herramientas (el que se hizo no usó ninguna), instrumentadas sobre el código final, dos riesgos teóricos del seguimiento del final con un aviso a la vista.
 Informe: `docs/NEXUS-AGENT-REDESIGN-20261118.md`.
 
 # vc221 / 1.9.185-agent: Nexus Cut rediseñado — Pixel 8 Pro, NO instalada en el S25 — 17/11/2026
