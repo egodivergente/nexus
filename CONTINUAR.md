@@ -15,8 +15,9 @@ al acabar); respuesta plana y mensaje del usuario a la derecha; tarjetas de gene
 el seguimiento se pausó; compositor de un bloque (adjuntos, razonamiento, modelo, micrófono, enviar/detener) con cola
 «Enviar al terminar»; fondo carbón y superficies mates en los temas oscuros; avisos emergentes al pie de la
 conversación, encima del compositor (vc224).
-Probado: Pixel 8 Pro: a mano con un guion local sin modelo (la pantalla, con la vc222; los avisos, con la vc224) y un turno con modelo real (AGY, Hidrógeno) sobre la APK final; pruebas instrumentadas 6/6 sobre `926698f7`, no repetidas sobre el código final (ver «Pruebas»).
-Pendiente: «Recuperar» con un encargo real, abrir y repasar en el S25 (lleva la vc225, que contiene esta rama; sin probar en él), un turno real con herramientas (el que se hizo no usó ninguna), instrumentadas sobre el código final, dos riesgos teóricos del seguimiento del final con un aviso a la vista.
+Probado: Pixel 8 Pro: a mano con un guion local sin modelo (la pantalla, con la vc222; los avisos, con la vc224) y dos turnos con modelo real (AGY, Hidrógeno): uno sin herramientas sobre la APK final y otro con cinco llamadas a herramientas sobre la vc225, que contiene esta rama; pruebas instrumentadas 6/6 sobre `926698f7`, no repetidas sobre el código final (ver «Pruebas»).
+Pendiente: «Recuperar» con un encargo real, abrir y repasar en el S25 (lleva la vc225, que contiene esta rama; sin probar en él), instrumentadas sobre el código final, dos riesgos teóricos del seguimiento del final con un aviso a la vista, y tres detalles vistos en el turno real con herramientas (19/11), sin cambiar: «Tarda más de lo normal» a los 30 s aunque el agente avance, un parpadeo al acabar el turno y los asteriscos de una negrita sin cerrar mientras llega el texto.
+Release: Prerelease `v1.9.188-agent` en GitHub (https://github.com/egodivergente/nexus/releases/tag/v1.9.188-agent), publicada el 19/11 con el visto bueno de Vidal: etiqueta sobre `5b55394e`, la APK instalable como `NEXUS-Agent-1.9.188-vc224-5b55394.apk` y `SHA256SUMS.txt`. Descarga pública comprobada contra el SHA-256.
 Informe: `docs/NEXUS-AGENT-REDESIGN-20261118.md`.
 
 # vc221 / 1.9.185-agent: Nexus Cut rediseñado — Pixel 8 Pro, NO instalada en el S25 — 17/11/2026

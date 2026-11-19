@@ -69,6 +69,32 @@
         },
         "s25OpenedOrTested": false,
         "realModelTurnTested": true,
+        "realModelTurnWithTools": {
+            "at": "2026-11-19 17:51",
+            "device": "Pixel 8 Pro",
+            "onVersionCode": 225,
+            "brain": "AGY",
+            "model": "gemini-4-hydrogen-medium",
+            "seconds": 55,
+            "steps": 9,
+            "toolCalls": 5,
+            "streamedText": true,
+            "error": false,
+            "crashes": 0
+        },
+        "githubRelease": {
+            "tag": "v1.9.188-agent",
+            "prerelease": true,
+            "target": "5b55394ed050074bcbb8d7079527ea23bbe7b9e3",
+            "asset": "NEXUS-Agent-1.9.188-vc224-5b55394.apk",
+            "sha256": "257ac2601285635e3f48fa175a814959d77f97b1364c976d7a509547bf0c846e",
+            "publishedAt": "2026-11-19T17:08:04Z"
+        },
+        "knownIssues": [
+            "«Tarda más de lo normal» a los 30 s de turno aunque el agente avance",
+            "parpadeo de la respuesta al acabar el turno (mecanismo anterior al rediseño)",
+            "asteriscos de una negrita sin cerrar mientras llega el texto"
+        ],
         "realModelTurn": {
             "at": "2026-11-18 15:08",
             "device": "Pixel 8 Pro",
@@ -83,7 +109,6 @@
         "pending": [
             "Recuperar con un encargo real",
             "abrir y repasar en el S25 (lleva la vc225)",
-            "turno real con herramientas",
             "instrumentadas sobre el código final"
         ],
         "report": "docs/NEXUS-AGENT-REDESIGN-20261118.md"
