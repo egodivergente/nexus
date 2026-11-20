@@ -2,6 +2,9 @@ package com.vidadomu.nexus.assistant
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -34,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -44,6 +48,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vidadomu.nexus.agent.core.orders.Order
@@ -237,15 +243,53 @@ internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long,
     }
 }
 
+/** How long the row that closes a turn takes to settle: its steps fold while its summary line and footer open. */
+internal const val TurnSettleMs = 260
+
+/**
+ * How the row that closes a turn comes in. It takes the place of the live activity, so for its first frame it looks
+ * like it ([arrived] false: the steps on show, no summary line, nothing under the text) and from there it settles
+ * into its saved form in one movement, instead of changing height in a single step. What it brings that was not on
+ * screen takes [entering] and fades in. Every other row, and all of them when motion is off, is simply there.
+ */
+internal class TurnSettle(val arrived: Boolean, val entering: Modifier)
+
+/** [bodyOnShow]: the words under the steps were already being written, so only the steps and the footer change. */
+@Composable
+internal fun rememberTurnSettle(id: String, closesTurn: Boolean, bodyOnShow: Boolean = true): TurnSettle {
+    val motion = rememberNexusMotionAllowed()
+    var arrived by rememberSaveable(id) { mutableStateOf(!(closesTurn && motion)) }
+    // Decided once, as the row is born: a row that comes back into view later is not arriving again.
+    val fade = remember(id) { Animatable(if (arrived || bodyOnShow) 1f else 0f) }
+    val entering = remember(id) { if (fade.value < 1f) Modifier.graphicsLayer { alpha = fade.value } else Modifier }
+    LaunchedEffect(id) {
+        arrived = true
+        if (fade.value < 1f) fade.animateTo(1f, tween(TurnSettleMs, easing = LinearOutSlowInEasing))
+    }
+    return TurnSettle(arrived, entering)
+}
+
+/** A part the closing row adds under what was already on screen: it opens its own room, so nothing is pushed in one step. */
+@Composable
+internal fun SettleIn(arrived: Boolean, content: @Composable () -> Unit) {
+    val motion = rememberNexusMotionAllowed()
+    AnimatedVisibility(arrived,
+        enter = if (motion) expandVertically(tween(TurnSettleMs, easing = NexusTokens.easing), expandFrom = Alignment.Top) +
+            fadeIn(tween(TurnSettleMs, easing = NexusTokens.easing)) else EnterTransition.None,
+        exit = ExitTransition.None) { content() }
+}
+
 /**
  * The activity kept with a finished message: folded to one line («5 pasos · 34 s», plus the incidents if any) and
  * opened on demand, so a reopened conversation still shows how the answer was reached. [superseded] turning true
  * (the conversation moved on from a failed turn that showed its steps) folds them once; after that the reader's
- * choice stands.
+ * choice stands. [arrived] false is the first frame of the row that closes a turn (see [TurnSettle]): the steps are
+ * on show as they were live, [liveGap] under them is the extra room the live activity kept above the text, and the
+ * summary line is not there yet. When it turns true the line opens as the steps and that room close under it.
  */
 @Composable
 internal fun AgentActivitySaved(id: String, steps: List<AgentStep>, modifier: Modifier = Modifier, initiallyOpen: Boolean = false,
-    superseded: Boolean = false) {
+    superseded: Boolean = false, arrived: Boolean = true, liveGap: Dp = 0.dp) {
     if (steps.isEmpty()) return
     var open by rememberSaveable(id) { mutableStateOf(initiallyOpen) }
     var wasSuperseded by rememberSaveable("$id:superseded") { mutableStateOf(superseded) }
@@ -259,7 +303,14 @@ internal fun AgentActivitySaved(id: String, steps: List<AgentStep>, modifier: Mo
     val summary = AgentActivityText.summary(steps)
     val motion = rememberNexusMotionAllowed()
     val haptic = rememberNexusHaptics()
+    // One pace for every fold of these steps, the reader's and the one that ends a turn: what opens and what closes
+    // share the time and the curve, so the height changes once and evenly.
+    val fold = remember { tween<IntSize>(TurnSettleMs, easing = NexusTokens.easing) }
+    val fade = remember { tween<Float>(TurnSettleMs, easing = NexusTokens.easing) }
     Column(modifier.fillMaxWidth()) {
+        AnimatedVisibility(arrived,
+            enter = if (motion) expandVertically(fold, expandFrom = Alignment.Top) + fadeIn(fade) else EnterTransition.None,
+            exit = ExitTransition.None) {
         Row(Modifier.clip(RoundedCornerShape(10.dp))
             .clickable(onClickLabel = if (open) "Ocultar la actividad" else "Ver la actividad", role = Role.Button) {
                 haptic.perform(NexusHapticEvent.SELECTION)
@@ -285,11 +336,14 @@ internal fun AgentActivitySaved(id: String, steps: List<AgentStep>, modifier: Mo
             Spacer(Modifier.width(NexusTokens.space4))
             Icon(if (open) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, Modifier.size(18.dp), tint = colors.outline)
         }
-        AnimatedVisibility(open,
-            enter = if (motion) expandVertically() + fadeIn() else EnterTransition.None,
-            exit = if (motion) shrinkVertically() + fadeOut() else ExitTransition.None) {
+        }
+        AnimatedVisibility(open || !arrived,
+            enter = if (motion) expandVertically(fold) + fadeIn(fade) else EnterTransition.None,
+            exit = if (motion) shrinkVertically(fold) + fadeOut(fade) else ExitTransition.None) {
             AgentTimeline { steps.forEach { step -> key(step.id) { AgentStepRow(step) } } }
         }
+        if (liveGap > 0.dp) AnimatedVisibility(!arrived, enter = EnterTransition.None,
+            exit = if (motion) shrinkVertically(fold) else ExitTransition.None) { Spacer(Modifier.height(liveGap)) }
     }
 }
 

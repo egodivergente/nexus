@@ -149,7 +149,19 @@ private fun AssistantScreenContent(
     val wasStreaming = remember { booleanArrayOf(false) }
     val streamingNow = ui.streamingText.isNotBlank()
     settledReplyId(wasStreaming[0], streamingNow, ui.items)?.let(seenRows::add)
-    SideEffect { wasStreaming[0] = streamingNow }
+    // The row that closes a turn takes the place of the live activity with the same steps on show, and folds them
+    // itself (rememberTurnSettle): the end of a turn changes no height in a single step. Until it has settled the
+    // rows keep their exact places, without sliding after it, and the end of the list is held frame by frame.
+    val liveIn = remember { arrayOfNulls<String>(1) }
+    var closingRow by remember { mutableStateOf<ClosingRow?>(null) }
+    if (motion) turnClosingRowId(liveIn[0], ui.conversationId, ui.thinking, ui.items)?.let { id ->
+        seenRows.add(id)
+        closingRow = ClosingRow(id, textOnShow = wasStreaming[0])
+    }
+    SideEffect {
+        wasStreaming[0] = streamingNow
+        liveIn[0] = ui.conversationId.takeIf { ui.thinking && ui.steps.isNotEmpty() }
+    }
     val presentation by rememberAssistantPresentationStore().state()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -289,6 +301,19 @@ private fun AssistantScreenContent(
     LaunchedEffect(ui.items.size, ui.thinking, ui.streamingText, ui.plans, ui.scrollRequest, ui.steps.size, slowNotice) {
         if (following) followLast()
     }
+    // The closing row changes height for a few frames (its steps fold, its summary line and footer open): a list that
+    // was at its end stays there on each of them. After that the rows slide to their places again.
+    LaunchedEffect(closingRow) {
+        val row = closingRow ?: return@LaunchedEffect
+        try {
+            val start = withFrameNanos { it }
+            while (withFrameNanos { it } - start < (TurnSettleMs + 140) * 1_000_000L) {
+                // A finger on the list outranks this scroll and cancels it: the next frame tries again.
+                try { if (following) followLast() }
+                catch (e: java.util.concurrent.CancellationException) { if (this@LaunchedEffect.coroutineContext[kotlinx.coroutines.Job]?.isActive != true) throw e }
+            }
+        } finally { if (closingRow === row) closingRow = null }
+    }
     // Al enfocar el compositor (IME o teclado físico) el último mensaje queda justo encima del campo.
     var composerFocused by remember { mutableStateOf(false) }
     // Typing in the composer means «continue in the current project»: the chooser steps aside.
@@ -424,13 +449,14 @@ private fun AssistantScreenContent(
                     })
                 }
                 items(rows, key = { when (it) { is ChatItem -> it.id; is CardGroup -> it.key; is GroupHeader -> "gh:" + it.firstId; is PendingHeader -> "ph:" + it.firstId; else -> it.hashCode() } }) { row ->
+                    val still = closingRow != null
                     if (row is PendingHeader) {
                         val open = row.firstId in expandedPending
                         val currency = (LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication).currencyManager
                         val currencyNow by currency.state.collectAsState()
                         val plans = row.cards.mapNotNull { ui.plans[it.planId] }
                         val amounts = plans.mapNotNull { it.plan.estimate?.amountUsd }
-                        Card(Modifier.fillMaxWidth().then(rowPlacement()), shape = NexusTokens.card) {
+                        Card(Modifier.fillMaxWidth().then(rowPlacement(still)), shape = NexusTokens.card) {
                             Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
@@ -495,7 +521,7 @@ private fun AssistantScreenContent(
                                     "${t.model} · ${index + 1}")
                             } to ready.indexOfFirst { it.key == clicked.key }.coerceAtLeast(0)
                         }, onExpand = { expandedGroups = expandedGroups + row.cards.first().id },
-                            modifier = rowPlacement())
+                            modifier = rowPlacement(still))
                         return@items
                     }
                     if (row is GroupHeader) {
@@ -503,7 +529,7 @@ private fun AssistantScreenContent(
                         return@items
                     }
                     val item = row as ChatItem
-                    EntranceSpring(item.id, seenRows, if (motion) rowPlacement() else Modifier) {
+                    EntranceSpring(item.id, seenRows, if (motion) rowPlacement(still) else Modifier) {
                     when (item) {
                         is ChatItem.User -> Box { UserBubble(item) { copyMessageIds = setOf(item.id); showChatCopy = true } }
                         is ChatItem.Assistant -> Box {
@@ -511,7 +537,8 @@ private fun AssistantScreenContent(
                                 onSelectMessages = { copyMessageIds = setOf(item.id); showChatCopy = true },
                                 answered = answerAfter(ui.items, item)?.text,
                                 widgetAnswer = answerAfter(ui.items, item)?.widgetAnswer,
-                                onReply = { vm.send(it) }, onWidgetReply = { vm.send(it.text, widgetAnswer = it.answer) })
+                                onReply = { vm.send(it) }, onWidgetReply = { vm.send(it.text, widgetAnswer = it.answer) },
+                                closesTurn = closingRow?.id == item.id, textOnShow = closingRow?.textOnShow != false)
                         }
                         is ChatItem.Notice -> {
                             // «Reintentar» belongs to the notice that closed the failed turn, while the app holds its message.
@@ -521,7 +548,7 @@ private fun AssistantScreenContent(
                                 onChangeModel = { showSettings = true },
                                 onNewChat = if (canRetry && (item.text.contains("conversación nueva", true) || item.text.contains("razonamiento", true)))
                                     ({ vm.continueFailedTurnInNewChat() }) else null,
-                                compact = item.id != currentFailure)
+                                compact = item.id != currentFailure, closesTurn = closingRow?.id == item.id)
                         }
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
@@ -1214,9 +1241,12 @@ internal fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): ChatI
 @Composable
 internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null, onSelectMessages: () -> Unit = {},
     widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null,
-    onWidgetReply: ((com.vidadomu.nexus.agent.core.chat.WidgetReply) -> Boolean)? = null) {
+    onWidgetReply: ((com.vidadomu.nexus.agent.core.chat.WidgetReply) -> Boolean)? = null,
+    /** This reply has just closed the turn that was on show; [textOnShow]: its words were already being written. */
+    closesTurn: Boolean = false, textOnShow: Boolean = true) {
     val context=LocalContext.current
     val clipboard=LocalClipboardManager.current
+    val settle = rememberTurnSettle(item.id, closesTurn, bodyOnShow = textOnShow)
     var actionsExpanded by rememberSaveable(item.id) {mutableStateOf(false)}
     var selection by rememberSaveable(item.id) { mutableStateOf(false) }
     if (selection) MessageSelectionDialog(item.text) { selection = false }
@@ -1224,11 +1254,11 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
     // saved before the timeline existed only kept the tool names; those are listed without times.
     val savedSteps = remember(item.id, item.steps, item.toolCalls) { item.steps.ifEmpty { AgentActivityText.legacy(item.id, item.toolCalls) } }
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(NexusTokens.space4)) {
-        if (item.stop != "STREAMING") AgentActivitySaved(item.id, savedSteps)
+        if (item.stop != "STREAMING") AgentActivitySaved(item.id, savedSteps, arrived = settle.arrived, liveGap = LiveActivityGap)
         if (item.text.isNotBlank()) {
             // The answer reads on the ground itself: no card, edge or sheen around the text.
             run {
-                Box(Modifier.fillMaxWidth().padding(start = 2.dp, end = NexusTokens.space4, top = 2.dp, bottom = 2.dp)) {
+                Box(Modifier.fillMaxWidth().then(settle.entering).padding(start = 2.dp, end = NexusTokens.space4, top = 2.dp, bottom = 2.dp)) {
                     val streaming = item.stop == "STREAMING"
                     val responseText = remember(item.text, streaming) {
                         if (item.text.trim() in setOf("…", "...")) {
@@ -1250,7 +1280,8 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
         }
         if (item.text.isNotBlank() && item.stop != "STREAMING") {
             val responseHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
-            Box {
+            // Who answered and when is new under a reply that was being written: it opens its own room.
+            SettleIn(settle.arrived) { Box {
                 Row(
                     modifier = Modifier
                         .clip(NexusTokens.pill)
@@ -1285,7 +1316,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                         }.onFailure { Toast.makeText(context, "No se pudo compartir la respuesta", Toast.LENGTH_SHORT).show() }
                     })
                 }
-            }
+            } }
         }
         if(com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)) HistoryLinkButton(onOpenHistory)
         if(item.media.isNotEmpty()) {
@@ -1381,12 +1412,17 @@ private fun NoticeRow(
     onChangeModel: (() -> Unit)? = null,
     onNewChat: (() -> Unit)? = null,
     compact: Boolean = false,
+    /** This notice has just closed the turn that was on show (stopped or failed): its steps stay where they were. */
+    closesTurn: Boolean = false,
 ) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
+    // The steps were on screen; the notice itself is what is new.
+    val settle = rememberTurnSettle(item.id, closesTurn, bodyOnShow = false)
     Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
     // A turn that was stopped or failed keeps what it had done: the step with the incident is the explanation. They
     // fold with their notice when the conversation moves on.
-    AgentActivitySaved(item.id + ":steps", item.steps, initiallyOpen = item.error && !compact, superseded = item.error && compact)
+    AgentActivitySaved(item.id + ":steps", item.steps, initiallyOpen = item.error && !compact, superseded = item.error && compact,
+        arrived = settle.arrived, liveGap = LiveActivityGap)
     // Todo error ofrece una salida directa: repetir, cambiar de modelo, continuar en chat nuevo o revisar el historial.
     if (item.error) AgentErrorNotice(
         item.id, item.text,
@@ -1394,9 +1430,10 @@ private fun NoticeRow(
         onChangeModel = onChangeModel,
         onNewChat = onNewChat,
         onOpenHistory = if (history) onOpenHistory else null,
+        modifier = settle.entering,
         compact = compact,
     )
-    else Column {
+    else Column(settle.entering) {
         Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
         if(history) HistoryLinkButton(onOpenHistory)
     }
@@ -1997,7 +2034,34 @@ internal fun thinkingElapsedSeconds(nowElapsedMs: Long, startedAtElapsedMs: Long
  * in. A jump (`scrollToItem`) makes the list forget every row it knew, so it replayed that fade on every row in view:
  * when a turn ended the whole conversation went blank and came back. New rows still enter once, with [EntranceSpring].
  */
-private fun LazyItemScope.rowPlacement(): Modifier = Modifier.animateItem(fadeInSpec = null)
+private fun LazyItemScope.rowPlacement(still: Boolean = false): Modifier =
+    // [still]: while the row that closes a turn settles its height changes on every frame. Sliding after each of
+    // those changes would leave every row a little behind its place; they are simply put where they belong.
+    if (still) Modifier.animateItem(fadeInSpec = null, placementSpec = null) else Modifier.animateItem(fadeInSpec = null)
+
+/**
+ * The live activity is a row of its own, one list gap above the text being written; kept with the reply, the steps
+ * sit closer to it. The row that closes a turn starts with that difference under its steps and closes it as it settles.
+ */
+private val LiveActivityGap = NexusTokens.space16 - NexusTokens.space4
+
+/** The row that is taking the place of the live activity right now, and whether its words were already being written. */
+private class ClosingRow(val id: String, val textOnShow: Boolean)
+
+/**
+ * The row that has just closed the turn whose steps were on show: the reply, or the notice of an answer that was
+ * stopped or failed. It takes the place of the live activity, so it settles from it instead of entering as a new
+ * row. [liveIn] is the conversation that was showing live steps a moment ago. Null while the agent still works, in
+ * any other conversation, when the turn kept no steps, and when the cards of the turn were moved after its reply:
+ * then the rows change order and each one slides to its place as it did.
+ */
+internal fun turnClosingRowId(liveIn: String?, conversationId: String, working: Boolean, items: List<ChatItem>): String? {
+    if (liveIn == null || liveIn != conversationId || working) return null
+    val turn = items.takeLastWhile { it !is ChatItem.User }
+    val at = turn.indexOfLast { (it is ChatItem.Assistant && it.steps.isNotEmpty()) || (it is ChatItem.Notice && it.steps.isNotEmpty()) }
+    if (at < 0 || turn.drop(at + 1).any { it is ChatItem.PlanCard }) return null
+    return turn[at].id
+}
 
 /**
  * The reply that has just taken the place of the text that was being written. Its words were already on screen,

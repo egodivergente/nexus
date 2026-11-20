@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.text.input.TextFieldValue
@@ -91,6 +92,44 @@ class AgentChatRedesignUiTest {
         compose.onNode(issue).performClick()
         compose.onNodeWithText("No existe el proyecto x.").assertDoesNotExist()
         compose.onNodeWithText("search_assets text=faro project=x").assertDoesNotExist()
+    }
+
+    @Test fun theRowThatClosesATurnArrivesAsTheLiveActivityAndSettlesIntoItsSummary() {
+        var arrived by mutableStateOf(false)
+        var motion = true
+        compose.setContent { NexusTheme { AgentChatTheme {
+            motion = com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed()
+            androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.testTag("activity")) {
+                AgentActivitySaved("a1", steps, arrived = arrived, liveGap = 12.dp)
+            }
+        } } }
+        val header = "Actividad del agente: 3 pasos · 8 s, 1 incidencia"
+        // Its first frame is what the live activity showed: the steps, and no summary line yet.
+        compose.onNodeWithText("Pensando").assertIsDisplayed()
+        compose.onNodeWithText("Mostrando los archivos encontrados").assertIsDisplayed()
+        compose.onNodeWithContentDescription(header).assertDoesNotExist()
+        val live = compose.onNodeWithTag("activity").getUnclippedBoundsInRoot().height
+
+        // Halfway the line is opening while the steps are still closing: one movement, not one after the other.
+        // (With animations off in the device or in the app there is no halfway: it is simply settled.)
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread { arrived = true }
+        compose.mainClock.advanceTimeBy(TurnSettleMs / 2L)
+        val halfway = compose.onNodeWithTag("activity").getUnclippedBoundsInRoot().height
+        if (motion) {
+            compose.onNodeWithContentDescription(header).assertExists()
+            compose.onNodeWithText("Pensando").assertExists()
+        }
+        compose.mainClock.autoAdvance = true
+
+        // Settled: the summary line, folded, and the steps one tap away.
+        compose.onNode(hasContentDescription(header) and hasStateDescription("Plegada")).assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithText("Pensando").assertDoesNotExist()
+        val settled = compose.onNodeWithTag("activity").getUnclippedBoundsInRoot().height
+        assertTrue("plegada ocupa menos: $live > $settled", live > settled)
+        if (motion) assertTrue("la altura cambia de forma gradual: $live > $halfway > $settled", live > halfway && halfway > settled)
+        compose.onNodeWithContentDescription(header).performClick()
+        compose.onNodeWithText("Pensando").assertIsDisplayed()
     }
 
     @Test fun liveActivityShowsWhatRunsNowAndWhatAlreadyEnded() {
