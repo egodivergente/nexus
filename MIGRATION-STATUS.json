@@ -34,10 +34,67 @@
             4258,
             4258
         ],
+        "pixelNow": "vc225 de AXEL Link desde 2026-11-18 23:35 (segunda compilación, 23:56:17), instalada por ese hilo",
+        "installableApk": {
+            "file": "Nexus-Agent-1.9.188-agent-preview-vc224-instalable.apk",
+            "sha256": "257ac2601285635e3f48fa175a814959d77f97b1364c976d7a509547bf0c846e",
+            "buildId": "vidal-android-build:adeecf0b-1cc6-482d-b281-02c5abf1b611",
+            "commit": "5b55394ed050074bcbb8d7079527ea23bbe7b9e3",
+            "testOnly": false,
+            "jvmTestsInThisBuild": false,
+            "installedOrTestedOnDevice": false
+        },
         "s25Installed": false,
         "s25InstalledAt": null,
+        "s25Note": "La vc224 como tal no se instaló en el S25; lleva la vc225 de AXEL Link, que contiene esta rama.",
+        "s25Carries": {
+            "versionCode": 225,
+            "versionName": "1.9.189-agent-preview",
+            "apkSha256": "8176db142ea1c5f55d12bf9e7d4bc5d6e0dfd98224442525daa7dedbbe0d8c9b",
+            "installedAt": "2026-11-19 01:39:12",
+            "installedBy": "hilo de AXEL Link",
+            "branch": "aki/axel-link-agent-20261118",
+            "commit": "589d960a",
+            "containsThisBranch": true,
+            "dataFilesBeforeAfterReportedByInstaller": [
+                5073,
+                5073
+            ],
+            "checkedHereReadOnly": [
+                "versionCode",
+                "apkSha256",
+                "firma",
+                "firstInstallTime"
+            ]
+        },
         "s25OpenedOrTested": false,
         "realModelTurnTested": true,
+        "realModelTurnWithTools": {
+            "at": "2026-11-19 17:51",
+            "device": "Pixel 8 Pro",
+            "onVersionCode": 225,
+            "brain": "AGY",
+            "model": "gemini-4-hydrogen-medium",
+            "seconds": 55,
+            "steps": 9,
+            "toolCalls": 5,
+            "streamedText": true,
+            "error": false,
+            "crashes": 0
+        },
+        "githubRelease": {
+            "tag": "v1.9.188-agent",
+            "prerelease": true,
+            "target": "5b55394ed050074bcbb8d7079527ea23bbe7b9e3",
+            "asset": "NEXUS-Agent-1.9.188-vc224-5b55394.apk",
+            "sha256": "257ac2601285635e3f48fa175a814959d77f97b1364c976d7a509547bf0c846e",
+            "publishedAt": "2026-11-19T17:08:04Z"
+        },
+        "knownIssues": [
+            "«Tarda más de lo normal» a los 30 s de turno aunque el agente avance",
+            "parpadeo de la respuesta al acabar el turno (mecanismo anterior al rediseño)",
+            "asteriscos de una negrita sin cerrar mientras llega el texto"
+        ],
         "realModelTurn": {
             "at": "2026-11-18 15:08",
             "device": "Pixel 8 Pro",
@@ -51,9 +108,7 @@
         "recoverTestedWithRealJob": false,
         "pending": [
             "Recuperar con un encargo real",
-            "instalar en S25 (autorizado; teléfono fuera de casa)",
-            "abrir y repasar en el S25",
-            "turno real con herramientas",
+            "abrir y repasar en el S25 (lleva la vc225)",
             "instrumentadas sobre el código final"
         ],
         "report": "docs/NEXUS-AGENT-REDESIGN-20261118.md"
