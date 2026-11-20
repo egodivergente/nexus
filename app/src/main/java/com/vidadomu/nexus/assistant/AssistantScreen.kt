@@ -289,6 +289,10 @@ private fun AssistantScreenContent(
                 listState.scrollBy(followDistance(last.offset+last.size, layout.viewportEndOffset, layout.afterContentPadding).toFloat())
             }
         }
+        // A finger on the list outranks this scroll and cancels it. Whoever asked for it goes on (a collector that
+        // follows the viewport must not die of it) and the next change tries again; a caller that was itself
+        // cancelled still stops here.
+        catch (e: java.util.concurrent.CancellationException) { if (kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]?.isActive != true) throw e }
         finally { automaticScroll = false }
     }
     LaunchedEffect(listState) {
@@ -296,9 +300,9 @@ private fun AssistantScreenContent(
             if (moving && !automatic) following = !canForward
         }
     }
-    // Keyboard, reference panels and a notice on show move the end of the reading area without adding a message.
+    // Keyboard and reference panels resize the viewport without adding a message.
     LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.let { it.viewportEndOffset - it.afterContentPadding } }.collect {
+        snapshotFlow { listState.layoutInfo.viewportEndOffset }.collect {
             if (following) followLast()
         }
     }
