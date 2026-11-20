@@ -284,8 +284,9 @@ private fun AssistantScreenContent(
             }
             val layout=listState.layoutInfo
             layout.visibleItemsInfo.lastOrNull()?.let { last ->
-                // With a notice up, the end of the reading area is the notice's top edge, not the composer's.
-                listState.scrollBy((last.offset+last.size-layout.viewportEndOffset+noticeRoom).coerceAtLeast(0).toFloat())
+                // The reading area ends above the room the list keeps under its last row (the handle on the composer's
+                // edge and the notice on show, if any), not at the composer: the last line always rests clear of both.
+                listState.scrollBy(followDistance(last.offset+last.size, layout.viewportEndOffset, layout.afterContentPadding).toFloat())
             }
         }
         finally { automaticScroll = false }
@@ -295,9 +296,9 @@ private fun AssistantScreenContent(
             if (moving && !automatic) following = !canForward
         }
     }
-    // Keyboard and reference panels resize the viewport without adding a message.
+    // Keyboard, reference panels and a notice on show move the end of the reading area without adding a message.
     LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.viewportEndOffset }.collect {
+        snapshotFlow { listState.layoutInfo.let { it.viewportEndOffset - it.afterContentPadding } }.collect {
             if (following) followLast()
         }
     }
@@ -2064,6 +2065,14 @@ internal fun turnClosingRowId(liveIn: String?, conversationId: String, working: 
     if (at < 0 || turn.drop(at + 1).any { it is ChatItem.PlanCard }) return null
     return turn[at].id
 }
+
+/**
+ * How far the list still has to move for its last row to rest at the end of the reading area. [viewportEnd] is the
+ * very edge of the list and [roomBelow] what it keeps free under its last row, so the reading area ends that much
+ * higher. Never negative: a row that already rests above that line stays where it is.
+ */
+internal fun followDistance(lastRowEnd: Int, viewportEnd: Int, roomBelow: Int): Int =
+    (lastRowEnd - (viewportEnd - roomBelow)).coerceAtLeast(0)
 
 /**
  * The reply that has just taken the place of the text that was being written. Its words were already on screen,
