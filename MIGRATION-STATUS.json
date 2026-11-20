@@ -1,4 +1,164 @@
 ﻿{
+    "agentPolish20261120": {
+        "date": "2026-11-20",
+        "branch": "aki/agent-polish-20261120",
+        "base": {
+            "branch": "aki/agent-fixes-20261120",
+            "commit": "73b3723e",
+            "versionCode": 226
+        },
+        "codeCommits": [
+            "b5de6e13",
+            "671040d6",
+            "17be4e8c",
+            "229a9c58",
+            "ed9faa1c",
+            "c630f955",
+            "0edd7750",
+            "2032ab33",
+            "b2ba71f6",
+            "2c3edfaa48951052fb35638ebbc9adde3a41bf1b"
+        ],
+        "versionCode": 227,
+        "versionName": "1.9.191-agent-preview",
+        "improvements": [
+            "turnSettle: la fila que cierra el turno ocupa el sitio de la actividad en vivo y se asienta en un solo movimiento de 260 ms; las demás filas no se deslizan detrás",
+            "oneFailureMessage: un fallo se dice solo en su tarjeta, sin aviso emergente; «Reintentar» es de la tarjeta que cerró ese turno y reenvía el mismo mensaje; la tarjeta anterior se pliega al seguir la conversación",
+            "slowNotice: la última señal de vida se guarda con el turno y con reloj monótono; desaparecen los dos límites anotados en la vc226",
+            "desktopMarkdown: ChatMarkdown.kt de desktop/agent/core es copia exacta del de agent-core; DesktopAgent.kt vuelve a compilar. No está en la edición de Windows en uso",
+            "cleanSteps: cada paso es una línea en palabras; la orden técnica queda en el detalle",
+            "followGap: la última fila descansa sobre el hueco de 28 dp que la lista reserva bajo ella (salió al probar; ya pasaba en la vc226)"
+        ],
+        "build": {
+            "codebuild": "vidal-android-build:bd0799ed-3699-47cc-84ca-ff3380911f26",
+            "status": "SUCCEEDED",
+            "commit": "2c3edfaa48951052fb35638ebbc9adde3a41bf1b",
+            "earlierBuilds": [
+                {
+                    "codebuild": "vidal-android-build:be15ce85-14f7-43c9-9e37-fdfbc1b61fc0",
+                    "commit": "c630f955",
+                    "status": "FAILED solo en el APK de instrumentadas (faltaba un import); la app compiló y sus pruebas pasaron",
+                    "apkSha256": "807775c7263e7a82ebf9ab55c0ea6c7a4081969a2bc33f76e6a6fa6a7ed7ba35"
+                },
+                {
+                    "codebuild": "vidal-android-build:824e9b20-91c3-46fc-8e70-64eb83a22229",
+                    "commit": "2032ab33",
+                    "apkSha256": "9a059f6a2328c48bc36d5d96e1ef7c1dbe5a475e537bb691e0ba25023daeab21"
+                },
+                {
+                    "codebuild": "vidal-android-build:9992aaf2-7a03-4939-bde2-ee031b31a56d",
+                    "commit": "b2ba71f6",
+                    "apkSha256": "1db89131c5d606edc365abbbbe464be196f5d3dab0a533e28967519452b38233"
+                }
+            ]
+        },
+        "jvmTests": {
+            "agentCore": 562,
+            "agentCoreSkipped": 4,
+            "app": 1055,
+            "appScope": "todas las del módulo: 211 de com.vidadomu.nexus.assistant.* y 844 del resto",
+            "cutCore": 133,
+            "failures": 0,
+            "errors": 0,
+            "desktopCore": "ChatMarkdownTest 28 de 28, en AXELPC"
+        },
+        "apk": {
+            "file": "Nexus-Agent-1.9.191-agent-preview-vc227-preview.apk",
+            "sha256": "45f7cf4dd09b0df464ca0fcbed73751e644f4fadb7d5998513b8d873ad80a597",
+            "size": 49402109,
+            "certSha256": "8b75db0fe0849019990f0d9d6426b95d85414f0585acac78a06c484b91cd7127",
+            "schemes": "v2+v3",
+            "pageAlign16k": true,
+            "nativeLibsIdenticalToVc220": "6/6",
+            "testOnlyInManifest": false,
+            "debuggableInManifest": true
+        },
+        "pixel8Pro": {
+            "installedAt": "2026-11-20T19:16:48+01:00",
+            "over": "vc227 tercera compilación (1db89131…8233, 19:01:44), sobre la segunda (9a059f6a…ab21, 18:23:18), sobre la primera (807775c7…ba35, 18:13:32, encima de la vc226 2f1445f5…c917)",
+            "dataFilesBefore": 4337,
+            "dataFilesAfter": 4337,
+            "missing": 0,
+            "cutFilesIdentical": true,
+            "sameSignature": true
+        },
+        "deviceChecks": {
+            "device": "Pixel 8 Pro",
+            "script": "guion local sin modelo (AgentChatQa: streaming, model_error, paso parado)",
+            "turns": 10,
+            "turnsOnFinalBuild": 3,
+            "endOfTurn": "asentamiento en unos 225 ms, sin segundo deslizamiento; tinta mínima 0,91 (tercera compilación) y 0,917 (final) de la referencia; ningún fotograma por debajo de la mitad",
+            "gapUnderLastRowDp": "antes del arreglo, de 4 a 10; después, 36 con pasos en vivo, de 34,3 a 34,7 mientras escribe y al acabar, 32 bajo la tarjeta de un fallo (de la última tinta al compositor, en capturas)",
+            "failure": "una sola tarjeta, sin aviso emergente",
+            "retry": "reenvía el mismo mensaje, la tarjeta anterior se pliega a una línea, el turno nuevo acaba con respuesta",
+            "failureWhileScrolledUp": "el botón de bajar al final lleva el punto",
+            "stuckStep40s": "sin aviso a los 28,5 ni a los 30,2 s; a la vista a los 34 s; se va al empezar el paso siguiente y vuelve a los 34 s de ese paso",
+            "crashes": 0
+        },
+        "instrumented": {
+            "class": "AgentChatRedesignUiTest",
+            "result": "OK (7 tests)",
+            "ranAt": "2026-11-20T19:09:20+01:00",
+            "onCommit": "b2ba71f6",
+            "note": "un commit antes del final; la diferencia son seis líneas de AssistantScreen.kt, que estas pruebas no componen",
+            "codebuild": "vidal-android-build:ae865ffe-7cb6-47af-8d15-309c117f5e60",
+            "sandbox": "com.vidadomu.nexus.minimalqa (instalado y desinstalado)",
+            "finalBuildTestApk": "compilado, no ejecutado"
+        },
+        "realModelTurn": {
+            "on": "compilación final",
+            "at": "2026-11-20T19:27+01:00",
+            "brain": "AGY · Hidrógeno",
+            "readOnly": true,
+            "steps": 4,
+            "seconds": 26,
+            "endOfTurn": "ningún fotograma por debajo de la mitad de tinta (mínimo 0,905)",
+            "appErrorsInLogcat": 0,
+            "crashes": 0
+        },
+        "review": {
+            "readOnly": true,
+            "severe": 0,
+            "rounds": [
+                {
+                    "on": "c630f955",
+                    "fixedFromIt": [
+                        "0edd7750",
+                        "2032ab33"
+                    ]
+                },
+                {
+                    "on": "c630f955..b2ba71f6",
+                    "fixedFromIt": [
+                        "2c3edfaa"
+                    ]
+                },
+                {
+                    "on": "2c3edfaa",
+                    "result": "4 de 4 conformes"
+                }
+            ],
+            "leftUnchanged": "hallazgos menores y dos sospechas sin confirmar; ver el informe"
+        },
+        "desktop": {
+            "coreMarkdownIdenticalToAgentCore": true,
+            "desktopAgentCompiles": true,
+            "portedToDesktopBranch": false,
+            "installerBuilt": false,
+            "deployed": false
+        },
+        "s25Touched": false,
+        "seenNotInvestigated": "al reabrir la app tras reinstalar, la conversación vuelve a la posición guardada y queda unos 29 dp antes del final; restauración anterior a este encargo; sin comprobar en la vc226",
+        "pending": [
+            "S25 (sigue en la vc225)",
+            "llevar el Markdown a la rama de escritorio y desplegar Windows",
+            "un fallo real del modelo y su reintento",
+            "la posición de la conversación al reabrir la app",
+            "hallazgos menores de revisión",
+            "merge y PR: de Vidal"
+        ],
+        "report": "docs/NEXUS-AGENT-REDESIGN-20261118.md, sección «Mejoras del 20/11 por la tarde»"
+    },
     "agentFixes20261120": {
         "date": "2026-11-20",
         "branch": "aki/agent-fixes-20261120",

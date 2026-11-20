@@ -1,3 +1,34 @@
+# vc227 / 1.9.191-agent: cinco mejoras de la pantalla del Agente y un arreglo — Pixel 8 Pro; el S25 sigue en la vc225 — 20/11/2026
+
+Rama `aki/agent-polish-20261120` sobre `aki/agent-fixes-20261120` (`73b3723e`, vc226); no mueve esa rama ni las
+anteriores, ni los PR #19 y #20. AWS CodeBuild `vidal-android-build:bd0799ed-3699-47cc-84ca-ff3380911f26` SUCCEEDED sobre
+`2c3edfaa`; firmado en AXELPC con la identidad instalada (cert `8b75db0f…7127`), v2+v3, 16 KiB, 6/6 `.so` idénticas
+a vc220. APK SHA-256 `45f7cf4dd09b0df464ca0fcbed73751e644f4fadb7d5998513b8d873ad80a597` (instalable tocándola; depurable). Pruebas JVM: agent-core 562 (4
+omitidas), app 1055 (todas), cut-core 133; 0 fallos. **Instalada en el Pixel 8 Pro**
+(20/11 a las 19:16:48, `adb install -r` sobre la compilación anterior de la misma vc227; la primera de las cuatro
+entró a las 18:13:32 encima de la vc226; 4337 archivos de datos antes y después, 0 desaparecidos, archivos
+de Cut idénticos, misma firma). El S25 no se ha tocado: sigue con la vc225.
+
+Qué cambia: (1) al acabar un turno, los pasos en vivo ya no se cambian de golpe por «7 pasos · 45 s»: la fila que
+cierra el turno ocupa su sitio y se asienta en un solo movimiento de 260 ms; (2) un fallo se dice una sola vez, en su
+tarjeta, sin aviso emergente duplicado, y «Reintentar» es de la tarjeta que cerró ese turno; al seguir la
+conversación la tarjeta se pliega sola; (3) el aviso «Tarda más de lo normal» cuenta desde la última señal de vida
+guardada con el turno y con reloj monótono; (4) el Markdown del núcleo de escritorio queda igual que el del móvil
+(solo código y pruebas en esta rama: la edición de Windows en uso sale de otra rama, más antigua, y no se ha portado
+ni desplegado nada); (5) los pasos son una línea en palabras y la orden técnica queda en el detalle; (6) la última
+fila descansa sobre el hueco de 28 dp que la lista reserva bajo ella, en vez de pegada al compositor (medido en
+capturas, de la última tinta al compositor: de 4 a 10 dp antes, de 32 a 36 dp ahora). De paso, `DesktopAgent.kt` vuelve a compilar en esta rama.
+Probado: Pixel 8 Pro. Diez turnos con el guion local, sin modelo: final del turno medido fotograma a fotograma, fallo con
+una sola tarjeta, reintento, punto en el botón de bajar, paso parado 40 s y hueco medido en capturas; tres de ellos
+sobre la compilación final. Un turno con modelo real (AGY · Hidrógeno, solo lectura; 4 pasos, 26 s) sobre la final.
+Instrumentadas `AgentChatRedesignUiTest` 7 de 7 sobre `b2ba71f6`, un commit antes del final.
+Revisado: tres revisiones de solo lectura (sobre `c630f955`, sobre `c630f955..b2ba71f6` y sobre `2c3edfaa`), sin defectos
+graves; de ellas salen `0edd7750`, `2032ab33` y `2c3edfaa`. Quedan hallazgos menores anotados sin cambiar (informe).
+Pendiente: el S25; llevar el Markdown a la rama de escritorio y desplegar Windows (preguntar antes); un fallo real del
+modelo con su reintento; mirar por qué al reabrir la app la conversación queda unos 29 dp antes del final (código
+anterior, sin investigar); los hallazgos menores de revisión. Merge y PR, de Vidal.
+Informe: `docs/NEXUS-AGENT-REDESIGN-20261118.md`, sección «Mejoras del 20/11 por la tarde».
+
 # vc226 / 1.9.190-agent: tres arreglos de la pantalla del Agente — Pixel 8 Pro; el S25 sigue en la vc225 — 20/11/2026
 
 Rama `aki/agent-fixes-20261120` sobre `aki/axel-link-agent-20261118` (`5dc00e14`, vc225) con

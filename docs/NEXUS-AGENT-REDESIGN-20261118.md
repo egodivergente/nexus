@@ -18,6 +18,188 @@ acabado carbón y mate). Rama `aki/agent-redesign-20261118` sobre `aki/cut-premi
 | S25 | Lleva la **vc225** `1.9.189-agent-preview` de AXEL Link (rama `aki/axel-link-agent-20261118`, commit `589d960a`, SHA-256 `8176db142ea1c5f55d12bf9e7d4bc5d6e0dfd98224442525daa7dedbbe0d8c9b`), que es esta rama entera (`5b55394e`) más cuatro commits de AXEL Link. Esos commits no tocan la interfaz de la pantalla del Agente (`AssistantScreen.kt` y los demás archivos de composición son idénticos); en la app solo añaden las herramientas remotas en `AssistantRuntime.kt`, un método de depuración en `NexusAgentProvider.kt` y `NexusLink.kt`. La instaló el hilo de AXEL Link el 19/11 a las 01:39:12 con `adb install -r -t --user 0` sobre la vc220 (5073 archivos de datos antes y después, según su registro). Comprobado desde este trabajo por adb, en solo lectura: versionCode, SHA-256 de la APK instalada, firma y fecha de primera instalación conservada (entró como actualización). La vc224 como tal no llegó a instalarse en el S25: el 18/11 el teléfono había salido de la wifi de casa y la copia previa de datos se cortó. No se ha abierto ni probado en él. |
 | Probado en dispositivo | Pixel 8 Pro: a mano con un guion local sin modelo (la pantalla, con la vc222; los avisos, con la vc224) y dos turnos con modelo real (AGY, Hidrógeno): uno sin herramientas sobre la APK final y otro con cinco llamadas a herramientas sobre la vc225, que contiene esta rama; pruebas instrumentadas 6/6 sobre `926698f7`, no repetidas sobre el código final (ver «Pruebas»). |
 
+## Mejoras del 20/11 por la tarde: vc227 / 1.9.191-agent
+
+Cinco mejoras de la pantalla del Agente, propuestas tras repasar la vc226 y encargadas por Vidal («Si. Adelante, haz
+las 5 mejoras»), y un arreglo que salió al probarlas (punto 6). Rama `aki/agent-polish-20261120` sobre `aki/agent-fixes-20261120` (`73b3723e`, la vc226), sin mover
+esa rama ni las anteriores, ni los PR #19 y #20. Commits: `b5de6e13` (pasos más limpios), `671040d6` (aviso de
+lentitud), `17be4e8c` (un solo mensaje por fallo), `229a9c58` (final del turno), `ed9faa1c` (Markdown del núcleo de
+escritorio) y `c630f955` (versión). Después, de las revisiones y de las pruebas: `0edd7750` (un turno que falla en otra conversación no se anuncia como terminado), `2032ab33` (el programa de escritorio vuelve a compilar), `b2ba71f6` (el hueco bajo la última fila) y `2c3edfaa` (ajustes de la segunda revisión).
+
+| Qué | Estado |
+| --- | --- |
+| Compilado | AWS CodeBuild `vidal-android-build:bd0799ed-3699-47cc-84ca-ff3380911f26` SUCCEEDED sobre `2c3edfaa` |
+| Pruebas JVM | agent-core 562 (4 omitidas), app 1055 (todas las de la app: 211 del paquete `assistant` y 844 del resto), cut-core 133; 0 fallos, 0 errores. Núcleo de escritorio: `ChatMarkdownTest` 28 de 28, en AXELPC. |
+| Firmado | identidad instalada (cert `8b75db0f…7127`), v2+v3, 16 KiB, 6/6 `.so` idénticas a vc220 |
+| APK | `Nexus-Agent-1.9.191-agent-preview-vc227-preview.apk`, SHA-256 `45f7cf4dd09b0df464ca0fcbed73751e644f4fadb7d5998513b8d873ad80a597`. Sin la marca test-only (se instala tocándola); `debuggable`. |
+| Instalado | **Pixel 8 Pro**, 20/11 a las 19:16:48, `adb install -r` sobre la compilación anterior de la misma vc227. Hubo tres antes: `807775c7…ba35` (sobre `c630f955`, puesta a las 18:13:32 encima de la vc226 `2f1445f5…c917`; 4303 archivos de datos), `9a059f6a…ab21` (sobre `2032ab33`, a las 18:23:18; 4309) y `1db89131…8233` (sobre `b2ba71f6`, a las 19:01:44; 4326). En la final, 4337 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma y fecha de primera instalación; lo mismo en las tres anteriores. |
+| S25 | Sin tocar: sigue con la vc225. |
+| Probado en dispositivo | Pixel 8 Pro: diez turnos con el guion local sin modelo, un turno con modelo real (AGY · Hidrógeno, solo lectura) y las pruebas instrumentadas, 7 de 7. Sobre la compilación final van tres de los diez turnos y el turno real; las instrumentadas, sobre `b2ba71f6`, un commit antes (ver «Pruebas de la vc227»). |
+| Escritorio | Código y pruebas del núcleo, y `DesktopAgent.kt` vuelve a compilar (`compileKotlin` de `desktop/agent`, en AXELPC). **Sin compilar el instalador ni desplegar**; la edición de Windows en uso sale de otra rama (punto 4). |
+
+### 1. Final del turno sin salto (`turnClosingRowId` en `assistant/AssistantScreen.kt`; `rememberTurnSettle`, `AgentActivitySaved` en `assistant/AgentActivity.kt`)
+
+Al acabar un turno, la lista de pasos en vivo se cambiaba de golpe por la línea «7 pasos · 45 s»: todo lo de encima
+bajaba de una vez y las filas llegaban después deslizándose (lo que quedó «a la vista» en la vc226).
+
+- La fila que cierra el turno (la respuesta, o el aviso de un turno detenido o fallido) ocupa el sitio de la actividad
+  en vivo con los mismos pasos a la vista y, desde ahí, se asienta en un solo movimiento de 260 ms: la línea de
+  resumen se abre mientras los pasos se cierran bajo ella.
+- La línea de autor y hora abre su propio hueco bajo el texto. Lo que la fila trae y no estaba en pantalla (una
+  respuesta que no se transmitió, el aviso) aparece con una transición de opacidad.
+- Mientras la fila se asienta, las demás se colocan en su sitio exacto, sin deslizarse detrás de cada cambio de
+  altura, y una lista que estaba al final se mantiene al final en cada fotograma. Si el lector ha subido, no se le
+  arrastra.
+- Todos los pliegues de los pasos, también los que hace el lector, comparten ese ritmo.
+- Sin animaciones (ajuste de la app o del sistema) todo queda como estaba: la fila aparece ya asentada.
+- No se aplica cuando las tarjetas del turno pasan detrás de la respuesta: ahí las filas cambian de orden y se deslizan
+  como antes.
+
+### 2. Un solo mensaje por fallo (`failedTurns`, `retryNoticeId`, `retryTurn(noticeId)` en `AssistantViewModel.kt`; `AgentErrorNotice`; `ChatFailureFeedback.kt`)
+
+Un turno fallido se decía dos veces: la tarjeta en la conversación y un aviso emergente sobre el compositor, cada uno
+con su «Reintentar».
+
+- Lo dice solo la tarjeta. El aviso emergente del fallo desaparece; queda una vibración de error y, si la tarjeta está
+  fuera de la vista, un punto en el botón de bajar al final.
+- «Reintentar» pertenece al aviso que cerró el turno fallido, mientras la app conserva su mensaje (`retryNoticeId`), y
+  reenvía el mismo texto y los mismos adjuntos. No sale en avisos restaurados del disco, ni después de enviar otro
+  mensaje, ni tras cambiar de conversación. Sin reintento ya no hay línea «Reintento no disponible».
+- El mensaje se guarda por conversación: un turno que falla en segundo plano no entrega el suyo a la conversación que
+  está en pantalla. Ese turno se anuncia como lo que es («Nexus no ha podido terminar en «…»», `backgroundTurnMessage`),
+  no como terminado.
+- Cuando la conversación avanza (otro mensaje o un fallo más nuevo) la tarjeta anterior y sus pasos se pliegan solos
+  a una línea; un toque la vuelve a abrir.
+- Cualquier envío (compositor, respuesta rápida, panel o «Reintentar») cierra el aviso emergente que hubiera a la
+  vista; los de otros orígenes siguen existiendo.
+
+### 3. Aviso de lentitud sin sus dos límites (`AssistantUiState.lastActivityAtElapsedMs`, `AgentActivityText.untilSlowMs`)
+
+Los dos límites anotados en la vc226 desaparecen. La última señal de vida (inicio del turno, paso que empieza o
+acaba, texto nuevo) se guarda con el turno, no en la fila que lo pinta, y con reloj monótono: la cuenta no empieza de
+nuevo si la fila sale de pantalla y vuelve, ni se mueve con un cambio de hora del teléfono. La fila ya no pregunta
+cada segundo: duerme hasta que toca el aviso.
+
+### 4. La misma negrita en el núcleo de escritorio (`desktop/agent/core`)
+
+`ChatMarkdown.kt` del núcleo de escritorio pasa a ser la copia exacta del de `agent-core`, con sus pruebas (de 93 a
+297 líneas, 28 pruebas, pasadas en AXELPC). En `android-source-manifest.json` solo cambian esas dos huellas.
+
+Al compilar el programa de escritorio salió que en esta rama **no compilaba desde antes de las mejoras**: el `when`
+de `DesktopAgent.kt` sobre los bloques de Markdown no cubría `MdBlock.Visual`. Arreglado (`2032ab33`): la edición de
+escritorio no dibuja esos bloques, enseña su fuente como un bloque de código. `compileKotlin` de `desktop/agent`
+pasa en AXELPC.
+
+Lo que **no** llega todavía a Windows:
+
+- La edición de Windows en uso no sale de esta rama. Las ramas de escritorio (`aki/desktop-sync-journal-20261114`, la
+  desplegada, y `aki/axel-link-desktop-20261118`) llevan un `ChatMarkdown.kt` más antiguo (212 líneas, sin bloques
+  visuales ni modo de texto en curso) y su propio `DesktopAgent.kt`. Para que la negrita sea la misma allí hay que
+  llevar este cambio a la rama de escritorio y desplegarla. No está hecho: es otra rama y otro despliegue.
+- Mientras llega el texto, la interfaz de escritorio lo pinta como texto plano (`desktop/ui/assistant.js`), así que la
+  negrita a medias no se vería hasta que la respuesta acaba. Para verla en vivo hay que pintar ese texto como HTML.
+- El manifiesto ya iba atrasado antes de este cambio (28 de 167 entradas no coinciden con sus archivos) y no se ha
+  tocado más que en las dos huellas.
+
+### 5. Pasos más limpios (`AgentStepRow`)
+
+Cada paso es una línea en palabras. La orden técnica (`search_assets text=faro limit=3`) ya no va debajo: está en el
+detalle, que se abre al tocar el paso. Abrir o plegar un paso, o la actividad guardada, da una vibración de selección.
+
+### 6. La última fila descansa sobre su hueco (`followDistance` en `assistant/AssistantScreen.kt`)
+
+Salió al probar el punto 2 en el Pixel: sin el aviso emergente, la tarjeta del fallo quedaba pegada al compositor.
+No era de la tarjeta: al seguir la conversación, la lista bajaba hasta que su última fila tocaba el borde inferior y
+se comía los 28 dp que reserva bajo ella. Pasaba también con el texto que se escribía y con los pasos en curso (ya en
+la vc226), y al acabar el turno el hueco aparecía de golpe.
+
+- La zona de lectura acaba encima de ese hueco y del aviso emergente que haya a la vista; la última fila descansa
+  siempre sobre ese hueco, mientras se escribe y al acabar (`b2ba71f6`). Medido en capturas, de la última tinta al
+  compositor: de 4 a 10 dp antes, de 32 a 36 dp ahora.
+- De la segunda revisión (`2c3edfaa`): `followLast` ya no deja escapar la cancelación de un desplazamiento que pierde
+  contra el dedo del lector. Ese caso podía parar para siempre al colector que sigue los cambios de tamaño de la
+  lista (teclado, paneles); ahora el siguiente cambio lo intenta de nuevo. Era anterior a la vc227 y no se ha
+  reproducido en dispositivo: es una lectura del código. Un primer intento de este punto añadía un segundo seguidor
+  para el aviso emergente; sobraba (la lista ya lo acompaña con `snapshotFlow { noticeRoom }`) y se quitó.
+
+### Pruebas de la vc227
+
+- JVM nuevas o ampliadas: `ChatRowEntranceTest` (+3, `turnClosingRowId`), `ChatFailureFeedbackTest`
+  (`currentFailureId`, `backgroundTurnMessage`), `ProjectAgentFlowTest` (estado del aviso sin reintento),
+  `AgentActivityTextTest` (`untilSlowMs`, `withStep`, `withStreamingText`), `ChatFollowTest` (2, `followDistance`).
+- Instrumentada nueva: `AgentChatRedesignUiTest.theRowThatClosesATurnArrivesAsTheLiveActivityAndSettlesIntoItsSummary`.
+  Compilada y ejecutada con el resto de la clase: `OK (7 tests)` en el Pixel 8 Pro el 20/11 a las 19:09 (8,5 s), en el
+  paquete aislado `com.vidadomu.nexus.minimalqa` (CodeBuild `vidal-android-build:ae865ffe-7cb6-47af-8d15-309c117f5e60`),
+  instalado y desinstalado; Nexus sin cambios. **Sobre `b2ba71f6`, un commit antes del final**: la diferencia son seis
+  líneas de `AssistantScreen.kt`, que estas pruebas no componen. El APK de instrumentadas de la compilación final se
+  compiló y no se ejecutó. Límite de la prueba nueva: compone `AgentActivitySaved` suelta, no la pantalla con su
+  cableado, y con las animaciones desactivadas solo comprueba el estado final.
+- En el Pixel 8 Pro, el 20/11, con el guion local (`AgentChatQa`; sin modelo ni coste):
+  - **Turno que avanza** (guion `streaming`; con la primera, la tercera y la cuarta compilación, que es la final): cada
+    paso es una línea en palabras, sin la orden técnica debajo. Final del turno medido fotograma a fotograma: la fila
+    se asienta en unos 225 ms (primera compilación), sin un segundo deslizamiento. Contando por fotograma los píxeles
+    de texto de la conversación, el mínimo alrededor del final es 0,91 de la referencia en la tercera y 0,917 en la
+    final; ningún fotograma baja de la mitad en ninguna de las tres.
+  - **Hueco bajo la última fila**, medido en las capturas, de la última tinta al borde del compositor: con la segunda
+    compilación, antes del arreglo, entre 4 y 10 dp; con la tercera y la final, 36 dp con los pasos en vivo, entre
+    34,3 y 34,7 dp mientras se escribe la respuesta y al acabar, y 32 dp bajo la tarjeta de un fallo.
+  - **Fallo** (`model_error`; segunda, tercera y final): una sola tarjeta en la conversación y ningún aviso emergente.
+  - **Reintento** (segunda y final): «Reintentar» reenvía el mismo mensaje, la tarjeta anterior se pliega sola a una
+    línea y el turno nuevo acaba con su respuesta.
+  - **Fallo con el lector arriba** (segunda): el botón de bajar al final lleva el punto.
+  - **Paso parado 40 s** (segunda): sin aviso con el paso en 28,5 y en 30,2 s; «Tarda más de lo normal. Puedes
+    detenerlo y volver a intentarlo.» a la vista a los 34 s; se va al empezar el paso siguiente y vuelve a los 34 s
+    de ese paso.
+  - Diez turnos en total, tres sobre la compilación final (turno que avanza, fallo y reintento). Sin cierres en
+    ninguno; el registro de la app, sin errores en los que se revisó (el reintento de la segunda compilación y la
+    compilación final).
+- Turno con modelo real (AGY · Hidrógeno, solo lectura, autorizado por Vidal): uno, sobre la compilación final, el 20/11 de 19:27 a 19:28. Se le pidió listar los proyectos y buscar en la
+  Biblioteca los tres vídeos más recientes, sin crear, mover ni generar nada. Cuatro pasos, 26 s; respondió con seis
+  proyectos y tres vídeos, y el texto llegó poco a poco. Final medido fotograma a fotograma: ningún fotograma por
+  debajo de la mitad de tinta (mínimo 0,905); los pasos se cierran y el pie se abre sin salto. Hueco de 36 dp
+  mientras trabaja y de 34,3 dp al acabar. Sin errores en el registro de la app ni cierres. Es un solo turno, corto y
+  sin fallos: no enseña un fallo real ni su reintento.
+- Las capturas y los vídeos no van al repositorio.
+
+### Revisión de solo lectura
+
+Tres revisiones independientes, de solo lectura, con archivo y línea. Ninguna encontró defectos graves.
+
+- **Primera**, sobre `c630f955` (las cinco mejoras). De ella salen `0edd7750` (un turno que falla en otra conversación
+  se anunciaba como terminado; el aviso emergente se cierra cuando el envío se acepta; `retryTurn` dice si reintentó;
+  un import que faltaba en la instrumentada) y `2032ab33` (el programa de escritorio no compilaba).
+- **Segunda**, sobre `c630f955..b2ba71f6` y las aserciones de las pruebas. Dos hallazgos medios, corregidos en
+  `2c3edfaa`: un seguidor duplicado para el aviso emergente y la sospecha de que un dedo podía parar al colector del
+  visor. Un tercero, sin cambiar: `ChatFollowTest` comprueba la cuenta de `followDistance`, pero no distingue el
+  código anterior del nuevo, porque la fórmula es la misma y lo que cambia es que el hueco de 28 dp entra en ella. Lo
+  que cubre ese cambio es la medida en el dispositivo.
+- **Tercera**, sobre `2c3edfaa`: los cuatro puntos del ajuste, conformes.
+- Menores, sin cambiar:
+  - `sendQueued` (el mensaje en espera que sale solo) no cierra el aviso emergente que hubiera a la vista.
+  - `retryTurn` devuelve `false` sin avisar si ya no hay mensaje que reenviar.
+  - Sospecha sin confirmar sobre un error no fatal (`error=true`) en un turno de fondo.
+  - El `try/catch` del bucle de `closingRow` queda redundante tras `2c3edfaa`.
+  - Sospecha de gravedad media, sin confirmar y anterior a la vc227: el colector de `noticeRoom` desplaza la lista
+    con el valor acumulado de la animación y no con el incremento; lo recorta el límite de desplazamiento de la lista.
+
+### Sin probar en la vc227
+
+- El S25 (no se ha tocado; sigue con la vc225).
+- Windows: nada de esto está en la edición en uso. No se ha llevado a la rama de escritorio, ni compilado el
+  instalador, ni desplegado.
+- Un fallo real del modelo y su reintento: solo con el guion local.
+- Un turno que falla en segundo plano, en otra conversación: solo pruebas JVM.
+- Los dos límites que quita el punto 3 (la fila que sale de pantalla y vuelve, el cambio de hora): solo pruebas JVM.
+  En el dispositivo se ha visto el aviso con un paso parado, no esos dos casos.
+- El punto 1 con las animaciones desactivadas: sin mirar en el dispositivo.
+- Las instrumentadas sobre el commit final: se ejecutaron sobre el anterior (ver «Pruebas de la vc227»).
+- Con un modelo real, un turno de más de un minuto o con una incidencia devuelta por una herramienta.
+- **Visto y sin investigar**: al reabrir la app después de reinstalarla (con la tercera y la cuarta compilación), la
+  conversación vuelve a la posición guardada y queda unos 29 dp antes del final, con la última tarjeta cortada por el
+  compositor y el botón de bajar a la vista; un toque en el botón la lleva al final. La restauración de la posición
+  es código anterior a este encargo. No se ha comprobado si con la vc226 se veía igual.
+- Lo demás de «Pendiente y límites», al final de este informe.
+
 ## Arreglos del 20/11: vc226 / 1.9.190-agent
 
 Tres detalles vistos en el turno real con herramientas del 19/11, arreglados por orden de Vidal («Si arreglalo»).
@@ -55,6 +237,8 @@ Límites:
   turno puede adelantar o retrasar el aviso.
 - Un paso que acaba sin duración cuenta desde que empezó.
 
+En la vc227 los dos primeros límites desaparecen (punto 3 de «Mejoras del 20/11 por la tarde»).
+
 ### 2. Parpadeo al acabar el turno (`rowPlacement`, `settledReplyId` en `assistant/AssistantScreen.kt`)
 
 El diagnóstico del 19/11 se quedaba corto. Los fotogramas enseñan que se borraba **toda la conversación**, no solo la
@@ -77,6 +261,9 @@ desplazamiento animado de la lista, y la respuesta anterior aparece ya colocada.
 final ese desplazamiento dura unos 0,18 s y la burbuja pasa por encima de las últimas líneas de la respuesta
 anterior. Antes lo tapaba el borrado. Quitar ese desplazamiento es una decisión de diseño, de Vidal.
 
+Resuelto en la vc227 (punto 1 de «Mejoras del 20/11 por la tarde»): la fila que cierra el turno se asienta en un
+solo movimiento.
+
 ### 3. Negrita sin cerrar (`ChatMarkdown` en agent-core)
 
 Mientras llega el texto, en el bloque que se está escribiendo (la viñeta, el título, la cita o el párrafo en curso) un
@@ -86,6 +273,9 @@ palabra sigue literal (`2**10`, `5 * 3`, `a == b`, `snake_case`), y también lo 
 nada (`*.mp4`, `==>`), que guardado queda literal (`b2d759f8`). Una línea entera en negrita no pasa a etiqueta hasta
 que hay otra línea detrás. El texto guardado no cambia: solo cambia cómo se pinta mientras llega. La copia de
 escritorio (`desktop/agent/core`) es otro archivo y no se ha tocado.
+
+En la vc227 esa copia pasa a ser idéntica a la de `agent-core` (punto 4 de «Mejoras del 20/11 por la tarde»); la
+edición de Windows en uso sale de otra rama y todavía no lo lleva.
 
 Límite: es una apuesta. Si un marcador abierto al empezar palabra no llega a cerrarse nunca, el texto se ve con estilo
 mientras llega y literal, con su marcador, al acabar el bloque.
@@ -143,6 +333,8 @@ Un revisor independiente leyó el código y estos documentos (A a J, con archivo
   tienen valor por defecto.
 - El resto de pruebas JVM del módulo `app`, fuera del paquete `assistant`: la compilación de este encargo no las
   ejecuta (`--tests 'com.vidadomu.nexus.assistant.*'`).
+- Hecho después, en la vc227: un turno con modelo real, las instrumentadas (7 de 7, sobre el commit anterior al
+  final) y todas las pruebas JVM de `app` (1055).
 - Lo demás de «Pendiente y límites» sigue igual.
 
 ## Qué cambia
@@ -335,9 +527,12 @@ El cambio de los avisos (vc224) pasó otras dos revisiones de solo lectura. La p
 - **«Recuperar» con un encargo real**: probado en JVM (`OrderBookTest`, `OrderCardLogicTest`) y en la prueba instrumentada de la tarjeta; no con un trabajo real pausado.
 - **S25**: lleva la vc225 de AXEL Link, que contiene esta rama, pero no se ha abierto ni probado en él (no se toca la pantalla de Vidal). Cut premium va dentro. Ni esta rama ni la vc225 llevan el arreglo del reintento de 5 h de la sincronización del guion (la vc220 que tenía tampoco).
 - **Turno real con herramientas**: hecho el 19/11 sobre la vc225 (ver «Pruebas»). Con un modelo real sigue sin verse un paso con incidencia devuelta por una herramienta ni un turno de más de un minuto.
+  El 20/11 se hizo otro turno real sobre la vc227 (cuatro pasos, 26 s): tampoco enseña esos dos casos.
 - **Los tres detalles del turno real del 19/11** (el aviso «Tarda más de lo normal», el parpadeo al acabar y la negrita sin cerrar): arreglados en la vc226; ver «Arreglos del 20/11».
 - **Instrumentadas**: pasaron sobre `926698f7` y no se han repetido sobre el código final (ver «Pruebas»).
+  Repetidas el 20/11 sobre la vc227: 7 de 7 sobre `b2ba71f6`, un commit antes del final de esa versión.
 - **Avisos con acción**: el de un turno fallido lleva «Reintentar» y se queda hasta que se cierra; mientras está, ocupa el pie de la zona de lectura (la lista le hace sitio).
+  Desde la vc227 un turno fallido ya no saca ese aviso: lo dice solo su tarjeta, que es la que reintenta.
 - **Seguimiento del final con un aviso a la vista**: dos riesgos teóricos de la revisión, sin reproducir y sin cambiar (ver «Revisión independiente»).
 - **Selector de modelo**: solo cambia de modelo en el sitio con AGY y Codex; con los demás cerebros abre los ajustes.
 - **Tema claro**: conserva su fondo de papel; el carbón solo se aplica a los temas oscuros.
