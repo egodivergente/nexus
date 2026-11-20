@@ -9,6 +9,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import com.vidadomu.nexus.agent.core.orders.FailureKind
 import com.vidadomu.nexus.agent.core.orders.Order
 import com.vidadomu.nexus.agent.core.orders.OrderFailure

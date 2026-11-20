@@ -165,6 +165,9 @@ private fun AssistantScreenContent(
     val presentation by rememberAssistantPresentationStore().state()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    // A message on its way closes whatever notice was still up: it spoke about the moment before. Every way of
+    // sending goes through here (the composer, a quick reply, a panel's answer, «Reintentar»).
+    fun sent(accepted: Boolean): Boolean { if (accepted) snackbar.currentSnackbarData?.dismiss(); return accepted }
     val draftPrefs = LocalContext.current.getSharedPreferences("assistant_draft_v1", android.content.Context.MODE_PRIVATE)
     val draftKey="conversation:${ui.conversationId}"
     var input by rememberSaveable(ui.conversationId, stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString(draftKey, draftPrefs.getString("text", "")).orEmpty())) }
@@ -537,14 +540,14 @@ private fun AssistantScreenContent(
                                 onSelectMessages = { copyMessageIds = setOf(item.id); showChatCopy = true },
                                 answered = answerAfter(ui.items, item)?.text,
                                 widgetAnswer = answerAfter(ui.items, item)?.widgetAnswer,
-                                onReply = { vm.send(it) }, onWidgetReply = { vm.send(it.text, widgetAnswer = it.answer) },
+                                onReply = { sent(vm.send(it)) }, onWidgetReply = { sent(vm.send(it.text, widgetAnswer = it.answer)) },
                                 closesTurn = closingRow?.id == item.id, textOnShow = closingRow?.textOnShow != false)
                         }
                         is ChatItem.Notice -> {
                             // «Reintentar» belongs to the notice that closed the failed turn, while the app holds its message.
                             val canRetry = item.error && item.id == ui.retryNoticeId && !ui.thinking
                             NoticeRow(item, onOpenHistory,
-                                onRetry = if (canRetry) ({ vm.retryTurn(item.id) }) else null,
+                                onRetry = if (canRetry) ({ sent(vm.retryTurn(item.id)) }) else null,
                                 onChangeModel = { showSettings = true },
                                 onNewChat = if (canRetry && (item.text.contains("conversación nueva", true) || item.text.contains("razonamiento", true)))
                                     ({ vm.continueFailedTurnInNewChat() }) else null,
@@ -679,8 +682,7 @@ private fun AssistantScreenContent(
             }
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launchDevice(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
-                // A message on its way closes whatever notice was still up: it spoke about the moment before.
-                onSend = { if(vm.sendWithBoards(input.text)) {snackbar.currentSnackbarData?.dismiss();haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
+                onSend = { if(sent(vm.sendWithBoards(input.text))) {haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { sent(vm.send(it)) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
                 // Mode and model sit in the composer, wired to the same settings as before.
                 reasoningControl = { ReasoningPicker(ui, vm); BridgeModelPicker(ui, vm) { showSettings = true } },

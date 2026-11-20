@@ -16,3 +16,12 @@ internal fun currentFailureId(items: List<ChatItem>): String? {
     if (at < 0) return null
     return items[at].id.takeIf { (at + 1 until items.size).none { later -> items[later] is ChatItem.User } }
 }
+
+/**
+ * What the app says when the answer that was working in another conversation is over. A turn that ended in a failure
+ * did not finish: its card waits in that conversation, and until it is opened this line is the only word about it.
+ */
+internal fun backgroundTurnMessage(title: String, items: List<ChatItem>): String {
+    val failed = items.takeLastWhile { it !is ChatItem.User }.any { it is ChatItem.Notice && it.error }
+    return (if (failed) "Nexus no ha podido terminar en «$title»." else "Nexus ha terminado en «$title».") + " Ábrela en Conversaciones."
+}

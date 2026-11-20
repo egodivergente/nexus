@@ -283,7 +283,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             runCatching { chatStore.archive(bg, runtime.orders.snapshot()) }
             runtime.orders.restore(parked ?: com.vidadomu.nexus.agent.core.orders.OrderBookState(), _ui.value.plans.values.map { it.plan })
-            _ui.update { it.copy(workingIn = null, message = msg("Nexus ha terminado en «${chatTitle(bg)}». Ábrela en Conversaciones.")) }
+            _ui.update { it.copy(workingIn = null, message = msg(backgroundTurnMessage(chatTitle(bg), bg.items))) }
             publishOrders()
         }
     }
@@ -311,11 +311,11 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     /** By conversation: a turn that fails in the background must not hand its message to the conversation on screen. */
     private val failedTurns = mutableMapOf<String, FailedTurn>()
     /** «Reintentar» on the notice [noticeId]: only while it is the one that holds the message of its turn. */
-    fun retryTurn(noticeId: String) {
+    fun retryTurn(noticeId: String): Boolean {
         val state = _ui.value
-        val request = failedTurns[state.conversationId]?.takeIf { it.noticeId == noticeId && state.retryNoticeId == noticeId } ?: return
-        if (state.thinking) return
-        send(request.text, request.attachments)
+        val request = failedTurns[state.conversationId]?.takeIf { it.noticeId == noticeId && state.retryNoticeId == noticeId } ?: return false
+        if (state.thinking) return false
+        return send(request.text, request.attachments)
     }
     /** [note] reaches the agent with the message but is not shown in the user's bubble (e.g. what changed on a board). */
     fun send(text: String, retryAttachments: List<Attachment>? = null, note: String = "",

@@ -72,6 +72,18 @@ class ChatFailureFeedbackTest {
     }
 
     @Test
+    fun anAnswerThatFailedInAnotherConversationIsNotAnnouncedAsFinished() {
+        assertEquals("Nexus ha terminado en «Faro». Ábrela en Conversaciones.",backgroundTurnMessage("Faro",listOf(ask,reply)))
+        assertEquals("Nexus no ha podido terminar en «Faro». Ábrela en Conversaciones.",backgroundTurnMessage("Faro",listOf(ask,failed)))
+        // The cards a failed turn had prepared go after its notice: it is still the turn that failed.
+        assertEquals("Nexus no ha podido terminar en «Faro». Ábrela en Conversaciones.",
+            backgroundTurnMessage("Faro",listOf(ask,failed,ChatItem.PlanCard("c1","p1"))))
+        // An earlier failure, answered since, says nothing about the turn that has just ended; nor does a stop.
+        assertEquals("Nexus ha terminado en «Faro». Ábrela en Conversaciones.",backgroundTurnMessage("Faro",listOf(ask,failed,ask.copy(id="u2"),reply)))
+        assertEquals("Nexus ha terminado en «Faro». Ábrela en Conversaciones.",backgroundTurnMessage("Faro",listOf(ask,ChatItem.Notice("n1","Cancelado."))))
+    }
+
+    @Test
     fun aConversationWithoutFailuresHasNone() {
         assertNull(currentFailureId(emptyList()))
         assertNull(currentFailureId(listOf(ask,reply,ChatItem.Notice("n1","Cancelado."))))
