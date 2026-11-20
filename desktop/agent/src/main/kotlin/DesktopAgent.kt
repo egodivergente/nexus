@@ -43,6 +43,8 @@ private fun blocksHtml(blocks: List<MdBlock>): String = blocks.joinToString("") 
         is MdBlock.Paragraph -> "<p>${spansHtml(block.spans)}</p>"
         is MdBlock.Quote -> "<blockquote>${spansHtml(block.spans)}</blockquote>"
         is MdBlock.Code -> "<pre><code>${htmlEscape(block.code)}</code></pre>"
+        // Esta edición no dibuja los bloques visuales: enseña su fuente, como cualquier otro bloque de código.
+        is MdBlock.Visual -> "<pre><code>${htmlEscape(block.code)}</code></pre>"
         is MdBlock.ListBlock -> "<ul>" + block.items.joinToString("") { "<li>${spansHtml(it.spans)}</li>" } + "</ul>"
         is MdBlock.Table -> "<div class=agent-table><table><thead><tr>" + block.header.joinToString("") { "<th>${spansHtml(it)}</th>" } +
             "</tr></thead><tbody>" + block.rows.joinToString("") { row -> "<tr>" + row.joinToString("") { "<td>${spansHtml(it)}</td>" } + "</tr>" } + "</tbody></table></div>"
