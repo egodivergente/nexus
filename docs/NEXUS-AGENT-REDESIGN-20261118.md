@@ -22,19 +22,19 @@ acabado carbón y mate). Rama `aki/agent-redesign-20261118` sobre `aki/cut-premi
 
 Tres detalles vistos en el turno real con herramientas del 19/11, arreglados por orden de Vidal («Si arreglalo»).
 Rama `aki/agent-fixes-20261120`: parte de `aki/axel-link-agent-20261118` (`5dc00e14`, lo que llevan los móviles como
-vc225) con `aki/agent-redesign-20261118` (`d833e385`, solo documentos) fusionada dentro (`30168301`). Encima, dos
-commits de código: `5c1f981f` (los tres arreglos) y `2c2363c3` (la lista sigue al aviso). No mueve ninguna de las dos
-ramas de origen ni los PR #19 y #20.
+vc225) con `aki/agent-redesign-20261118` (`d833e385`, solo documentos) fusionada dentro (`30168301`). Encima, tres
+commits de código: `5c1f981f` (los tres arreglos), `2c2363c3` (la lista sigue al aviso) y `b2d759f8` (un ajuste del
+Markdown que salió en la revisión). No mueve ninguna de las dos ramas de origen ni los PR #19 y #20.
 
 | Qué | Estado |
 | --- | --- |
-| Compilado | AWS CodeBuild `vidal-android-build:959fb4aa-9227-418e-bf0c-bebb982f1fab` SUCCEEDED sobre `2c2363c3` |
-| Pruebas JVM | agent-core 561 (4 omitidas), app 200, cut-core 133; 0 fallos, 0 errores |
+| Compilado | AWS CodeBuild `vidal-android-build:3615192a-b082-42ba-ac33-5e2388078a85` SUCCEEDED sobre `b2d759f8` |
+| Pruebas JVM | agent-core 562 (4 omitidas), app 200 (solo el paquete `assistant`; el resto de pruebas JVM de `app` no se ejecuta en este encargo), cut-core 133; 0 fallos, 0 errores |
 | Firmado | identidad instalada (cert `8b75db0f…7127`), v2+v3, 16 KiB, 6/6 `.so` idénticas a vc220 |
-| APK | `Nexus-Agent-1.9.190-agent-preview-vc226-preview.apk`, SHA-256 `6dadb39c4dbf8d155b28062df7c80f1186527f6aaf36551554e94060f124d1ee`. Sin la marca test-only: se instala tocándola. Sigue siendo depurable. |
-| Instalado | **Pixel 8 Pro**, 20/11 a las 08:07:11, `adb install -r` sobre la primera compilación de la misma vc226 (`9e46d119…453a`, sobre `5c1f981f`, puesta a las 07:08:37 encima de la vc225). 4283 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma y fecha de primera instalación. |
+| APK | `Nexus-Agent-1.9.190-agent-preview-vc226-preview.apk`, SHA-256 `2f1445f54299985344dd34fa01c294434d3d4b67f37b31206155927ec340c917`. El manifiesto no lleva la marca test-only (se instala tocándola) y sí `debuggable`. |
+| Instalado | **Pixel 8 Pro**, 20/11 a las 08:52:37, `adb install -r` sobre la compilación anterior de la misma vc226. Hubo dos antes: `9e46d119…453a` (sobre `5c1f981f`, puesta a las 07:08:37 encima de la vc225) y `6dadb39c…d1ee` (sobre `2c2363c3`, a las 08:07:11). 4293 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma y fecha de primera instalación. |
 | S25 | Sin tocar: sigue con la vc225. |
-| Probado en dispositivo | Pixel 8 Pro, cuatro turnos con un guion local sin modelo (ver «Pruebas» de esta sección). **Ningún turno con modelo real sobre la vc226.** |
+| Probado en dispositivo | Pixel 8 Pro, seis turnos con un guion local sin modelo (ver «Pruebas de la vc226»). **Ningún turno con modelo real sobre la vc226.** |
 
 ### 1. «Tarda más de lo normal» (`AgentActivityText.slow`, `AgentActivityLive`)
 
@@ -45,10 +45,15 @@ desde el inicio del turno. Un turno que avanza no lo enseña por largo que sea; 
 Al probarlo en el Pixel salió un segundo fallo: el aviso aparece debajo del último paso cuando nada más cambia, así
 que nada pedía a la lista que bajara y quedaba tapado por el compositor. Antes no se notaba porque los pasos seguían
 llegando. Ahora `AgentActivityLive` avisa a la conversación (`onSlowChanged`) y la lista lo sigue como cualquier otro
-cambio (`2c2363c3`).
+cambio (`2c2363c3`); si el usuario ha subido a propósito, no lo arrastra.
 
-Límite: la hora del último texto se guarda en la propia fila de actividad. Si esa fila sale de la pantalla y vuelve
-durante un paso largo que está escribiendo, esa cuenta empieza de nuevo (la de los pasos no: llevan su hora real).
+Límites:
+
+- La hora del último texto se guarda en la propia fila de actividad. Si esa fila sale de la pantalla y vuelve durante
+  un paso largo que está escribiendo, esa cuenta empieza de nuevo (la de los pasos no: llevan su hora real).
+- La cuenta usa el reloj de pared, porque los pasos guardan su hora así. Un cambio de hora del teléfono a mitad de
+  turno puede adelantar o retrasar el aviso.
+- Un paso que acaba sin duración cuenta desde que empezó.
 
 ### 2. Parpadeo al acabar el turno (`rowPlacement`, `settledReplyId` en `assistant/AssistantScreen.kt`)
 
@@ -64,41 +69,70 @@ siguiente medida cada fila visible con `Modifier.animateItem()` repite su fundid
 - La respuesta guardada que sustituye al texto que se estaba escribiendo no repite esa entrada: sus palabras ya
   estaban en pantalla.
 
+La causa es una lectura del código, no una reproducción: con el guion local no se ha visto el parpadeo sobre el
+código anterior (ver «Pruebas de la vc226»). Lo medido es que con el código nuevo no hay ningún fotograma en blanco.
+
+Queda a la vista, sin cambiar: al plegarse los pasos en una línea, el mensaje del usuario baja a su sitio con el
+desplazamiento animado de la lista, y la respuesta anterior aparece ya colocada. En la grabación de la compilación
+final ese desplazamiento dura unos 0,18 s y la burbuja pasa por encima de las últimas líneas de la respuesta
+anterior. Antes lo tapaba el borrado. Quitar ese desplazamiento es una decisión de diseño, de Vidal.
+
 ### 3. Negrita sin cerrar (`ChatMarkdown` en agent-core)
 
-Mientras llega el texto, en la línea que se está escribiendo un marcador abierto al empezar palabra (`**`, `__`, `*`,
-`_`, `~~`, `==` y el código en línea) ya lleva su estilo y no enseña los marcadores. Un marcador recién llegado o un
-cierre a medias tampoco se ven. Lo que no abre al empezar palabra sigue literal (`2**10`, `5 * 3`, `a == b`,
-`snake_case`). Una línea entera en negrita no pasa a etiqueta hasta que hay otra línea detrás. El texto guardado no
-cambia: solo cambia cómo se pinta mientras llega. La copia de escritorio (`desktop/agent/core`) es otro archivo y no
-se ha tocado.
+Mientras llega el texto, en el bloque que se está escribiendo (la viñeta, el título, la cita o el párrafo en curso) un
+marcador abierto al empezar palabra (`**`, `__`, `*`, `_`, `~~`, `==` y el código en línea) ya lleva su estilo y no
+enseña los marcadores. Un marcador recién llegado o un cierre a medias tampoco se ven. Lo que no abre al empezar
+palabra sigue literal (`2**10`, `5 * 3`, `a == b`, `snake_case`), y también lo que va pegado a un signo que no empieza
+nada (`*.mp4`, `==>`), que guardado queda literal (`b2d759f8`). Una línea entera en negrita no pasa a etiqueta hasta
+que hay otra línea detrás. El texto guardado no cambia: solo cambia cómo se pinta mientras llega. La copia de
+escritorio (`desktop/agent/core`) es otro archivo y no se ha tocado.
+
+Límite: es una apuesta. Si un marcador abierto al empezar palabra no llega a cerrarse nunca, el texto se ve con estilo
+mientras llega y literal, con su marcador, al acabar el bloque.
 
 ### Pruebas de la vc226
 
-- JVM nuevas: `ChatMarkdownTest` (+8, 27 en total), `AgentActivityTextTest` (+3, 11 en total) y `ChatRowEntranceTest` (3).
+- JVM nuevas: `ChatMarkdownTest` (+9, 28 en total), `AgentActivityTextTest` (+3, 11 en total) y `ChatRowEntranceTest`
+  (3). Las de `ChatRowEntranceTest` prueban la decisión (`settledReplyId`), no el cableado de Compose.
 - Guion local nuevo, `streaming` (`AgentChatQa`; solo compilaciones depurables, sin modelo ni coste): cuatro llamadas
   al «modelo» con la espera pedida, tres herramientas reales de solo lectura (`list_projects`, `search_assets`,
   `get_generation_history`) y una respuesta que llega de 7 en 7 caracteres cada 90 ms, acumulada, con negrita,
   cursiva, tachado y código.
 - En el Pixel 8 Pro, el 20/11, con ese guion y con `model_error`; sin errores en el registro de la app ni cierres:
-  - **Turno que avanza** (7 pasos, 45 s; primera compilación a las 07:09 y compilación final a las 08:10): pasados
-    los 30 s de turno no hay aviso (capturas entre los 31 y los 39 s). La negrita abierta se ve en negrita y sin
-    asteriscos mientras llega; la cursiva, el tachado y el código, también con su estilo.
-  - **Final de ese turno**, medido fotograma a fotograma en las dos grabaciones: la conversación no se borra.
-    Contando por fotograma los píxeles de texto de la conversación, el mínimo alrededor del final es
-    19773 sobre 20189 de referencia (0,979) en la primera compilación y 19459 sobre 20533 (0,948) en la final;
-    ningún fotograma baja de la mitad en ninguna de las dos.
+  - **Turno que avanza** (7 pasos, 45 s; una vez con cada compilación, a las 07:09, las 08:10 y las 08:53): pasados
+    los 30 s de turno no hay aviso (capturas entre los 31 y los 39 s en las dos primeras y entre los 31 y los 46 s en
+    la final). Lo que queda abierto se ve con su estilo y sin marcadores mientras llega: en los fotogramas de la
+    grabación final la negrita va saliendo en negrita y sin asteriscos antes de que llegue su cierre («poco a
+    poco, c», «poco a poco, como la de un m»). La cursiva, el tachado y el código, también con su estilo.
+  - **Final de ese turno**, medido fotograma a fotograma en las tres grabaciones: la conversación no se borra.
+    Contando por fotograma los píxeles de texto de la conversación, el mínimo alrededor del final es 19773 sobre
+    20189 de referencia (0,979) en la primera compilación, 19459 sobre 20533 (0,948) en la segunda y 19954 sobre
+    20180 (0,989) en la final; ningún fotograma baja de la mitad en ninguna de las tres.
     Con la misma medida, la grabación del 19/11 (vc225, turno real) baja a cero durante 8 fotogramas.
-    Lo que se ve ahora es la conversación recolocándose porque los pasos se pliegan en una línea: en la primera
-    grabación el mensaje del usuario baja a su sitio en unos 0,1 s; en la final, el cambio ocurre en un solo
-    fotograma.
-  - **Paso parado 40 s** (compilación final, 08:08): sin aviso con el paso en 26 y en 29 s; a la vista, encima del
-    compositor, con el paso en 33 y en 37 s; se va al empezar el paso siguiente; en ese segundo paso, sin aviso a los
-    28 s y a la vista a los 34 s. Con la primera compilación (07:45) el aviso quedaba tapado por el compositor: es el
-    fallo que corrige `2c2363c3`.
+    Lo que se ve ahora es la conversación recolocándose porque los pasos se pliegan en una línea: la respuesta se
+    queda y el mensaje del usuario baja a su sitio, en unos 0,1 s en la primera grabación, en un solo fotograma en la
+    segunda y en unos 0,18 s en la final (ver «Queda a la vista» en el punto 2).
+  - **Paso parado 40 s** (segunda compilación a las 08:08 y final a las 08:56): sin aviso con el paso en 26 y en 29 o
+    30 s; a la vista, encima del compositor, con el paso en 33 o 34 s y en 37 s; se va al empezar el paso siguiente
+    (4 y 8 s); en ese segundo paso, sin aviso a los 28 s y a la vista a los 34 s. Con la primera compilación (07:45)
+    el aviso quedaba tapado por el compositor: es el fallo que corrige `2c2363c3`.
 - La comparación del parpadeo es entre un turno real (vc225) y uno de guion (vc226). El guion pasa por el mismo bucle
-  y los mismos eventos, pero el parpadeo no se ha reproducido con el guion sobre el código anterior, que no lo tenía.
+  y los mismos eventos, pero el parpadeo no se ha reproducido con el guion sobre el código anterior, que no tenía
+  ese guion.
 - Las capturas y los vídeos no van al repositorio: la conversación de prueba enseña nombres de archivos de Vidal.
+
+### Revisión de solo lectura
+
+Un revisor independiente leyó el código y estos documentos (A a J, con archivo y línea). Sin defectos graves.
+
+- Corregido a raíz de ella: el marcador pegado a un signo (`*.mp4`, `==>`, `====`), que en vivo abría estilo y
+  guardado quedaba literal; un asterisco escapado al final de una negrita abierta; y la redacción, que decía «línea»
+  donde el código trata el bloque entero.
+- Anotado como límite, sin cambiar: el reloj de pared, el paso que acaba sin duración y que la causa del parpadeo no
+  está reproducida (arriba).
+- Sin cambiar: una letra de fuera del plano básico de Unicode (rara) cuenta como signo al decidir si un marcador abre.
+- La revisión se hizo sobre `51b7cbe`. Una segunda, acotada al ajuste posterior `b2d759f8`, siguió a mano cada
+  aserto de la prueba nueva y los de las anteriores: 5 puntos de 5, sin defectos.
 
 ### Sin probar en la vc226
 
@@ -107,6 +141,8 @@ se ha tocado.
 - Las pruebas instrumentadas: ni compiladas ni ejecutadas sobre este código. La única llamada afectada,
   `AgentActivityLive(pasos, inicio)` en `AgentChatRedesignUiTest`, sigue siendo válida porque los parámetros nuevos
   tienen valor por defecto.
+- El resto de pruebas JVM del módulo `app`, fuera del paquete `assistant`: la compilación de este encargo no las
+  ejecuta (`--tests 'com.vidadomu.nexus.assistant.*'`).
 - Lo demás de «Pendiente y límites» sigue igual.
 
 ## Qué cambia

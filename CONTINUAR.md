@@ -2,12 +2,12 @@
 
 Rama `aki/agent-fixes-20261120` sobre `aki/axel-link-agent-20261118` (`5dc00e14`, vc225) con
 `aki/agent-redesign-20261118` (`d833e385`) fusionada; no mueve esas ramas ni los PR #19 y #20. AWS CodeBuild
-`vidal-android-build:959fb4aa-9227-418e-bf0c-bebb982f1fab` SUCCEEDED sobre `2c2363c3`; firmado en AXELPC con la
+`vidal-android-build:3615192a-b082-42ba-ac33-5e2388078a85` SUCCEEDED sobre `b2d759f8`; firmado en AXELPC con la
 identidad instalada (cert `8b75db0f…7127`), v2+v3, 16 KiB, 6/6 `.so` idénticas a vc220. APK SHA-256
-`6dadb39c4dbf8d155b28062df7c80f1186527f6aaf36551554e94060f124d1ee` (instalable tocándola; depurable). Pruebas JVM: agent-core 561
-(4 omitidas), app 200, cut-core 133; 0 fallos. **Instalada en el Pixel 8 Pro** (20/11 a las 08:07:11, `adb install -r`;
-4283 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma). El S25 no se ha
-tocado: sigue con la vc225.
+`2f1445f54299985344dd34fa01c294434d3d4b67f37b31206155927ec340c917` (instalable tocándola; depurable). Pruebas JVM: agent-core 562
+(4 omitidas), app 200 (solo el paquete `assistant`), cut-core 133; 0 fallos. **Instalada en el Pixel 8 Pro** (20/11 a
+las 08:52:37, `adb install -r`; 4293 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma
+firma). El S25 no se ha tocado: sigue con la vc225.
 
 Qué cambia: «Tarda más de lo normal» ya no sale a los 30 s del turno, sino cuando nada se ha movido en 30 s (ni un
 paso que empiece o acabe ni texto nuevo), y la lista baja para enseñarlo; al acabar el turno la conversación ya no se
@@ -16,6 +16,10 @@ a entrar); mientras llega el texto, una negrita, cursiva, tachado, resalte o có
 no enseñan los marcadores. Guion local nuevo `streaming` en `AgentChatQa` (solo depuración, sin modelo).
 Probado: Pixel 8 Pro con el guion local, sin modelo: turno de 45 s que avanza (sin aviso, negrita viva, final sin
 borrado medido fotograma a fotograma) y paso parado 40 s (aviso a la vista a partir de los 30 s del paso).
+Queda a la vista: al plegarse los pasos, el mensaje del usuario baja a su sitio (hasta 0,18 s) pasando sobre las
+últimas líneas de la respuesta anterior; quitar ese desplazamiento lo decide Vidal.
+Revisado: una revisión de solo lectura sobre `51b7cbe`, sin defectos graves; de ella sale el ajuste `b2d759f8`,
+revisado después aparte (5 puntos de 5).
 Pendiente: un turno con modelo real sobre la vc226, el S25, las instrumentadas (ni compiladas ni ejecutadas sobre este
 código) y lo que ya estaba pendiente en la vc224 («Recuperar» con un encargo real, riesgos teóricos del seguimiento
 con un aviso a la vista). Merge y PR, de Vidal.
