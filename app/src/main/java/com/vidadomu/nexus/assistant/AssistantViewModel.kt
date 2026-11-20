@@ -109,6 +109,12 @@ data class AssistantUiState(
     val thinking: Boolean = false,
     /** Monotonic start of the current turn. Survives LazyColumn disposal and chat switching. */
     val thinkingStartedAtElapsedMs: Long = 0L,
+    /**
+     * Monotonic time of the turn's last sign of life: its start, a step that started or ended, or text that arrived.
+     * It lives with the turn, not with the row that paints it, so the note about a stuck step neither starts again
+     * when the activity scrolls out of view nor moves when the wall clock is changed. 0 without a turn.
+     */
+    val lastActivityAtElapsedMs: Long = 0L,
     /** Texto parcial durante el streaming de un proveedor compatible (p. ej. Antigravity). */
     val streamingText: String = "",
     /** Pasos que el agente va haciendo en este turno (para «Pensando…»). */
@@ -145,6 +151,18 @@ data class AssistantUiState(
     /** Mensaje efímero (snackbar) con id, para que dos iguales seguidos se muestren los dos. */
     val message: Pair<Long, String>? = null,
 )
+
+/** A step that started or ended is a sign of life of the turn in progress. */
+internal fun AssistantUiState.withStep(step: AgentStep, nowElapsedMs: Long): AssistantUiState =
+    copy(steps = AgentSteps.upsert(steps, step), lastActivityAtElapsedMs = nowElapsedMs)
+
+/**
+ * Text that arrived is a sign of life too. The same text again is not, and neither is the empty text that clears
+ * the field before each call to the model: nothing has come back yet.
+ */
+internal fun AssistantUiState.withStreamingText(text: String, nowElapsedMs: Long): AssistantUiState =
+    if (text == streamingText) this
+    else copy(streamingText = text, lastActivityAtElapsedMs = if (text.isEmpty()) lastActivityAtElapsedMs else nowElapsedMs)
 
 /**
  * Chat de creación con planes individuales y envíos por bloque.
@@ -242,6 +260,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     /** The per-conversation part of [chat] put on screen, keeping what is global (catalog, settings, projects…). */
     private fun AssistantUiState.showing(chat: AssistantUiState) = copy(items = chat.items, plans = chat.plans, pendingAttachments = chat.pendingAttachments,
         thinking = chat.thinking, thinkingStartedAtElapsedMs = chat.thinkingStartedAtElapsedMs,
+        lastActivityAtElapsedMs = chat.lastActivityAtElapsedMs,
         streamingText = chat.streamingText, activity = chat.activity, steps = chat.steps, queuedSend = chat.queuedSend,
         replies = chat.replies, conversationId = chat.conversationId,
         activeProjectId = chat.activeProjectId, workingIn = null, scrollRequest = scrollRequest + 1)
@@ -327,7 +346,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val carriedNote = carried.joinToString("\n\n") { "Contexto traído de la conversación «${it.from}» (resumen):\n${it.summary}" }
         val started = android.os.SystemClock.elapsedRealtime()
         _ui.update { it.copy(items = it.items.map { item -> if (item is ChatItem.Context && item in carried) item.copy(sent = true) else item } +
-            ChatItem.User(newId(), shown, atts, System.currentTimeMillis(), widgetAnswer = widgetAnswer), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, thinkingStartedAtElapsedMs = started, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+            ChatItem.User(newId(), shown, atts, System.currentTimeMillis(), widgetAnswer = widgetAnswer), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, thinkingStartedAtElapsedMs = started, lastActivityAtElapsedMs = started, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -393,7 +412,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
                         card.id !in itemsBefore && state.plans[card.planId]?.state in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION)
                     }
-                    state.copy(thinking = false, thinkingStartedAtElapsedMs = 0L, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false,
+                    state.copy(thinking = false, thinkingStartedAtElapsedMs = 0L, lastActivityAtElapsedMs = 0L, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false,
                         lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
                         lastTurnBreakdown = lastBreakdown, items = state.items.filterNot { it in cards } + cards)
                 }
@@ -500,8 +519,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             is UiEvent.ResultsWall -> if (_ui.value.conversationId == chatId) _ui.update { it.copy(resultsWall = ev.media) }
             is UiEvent.Info -> notice(ev.text, chatId = chatId)
             is UiEvent.Activity -> updateChat(chatId) { it.copy(activity = (if (it.activity.lastOrNull() == ev.text) it.activity else it.activity + ev.text).takeLast(8)) }
-            is UiEvent.Step -> updateChat(chatId) { it.copy(steps = AgentSteps.upsert(it.steps, ev.step)) }
-            is UiEvent.StreamingText -> updateChat(chatId) { it.copy(streamingText = ev.text) }
+            is UiEvent.Step -> updateChat(chatId) { it.withStep(ev.step, android.os.SystemClock.elapsedRealtime()) }
+            is UiEvent.StreamingText -> updateChat(chatId) { it.withStreamingText(ev.text, android.os.SystemClock.elapsedRealtime()) }
             is UiEvent.Replies -> updateChat(chatId) { it.copy(replies = ev.replies) }
         }
     }
@@ -567,7 +586,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 synced.clear()
                 if(background != null) parkedOrders = com.vidadomu.nexus.agent.core.orders.OrderBookState()
                 else runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
-                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = listOfNotNull(carry), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, thinkingStartedAtElapsedMs = 0L, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, replies = emptyList(),
+                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = listOfNotNull(carry), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, thinkingStartedAtElapsedMs = 0L, lastActivityAtElapsedMs = 0L, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, replies = emptyList(),
                     workingIn = background?.conversationId, scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
                 publishOrders()

@@ -102,41 +102,77 @@ class AgentActivityTextTest {
             status(orders = listOf(order("o1", OrderStatus.FAILED), order("o2", OrderStatus.AWAITING_CONFIRMATION))).active)
     }
 
-    private fun timed(id: String, startedAt: Long, ms: Long? = null, kind: AgentStepKind = AgentStepKind.TOOL) =
+    private fun timed(id: String, ms: Long? = null, kind: AgentStepKind = AgentStepKind.TOOL) =
         AgentStep(id, kind, "Buscando en tu Biblioteca", if (ms == null) AgentStepStatus.RUNNING else AgentStepStatus.DONE,
-            startedAt = startedAt, durationMs = ms)
+            startedAt = 1_700_000_000_000L, durationMs = ms)
+
+    /** The turn as the ViewModel keeps it: each event moves the last sign of life to the monotonic time it arrived at. */
+    private fun turn(startedAt: Long) = AssistantUiState(thinking = true, thinkingStartedAtElapsedMs = startedAt, lastActivityAtElapsedMs = startedAt)
+    private fun slow(now: Long, state: AssistantUiState) = AgentActivityText.slow(now, state.thinkingStartedAtElapsedMs, state.lastActivityAtElapsedMs)
 
     @Test fun aTurnThatKeepsMovingIsNotSlowHoweverLongItRuns() {
-        val t0 = 1_700_000_000_000L
+        val t0 = 5_000_000L
         // The turn of 19-11: nine steps of a few seconds each, 35 s in all, and the note came up at second 30.
-        val done = (0 until 8).map { timed("s$it", t0 + it * 4_000L, 3_900L) }
-        val steps = done + timed("s8", t0 + 32_000L)
-        assertFalse("35 s de turno con el paso en curso recién empezado", AgentActivityText.slow(t0 + 35_000L, steps, t0))
-        assertFalse(AgentActivityText.slow(t0 + 61_999L, steps, t0))
-        assertTrue("ese mismo paso, 30 s parado", AgentActivityText.slow(t0 + 62_000L, steps, t0))
-        assertEquals(t0 + 32_000L, AgentActivityText.lastSignOfLife(steps, t0))
+        var state = turn(t0)
+        for (i in 0 until 8) {
+            state = state.withStep(timed("s$i"), t0 + i * 4_000L)
+            state = state.withStep(timed("s$i", 3_900L), t0 + i * 4_000L + 3_900L)
+        }
+        state = state.withStep(timed("s8"), t0 + 32_000L)
+        assertEquals("nueve pasos, cada uno una sola fila", 9, state.steps.size)
+        assertEquals(t0 + 32_000L, state.lastActivityAtElapsedMs)
+        assertFalse("35 s de turno con el paso en curso recién empezado", slow(t0 + 35_000L, state))
+        assertFalse(slow(t0 + 61_999L, state))
+        assertTrue("ese mismo paso, 30 s parado", slow(t0 + 62_000L, state))
     }
 
     @Test fun slowCountsFromTheLastSignOfLife() {
-        val t0 = 1_700_000_000_000L
-        assertFalse("antes del primer paso cuenta desde el inicio del turno", AgentActivityText.slow(t0 + 29_999L, emptyList(), t0))
-        assertTrue(AgentActivityText.slow(t0 + 30_000L, emptyList(), t0))
+        val t0 = 5_000_000L
+        assertFalse("antes del primer paso cuenta desde el inicio del turno", slow(t0 + 29_999L, turn(t0)))
+        assertTrue(slow(t0 + 30_000L, turn(t0)))
+        assertEquals("y dice cuánto falta, para despertar justo entonces", 12_000L, AgentActivityText.untilSlowMs(t0 + 18_000L, t0, t0))
         // Between two steps the clock runs from the end of the last one.
-        val ended = listOf(timed("a", t0 + 6_000L, 4_000L))
-        assertEquals(t0 + 10_000L, AgentActivityText.lastSignOfLife(ended, t0))
-        assertFalse(AgentActivityText.slow(t0 + 39_999L, ended, t0))
-        assertTrue(AgentActivityText.slow(t0 + 40_000L, ended, t0))
+        val ended = turn(t0).withStep(timed("a"), t0 + 6_000L).withStep(timed("a", 4_000L), t0 + 10_000L)
+        assertFalse(slow(t0 + 39_999L, ended))
+        assertTrue(slow(t0 + 40_000L, ended))
         // One long step that is writing the reply: each piece of text is a sign of life.
-        val writing = listOf(timed("t", t0 + 1_000L, kind = AgentStepKind.THINK))
-        assertTrue("sin texto, el paso lleva 59 s", AgentActivityText.slow(t0 + 60_000L, writing, t0))
-        assertFalse("con texto hace 10 s", AgentActivityText.slow(t0 + 60_000L, writing, t0, lastTextAt = t0 + 50_000L))
-        assertTrue("el texto dejó de llegar hace 30 s", AgentActivityText.slow(t0 + 80_000L, writing, t0, lastTextAt = t0 + 50_000L))
+        val thinking = turn(t0).withStep(timed("t", kind = AgentStepKind.THINK), t0 + 1_000L)
+        assertTrue("sin texto, el paso lleva 59 s", slow(t0 + 60_000L, thinking))
+        val writing = thinking.withStreamingText("Las tres más", t0 + 50_000L)
+        assertFalse("con texto hace 10 s", slow(t0 + 60_000L, writing))
+        assertTrue("el texto dejó de llegar hace 30 s", slow(t0 + 80_000L, writing))
+    }
+
+    @Test fun onlyTextThatReallyArrivesCountsAsASignOfLife() {
+        val t0 = 5_000_000L
+        val writing = turn(t0).withStreamingText("Las tres más", t0 + 10_000L)
+        assertEquals(t0 + 10_000L, writing.lastActivityAtElapsedMs)
+        assertEquals("el mismo texto otra vez no es avance", writing, writing.withStreamingText("Las tres más", t0 + 25_000L))
+        // Before each call to the model the field is cleared: the text goes, the wait does not start again.
+        val cleared = writing.withStreamingText("", t0 + 25_000L)
+        assertEquals("", cleared.streamingText)
+        assertEquals(t0 + 10_000L, cleared.lastActivityAtElapsedMs)
+        assertTrue(slow(t0 + 40_000L, cleared))
+    }
+
+    @Test fun theWaitBelongsToTheTurnNotToTheWallClockOrTheRow() {
+        val t0 = 5_000_000L
+        // The steps carry wall-clock times for display; changing the device's date does not move the wait.
+        val state = turn(t0).withStep(timed("a").copy(startedAt = 4_102_444_800_000L), t0 + 2_000L)
+        assertFalse(slow(t0 + 31_999L, state))
+        assertTrue(slow(t0 + 32_000L, state))
+        // A row composed again (it left the screen and came back) reads the same wait from the turn.
+        assertEquals(1_000L, AgentActivityText.untilSlowMs(t0 + 31_000L, state.thinkingStartedAtElapsedMs, state.lastActivityAtElapsedMs))
+        assertEquals(0L, AgentActivityText.untilSlowMs(t0 + 90_000L, state.thinkingStartedAtElapsedMs, state.lastActivityAtElapsedMs))
     }
 
     @Test fun withoutAClockNothingIsCalledSlow() {
-        val legacy = AgentActivityText.legacy("a1", listOf("search_assets"))
-        assertEquals(0L, AgentActivityText.lastSignOfLife(legacy, 0L))
-        assertFalse(AgentActivityText.slow(1_700_000_000_000L, legacy, 0L))
-        assertFalse("un reloj que retrocede no dispara el aviso", AgentActivityText.slow(1_000L, emptyList(), 50_000L))
+        assertNull(AgentActivityText.untilSlowMs(1_700_000_000_000L, 0L, 0L))
+        assertFalse(AgentActivityText.slow(1_700_000_000_000L, 0L, 0L))
+        assertFalse("un reloj que retrocede no dispara el aviso", AgentActivityText.slow(1_000L, 50_000L, 50_000L))
+        assertEquals("ni hace esperar más de la cuenta", AgentActivityText.SLOW_AFTER_MS, AgentActivityText.untilSlowMs(1_000L, 50_000L, 50_000L))
+        // A turn whose last sign was never recorded (a diagnosis, a switch of conversation) counts from its start.
+        assertTrue(AgentActivityText.slow(80_000L, 50_000L))
+        assertFalse(AgentActivityText.slow(79_999L, 50_000L))
     }
 }

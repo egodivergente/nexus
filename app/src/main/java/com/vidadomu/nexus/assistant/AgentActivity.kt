@@ -108,20 +108,20 @@ internal object AgentActivityText {
     const val SLOW_AFTER_MS = 30_000L
 
     /**
-     * When the turn last showed a sign of life, in wall-clock ms: a step that started or ended, or text that arrived.
-     * Before the first report it is the start of the turn. Zero when there is no clock to go by.
+     * How long until the turn counts as slow, and 0 once it does: [SLOW_AFTER_MS] after its last sign of life. A turn
+     * that keeps reporting steps or writing is never slow, however long it runs: the note is for the step that got
+     * stuck, not for the agent that is working. The three times are monotonic (`elapsedRealtime`) and the turn keeps
+     * them itself ([AssistantUiState.lastActivityAtElapsedMs]; before the first sign, the start of the turn), so the
+     * wait neither restarts when the row that paints it leaves the screen nor moves when the wall clock is changed.
+     * Null when there is no clock to go by.
      */
-    fun lastSignOfLife(steps: List<AgentStep>, turnStartedAt: Long, lastTextAt: Long = 0L): Long =
-        maxOf(turnStartedAt, lastTextAt, steps.maxOfOrNull { if (it.startedAt > 0L) it.startedAt + (it.durationMs ?: 0L) else 0L } ?: 0L)
-
-    /**
-     * True once nothing has moved for [SLOW_AFTER_MS]. A turn that keeps reporting steps or writing is not slow,
-     * however long it runs: the note is for the step that got stuck, not for the agent that is working.
-     */
-    fun slow(now: Long, steps: List<AgentStep>, turnStartedAt: Long, lastTextAt: Long = 0L): Boolean {
-        val last = lastSignOfLife(steps, turnStartedAt, lastTextAt)
-        return last > 0L && now - last >= SLOW_AFTER_MS
+    fun untilSlowMs(nowElapsedMs: Long, startedAtElapsedMs: Long, lastActivityAtElapsedMs: Long = 0L): Long? {
+        val last = maxOf(startedAtElapsedMs, lastActivityAtElapsedMs)
+        return if (last <= 0L) null else (SLOW_AFTER_MS - (nowElapsedMs - last)).coerceIn(0L, SLOW_AFTER_MS)
     }
+
+    fun slow(nowElapsedMs: Long, startedAtElapsedMs: Long, lastActivityAtElapsedMs: Long = 0L): Boolean =
+        untilSlowMs(nowElapsedMs, startedAtElapsedMs, lastActivityAtElapsedMs) == 0L
 
     /** Messages saved before the timeline existed only kept the tool names: one finished row each, without a time. */
     fun legacy(messageId: String, toolCalls: List<String>): List<AgentStep> = toolCalls.mapIndexed { index, tool ->
@@ -199,24 +199,28 @@ internal fun AgentChatHeader(
 }
 
 /**
- * The turn in progress: every step the orchestrator reports, on one quiet vertical line. [streamedChars] is how much
- * of the reply has arrived: text coming in is progress too, even inside one long step. [onSlowChanged] tells the
- * list when the note about a stuck step appears or goes: nothing else moves at that moment, so the list would not
- * follow it and the note would stay hidden under the composer.
+ * The turn in progress: every step the orchestrator reports, on one quiet vertical line. [lastActivityAtElapsedMs]
+ * is the turn's last sign of life, kept with the turn: a step that started or ended, or text that arrived (text
+ * coming in is progress too, even inside one long step). [onSlowChanged] tells the list when the note about a stuck
+ * step appears or goes: nothing else moves at that moment, so the list would not follow it and the note would stay
+ * hidden under the composer.
  */
 @Composable
-internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long, modifier: Modifier = Modifier, streamedChars: Int = 0,
+internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long, modifier: Modifier = Modifier, lastActivityAtElapsedMs: Long = 0L,
     onSlowChanged: (Boolean) -> Unit = {}) {
     // Before the first report there is still something true to show: the turn started and nothing has come back yet.
     val preparing = remember(startedAtElapsedMs) {
         val waited = if (startedAtElapsedMs > 0L) (android.os.SystemClock.elapsedRealtime() - startedAtElapsedMs).coerceAtLeast(0L) else 0L
         AgentStep("preparing", AgentStepKind.THINK, "Preparando la respuesta", AgentStepStatus.RUNNING, startedAt = System.currentTimeMillis() - waited)
     }
-    val lastTextAt = remember(startedAtElapsedMs, streamedChars) { if (streamedChars > 0) System.currentTimeMillis() else 0L }
-    val slow by produceState(false, steps, preparing.startedAt, lastTextAt) {
+    // This row only reads the wait: leaving the screen and coming back does not start it again. It sleeps until the
+    // note is due instead of asking every second; a new sign of life restarts the count from there.
+    val slow by produceState(false, startedAtElapsedMs, lastActivityAtElapsedMs) {
         while (true) {
-            value = AgentActivityText.slow(System.currentTimeMillis(), steps, preparing.startedAt, lastTextAt)
-            kotlinx.coroutines.delay(1_000L)
+            val wait = AgentActivityText.untilSlowMs(android.os.SystemClock.elapsedRealtime(), startedAtElapsedMs, lastActivityAtElapsedMs)
+            value = wait == 0L
+            if (wait == null || wait == 0L) break
+            kotlinx.coroutines.delay(wait)
         }
     }
     val latestOnSlow by rememberUpdatedState(onSlowChanged)

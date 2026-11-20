@@ -567,7 +567,7 @@ private fun AssistantScreenContent(
                 }
                 // The turn in progress, in the conversation itself: its real steps first, then the text as it arrives.
                 if (ui.thinking) item(key = "agent_activity_live") {
-                    AgentActivityLive(ui.steps, ui.thinkingStartedAtElapsedMs, streamedChars = ui.streamingText.length,
+                    AgentActivityLive(ui.steps, ui.thinkingStartedAtElapsedMs, lastActivityAtElapsedMs = ui.lastActivityAtElapsedMs,
                         onSlowChanged = { slowNotice = it })
                 }
                 if (ui.streamingText.isNotBlank()) {
