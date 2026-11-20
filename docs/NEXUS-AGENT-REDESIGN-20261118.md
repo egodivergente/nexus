@@ -34,7 +34,7 @@ escritorio) y `c630f955` (versión). Después, de las revisiones y de las prueba
 | APK | `Nexus-Agent-1.9.191-agent-preview-vc227-preview.apk`, SHA-256 `45f7cf4dd09b0df464ca0fcbed73751e644f4fadb7d5998513b8d873ad80a597`. Sin la marca test-only (se instala tocándola); `debuggable`. |
 | Instalado | **Pixel 8 Pro**, 20/11 a las 19:16:48, `adb install -r` sobre la compilación anterior de la misma vc227. Hubo tres antes: `807775c7…ba35` (sobre `c630f955`, puesta a las 18:13:32 encima de la vc226 `2f1445f5…c917`; 4303 archivos de datos), `9a059f6a…ab21` (sobre `2032ab33`, a las 18:23:18; 4309) y `1db89131…8233` (sobre `b2ba71f6`, a las 19:01:44; 4326). En la final, 4337 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma y fecha de primera instalación; lo mismo en las tres anteriores. |
 | S25 | Sin tocar: sigue con la vc225. |
-| Probado en dispositivo | Pixel 8 Pro: diez turnos con el guion local sin modelo, un turno con modelo real (AGY · Hidrógeno, solo lectura) y las pruebas instrumentadas, 7 de 7. Sobre la compilación final van tres de los diez turnos y el turno real; las instrumentadas, sobre `b2ba71f6`, un commit antes (ver «Pruebas de la vc227»). |
+| Probado en dispositivo | Pixel 8 Pro: diez turnos con el guion local sin modelo, un turno con modelo real (AGY · Hidrógeno, solo lectura) y las pruebas instrumentadas, 7 de 7. Sobre la compilación final van tres de los diez turnos y el turno real; las instrumentadas, sobre `b2ba71f6`, un commit antes del final (ver «Pruebas de la vc227»). |
 | Escritorio | Código y pruebas del núcleo, y `DesktopAgent.kt` vuelve a compilar (`compileKotlin` de `desktop/agent`, en AXELPC). **Sin compilar el instalador ni desplegar**; la edición de Windows en uso sale de otra rama (punto 4). |
 
 ### 1. Final del turno sin salto (`turnClosingRowId` en `assistant/AssistantScreen.kt`; `rememberTurnSettle`, `AgentActivitySaved` en `assistant/AgentActivity.kt`)
@@ -130,8 +130,8 @@ la vc226), y al acabar el turno el hueco aparecía de golpe.
 - Instrumentada nueva: `AgentChatRedesignUiTest.theRowThatClosesATurnArrivesAsTheLiveActivityAndSettlesIntoItsSummary`.
   Compilada y ejecutada con el resto de la clase: `OK (7 tests)` en el Pixel 8 Pro el 20/11 a las 19:09 (8,5 s), en el
   paquete aislado `com.vidadomu.nexus.minimalqa` (CodeBuild `vidal-android-build:ae865ffe-7cb6-47af-8d15-309c117f5e60`),
-  instalado y desinstalado; Nexus sin cambios. **Sobre `b2ba71f6`, un commit antes del final**: la diferencia son seis
-  líneas de `AssistantScreen.kt`, que estas pruebas no componen. El APK de instrumentadas de la compilación final se
+  instalado y desinstalado; Nexus sin cambios. **Sobre `b2ba71f6`, un commit antes del final**: la diferencia son 6 líneas
+  añadidas y 2 quitadas en `AssistantScreen.kt`, que la clase ejecutada no compone. El APK de instrumentadas de la compilación final se
   compiló y no se ejecutó. Límite de la prueba nueva: compone `AgentActivitySaved` suelta, no la pantalla con su
   cableado, y con las animaciones desactivadas solo comprueba el estado final.
 - En el Pixel 8 Pro, el 20/11, con el guion local (`AgentChatQa`; sin modelo ni coste):

@@ -19,8 +19,8 @@ ni desplegado nada); (5) los pasos son una línea en palabras y la orden técnic
 fila descansa sobre el hueco de 28 dp que la lista reserva bajo ella, en vez de pegada al compositor (medido en
 capturas, de la última tinta al compositor: de 4 a 10 dp antes, de 32 a 36 dp ahora). De paso, `DesktopAgent.kt` vuelve a compilar en esta rama.
 Probado: Pixel 8 Pro. Diez turnos con el guion local, sin modelo: final del turno medido fotograma a fotograma, fallo con
-una sola tarjeta, reintento, punto en el botón de bajar, paso parado 40 s y hueco medido en capturas; tres de ellos
-sobre la compilación final. Un turno con modelo real (AGY · Hidrógeno, solo lectura; 4 pasos, 26 s) sobre la final.
+una sola tarjeta, reintento, punto en el botón de bajar y paso parado 40 s (estos dos, solo con la segunda compilación, antes
+del arreglo del hueco) y hueco medido en capturas; tres de ellos sobre la compilación final. Un turno con modelo real (AGY · Hidrógeno, solo lectura; 4 pasos, 26 s) sobre la final.
 Instrumentadas `AgentChatRedesignUiTest` 7 de 7 sobre `b2ba71f6`, un commit antes del final.
 Revisado: tres revisiones de solo lectura (sobre `c630f955`, sobre `c630f955..b2ba71f6` y sobre `2c3edfaa`), sin defectos
 graves; de ellas salen `0edd7750`, `2032ab33` y `2c3edfaa`. Quedan hallazgos menores anotados sin cambiar (informe).

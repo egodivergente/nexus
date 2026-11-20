@@ -60,7 +60,7 @@
             "cutCore": 133,
             "failures": 0,
             "errors": 0,
-            "desktopCore": "ChatMarkdownTest 28 de 28, en AXELPC"
+            "desktopCore": "ChatMarkdownTest 28 de 28, en AXELPC (desktop/agent/core/build/test-results, 20/11 17:54)"
         },
         "apk": {
             "file": "Nexus-Agent-1.9.191-agent-preview-vc227-preview.apk",
@@ -100,7 +100,7 @@
             "result": "OK (7 tests)",
             "ranAt": "2026-11-20T19:09:20+01:00",
             "onCommit": "b2ba71f6",
-            "note": "un commit antes del final; la diferencia son seis líneas de AssistantScreen.kt, que estas pruebas no componen",
+            "note": "un commit antes del final; la diferencia son 6 líneas añadidas y 2 quitadas en AssistantScreen.kt, que la clase ejecutada no compone",
             "codebuild": "vidal-android-build:ae865ffe-7cb6-47af-8d15-309c117f5e60",
             "sandbox": "com.vidadomu.nexus.minimalqa (instalado y desinstalado)",
             "finalBuildTestApk": "compilado, no ejecutado"
