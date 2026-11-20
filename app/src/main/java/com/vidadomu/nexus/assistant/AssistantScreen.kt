@@ -253,6 +253,8 @@ private fun AssistantScreenContent(
     }
     val latestRows by rememberUpdatedState(rows)
     val latestUi by rememberUpdatedState(ui)
+    // The note about a stuck step appears under the last step while nothing else changes: the list follows it too.
+    var slowNotice by remember { mutableStateOf(false) }
     suspend fun followLast() {
         if(latestRows.isEmpty() && latestUi.streamingText.isBlank()) return
         automaticScroll = true
@@ -284,7 +286,7 @@ private fun AssistantScreenContent(
             if (following) followLast()
         }
     }
-    LaunchedEffect(ui.items.size, ui.thinking, ui.streamingText, ui.plans, ui.scrollRequest, ui.steps.size) {
+    LaunchedEffect(ui.items.size, ui.thinking, ui.streamingText, ui.plans, ui.scrollRequest, ui.steps.size, slowNotice) {
         if (following) followLast()
     }
     // Al enfocar el compositor (IME o teclado físico) el último mensaje queda justo encima del campo.
@@ -565,7 +567,8 @@ private fun AssistantScreenContent(
                 }
                 // The turn in progress, in the conversation itself: its real steps first, then the text as it arrives.
                 if (ui.thinking) item(key = "agent_activity_live") {
-                    AgentActivityLive(ui.steps, ui.thinkingStartedAtElapsedMs, streamedChars = ui.streamingText.length)
+                    AgentActivityLive(ui.steps, ui.thinkingStartedAtElapsedMs, streamedChars = ui.streamingText.length,
+                        onSlowChanged = { slowNotice = it })
                 }
                 if (ui.streamingText.isNotBlank()) {
                     item(key = "streaming_assistant_preview") {

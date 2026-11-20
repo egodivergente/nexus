@@ -198,10 +198,13 @@ internal fun AgentChatHeader(
 
 /**
  * The turn in progress: every step the orchestrator reports, on one quiet vertical line. [streamedChars] is how much
- * of the reply has arrived: text coming in is progress too, even inside one long step.
+ * of the reply has arrived: text coming in is progress too, even inside one long step. [onSlowChanged] tells the
+ * list when the note about a stuck step appears or goes: nothing else moves at that moment, so the list would not
+ * follow it and the note would stay hidden under the composer.
  */
 @Composable
-internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long, modifier: Modifier = Modifier, streamedChars: Int = 0) {
+internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long, modifier: Modifier = Modifier, streamedChars: Int = 0,
+    onSlowChanged: (Boolean) -> Unit = {}) {
     // Before the first report there is still something true to show: the turn started and nothing has come back yet.
     val preparing = remember(startedAtElapsedMs) {
         val waited = if (startedAtElapsedMs > 0L) (android.os.SystemClock.elapsedRealtime() - startedAtElapsedMs).coerceAtLeast(0L) else 0L
@@ -214,6 +217,9 @@ internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long,
             kotlinx.coroutines.delay(1_000L)
         }
     }
+    val latestOnSlow by rememberUpdatedState(onSlowChanged)
+    LaunchedEffect(slow) { latestOnSlow(slow) }
+    DisposableEffect(Unit) { onDispose { latestOnSlow(false) } }
     Column(modifier.fillMaxWidth().semantics { contentDescription = "Actividad del agente" }) {
         AgentTimeline {
             if (steps.isEmpty()) AgentStepRow(preparing)
@@ -221,7 +227,7 @@ internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long,
         }
         if (slow) Text("Tarda más de lo normal. Puedes detenerlo y volver a intentarlo.",
             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 47.dp, top = 2.dp))
+            modifier = Modifier.padding(start = 47.dp, top = 2.dp, bottom = 6.dp))
     }
 }
 
