@@ -18,6 +18,97 @@ acabado carbón y mate). Rama `aki/agent-redesign-20261118` sobre `aki/cut-premi
 | S25 | Lleva la **vc225** `1.9.189-agent-preview` de AXEL Link (rama `aki/axel-link-agent-20261118`, commit `589d960a`, SHA-256 `8176db142ea1c5f55d12bf9e7d4bc5d6e0dfd98224442525daa7dedbbe0d8c9b`), que es esta rama entera (`5b55394e`) más cuatro commits de AXEL Link. Esos commits no tocan la interfaz de la pantalla del Agente (`AssistantScreen.kt` y los demás archivos de composición son idénticos); en la app solo añaden las herramientas remotas en `AssistantRuntime.kt`, un método de depuración en `NexusAgentProvider.kt` y `NexusLink.kt`. La instaló el hilo de AXEL Link el 19/11 a las 01:39:12 con `adb install -r -t --user 0` sobre la vc220 (5073 archivos de datos antes y después, según su registro). Comprobado desde este trabajo por adb, en solo lectura: versionCode, SHA-256 de la APK instalada, firma y fecha de primera instalación conservada (entró como actualización). La vc224 como tal no llegó a instalarse en el S25: el 18/11 el teléfono había salido de la wifi de casa y la copia previa de datos se cortó. No se ha abierto ni probado en él. |
 | Probado en dispositivo | Pixel 8 Pro: a mano con un guion local sin modelo (la pantalla, con la vc222; los avisos, con la vc224) y dos turnos con modelo real (AGY, Hidrógeno): uno sin herramientas sobre la APK final y otro con cinco llamadas a herramientas sobre la vc225, que contiene esta rama; pruebas instrumentadas 6/6 sobre `926698f7`, no repetidas sobre el código final (ver «Pruebas»). |
 
+## Arreglos del 20/11: vc226 / 1.9.190-agent
+
+Tres detalles vistos en el turno real con herramientas del 19/11, arreglados por orden de Vidal («Si arreglalo»).
+Rama `aki/agent-fixes-20261120`: parte de `aki/axel-link-agent-20261118` (`5dc00e14`, lo que llevan los móviles como
+vc225) con `aki/agent-redesign-20261118` (`d833e385`, solo documentos) fusionada dentro (`30168301`). Encima, dos
+commits de código: `5c1f981f` (los tres arreglos) y `2c2363c3` (la lista sigue al aviso). No mueve ninguna de las dos
+ramas de origen ni los PR #19 y #20.
+
+| Qué | Estado |
+| --- | --- |
+| Compilado | AWS CodeBuild `vidal-android-build:959fb4aa-9227-418e-bf0c-bebb982f1fab` SUCCEEDED sobre `2c2363c3` |
+| Pruebas JVM | agent-core 561 (4 omitidas), app 200, cut-core 133; 0 fallos, 0 errores |
+| Firmado | identidad instalada (cert `8b75db0f…7127`), v2+v3, 16 KiB, 6/6 `.so` idénticas a vc220 |
+| APK | `Nexus-Agent-1.9.190-agent-preview-vc226-preview.apk`, SHA-256 `6dadb39c4dbf8d155b28062df7c80f1186527f6aaf36551554e94060f124d1ee`. Sin la marca test-only: se instala tocándola. Sigue siendo depurable. |
+| Instalado | **Pixel 8 Pro**, 20/11 a las 08:07:11, `adb install -r` sobre la primera compilación de la misma vc226 (`9e46d119…453a`, sobre `5c1f981f`, puesta a las 07:08:37 encima de la vc225). 4283 archivos de datos antes y después, 0 desaparecidos, archivos de Cut idénticos, misma firma y fecha de primera instalación. |
+| S25 | Sin tocar: sigue con la vc225. |
+| Probado en dispositivo | Pixel 8 Pro, cuatro turnos con un guion local sin modelo (ver «Pruebas» de esta sección). **Ningún turno con modelo real sobre la vc226.** |
+
+### 1. «Tarda más de lo normal» (`AgentActivityText.slow`, `AgentActivityLive`)
+
+Antes salía cuando el turno entero llevaba 30 s. Ahora sale cuando nada se ha movido en 30 s: cuenta desde la última
+señal de vida, que es un paso que empieza, un paso que acaba o texto de la respuesta que llega; antes del primer paso,
+desde el inicio del turno. Un turno que avanza no lo enseña por largo que sea; un paso parado, sí.
+
+Al probarlo en el Pixel salió un segundo fallo: el aviso aparece debajo del último paso cuando nada más cambia, así
+que nada pedía a la lista que bajara y quedaba tapado por el compositor. Antes no se notaba porque los pasos seguían
+llegando. Ahora `AgentActivityLive` avisa a la conversación (`onSlowChanged`) y la lista lo sigue como cualquier otro
+cambio (`2c2363c3`).
+
+Límite: la hora del último texto se guarda en la propia fila de actividad. Si esa fila sale de la pantalla y vuelve
+durante un paso largo que está escribiendo, esa cuenta empieza de nuevo (la de los pasos no: llevan su hora real).
+
+### 2. Parpadeo al acabar el turno (`rowPlacement`, `settledReplyId` en `assistant/AssistantScreen.kt`)
+
+El diagnóstico del 19/11 se quedaba corto. Los fotogramas enseñan que se borraba **toda la conversación**, no solo la
+respuesta, durante 8 fotogramas (unos 70 ms), y volvía con un fundido. La causa, leída en las fuentes de Compose
+Foundation 1.7.4: al acabar el turno `followLast` puede saltar con `scrollToItem`; ese salto llama a
+`itemAnimator.reset()` (`LazyListState.snapToItemIndexInternal`), la lista olvida las filas que conocía y en la
+siguiente medida cada fila visible con `Modifier.animateItem()` repite su fundido de entrada desde cero
+(`LazyLayoutItemAnimator.onMeasured`). Las dos piezas ya estaban en el commit base del rediseño (`72207c98`).
+
+- Las filas de la conversación usan `animateItem(fadeInSpec = null)`: conservan el desplazamiento animado y el fundido
+  de salida, y la lista ya no las funde al entrar. Las filas nuevas siguen entrando una vez con `EntranceSpring`.
+- La respuesta guardada que sustituye al texto que se estaba escribiendo no repite esa entrada: sus palabras ya
+  estaban en pantalla.
+
+### 3. Negrita sin cerrar (`ChatMarkdown` en agent-core)
+
+Mientras llega el texto, en la línea que se está escribiendo un marcador abierto al empezar palabra (`**`, `__`, `*`,
+`_`, `~~`, `==` y el código en línea) ya lleva su estilo y no enseña los marcadores. Un marcador recién llegado o un
+cierre a medias tampoco se ven. Lo que no abre al empezar palabra sigue literal (`2**10`, `5 * 3`, `a == b`,
+`snake_case`). Una línea entera en negrita no pasa a etiqueta hasta que hay otra línea detrás. El texto guardado no
+cambia: solo cambia cómo se pinta mientras llega. La copia de escritorio (`desktop/agent/core`) es otro archivo y no
+se ha tocado.
+
+### Pruebas de la vc226
+
+- JVM nuevas: `ChatMarkdownTest` (+8, 27 en total), `AgentActivityTextTest` (+3, 11 en total) y `ChatRowEntranceTest` (3).
+- Guion local nuevo, `streaming` (`AgentChatQa`; solo compilaciones depurables, sin modelo ni coste): cuatro llamadas
+  al «modelo» con la espera pedida, tres herramientas reales de solo lectura (`list_projects`, `search_assets`,
+  `get_generation_history`) y una respuesta que llega de 7 en 7 caracteres cada 90 ms, acumulada, con negrita,
+  cursiva, tachado y código.
+- En el Pixel 8 Pro, el 20/11, con ese guion y con `model_error`; sin errores en el registro de la app ni cierres:
+  - **Turno que avanza** (7 pasos, 45 s; primera compilación a las 07:09 y compilación final a las 08:10): pasados
+    los 30 s de turno no hay aviso (capturas entre los 31 y los 39 s). La negrita abierta se ve en negrita y sin
+    asteriscos mientras llega; la cursiva, el tachado y el código, también con su estilo.
+  - **Final de ese turno**, medido fotograma a fotograma en las dos grabaciones: la conversación no se borra.
+    Contando por fotograma los píxeles de texto de la conversación, el mínimo alrededor del final es
+    19773 sobre 20189 de referencia (0,979) en la primera compilación y 19459 sobre 20533 (0,948) en la final;
+    ningún fotograma baja de la mitad en ninguna de las dos.
+    Con la misma medida, la grabación del 19/11 (vc225, turno real) baja a cero durante 8 fotogramas.
+    Lo que se ve ahora es la conversación recolocándose porque los pasos se pliegan en una línea: en la primera
+    grabación el mensaje del usuario baja a su sitio en unos 0,1 s; en la final, el cambio ocurre en un solo
+    fotograma.
+  - **Paso parado 40 s** (compilación final, 08:08): sin aviso con el paso en 26 y en 29 s; a la vista, encima del
+    compositor, con el paso en 33 y en 37 s; se va al empezar el paso siguiente; en ese segundo paso, sin aviso a los
+    28 s y a la vista a los 34 s. Con la primera compilación (07:45) el aviso quedaba tapado por el compositor: es el
+    fallo que corrige `2c2363c3`.
+- La comparación del parpadeo es entre un turno real (vc225) y uno de guion (vc226). El guion pasa por el mismo bucle
+  y los mismos eventos, pero el parpadeo no se ha reproducido con el guion sobre el código anterior, que no lo tenía.
+- Las capturas y los vídeos no van al repositorio: la conversación de prueba enseña nombres de archivos de Vidal.
+
+### Sin probar en la vc226
+
+- Un turno con modelo real.
+- El S25 (no se ha tocado).
+- Las pruebas instrumentadas: ni compiladas ni ejecutadas sobre este código. La única llamada afectada,
+  `AgentActivityLive(pasos, inicio)` en `AgentChatRedesignUiTest`, sigue siendo válida porque los parámetros nuevos
+  tienen valor por defecto.
+- Lo demás de «Pendiente y límites» sigue igual.
+
 ## Qué cambia
 
 ### 1. Cabecera compacta (`AgentChatHeader`, `agentHeaderStatus` en `assistant/AgentActivity.kt`)
@@ -165,7 +256,7 @@ letra sale más gruesa que en un teléfono sin ese ajuste.
 - En el Pixel, a mano con un guion local: con la vc222 (`7678bd91`; desde entonces el código de la app solo cambia en los avisos): reposo, borrador con el teclado, ejecución completa (7 pasos, uno con incidencia devuelta por la herramienta real), actividad guardada plegada y desplegada, detalle de la incidencia, cola «Enviar al terminar» (el mensaje en espera salió solo al acabar), detener a mitad (paso cerrado como cancelado), error del modelo (tarjeta con Reintentar y Cambiar modelo) y error del modelo con un mensaje en espera (no se envió, siguió en el campo y Nexus avisó); la cola que se envía sola y detener, con la primera compilación de la vc222 (`bb9f68f7`). Con la vc224, los avisos: con el teclado abierto y un mensaje en espera, un turno que falla (primera compilación, `14ecc111`) deja los dos avisos encima del compositor sin tapar el campo ni los controles; con el teclado cerrado (APK final) el aviso queda al pie, la tarjeta del fallo entera por encima, la lista sube animada y, al cerrar el aviso, baja sin dejar hueco. Sin cierres inesperados.
 - Turno con un modelo real: dos, autorizados por Vidal, de solo lectura, con el cerebro AGY, modelo Hidrógeno (`gemini-4-hydrogen-medium`), razonamiento «Medio».
   - **Sin herramientas** (18/11 a las 15:08, Pixel, APK final vc224): «Lista mis proyectos y dime cuantos hay». Respondió bien en 20 s, sin error ni cierre. La cabecera pasó a «Pensando la respuesta», el campo a «Añade algo mientras trabaja» con el botón de detener, y al acabar la actividad quedó plegada («1 paso · 20 s») y la lista siguió el final. El modelo contestó sin llamar a ninguna herramienta (un solo paso de pensar).
-  - **Con herramientas** (19/11 a las 17:51, Pixel, sobre la vc225 de AXEL Link, que contiene esta rama; la vc224 ya no estaba instalada): se le pidió buscar en la Biblioteca las imágenes más recientes de un proyecto y consultar el historial de generaciones, sin generar nada. 9 pasos en 55 s: 4 esperas al modelo y 5 llamadas a herramientas (`search_assets` dos veces, `get_generation_history` dos veces, `list_library_assets`). La cabecera fue enseñando el paso en curso, las filas entraron una a una con su orden resumida y su duración, la lista siguió el final, la respuesta llegó como texto que va entrando (alrededor de 1 s) y al acabar la actividad quedó plegada («9 pasos · 55 s»). Sin errores en el registro de la app ni cierres; ninguna herramienta devolvió una incidencia. El modelo dio los tres nombres y dijo que no podía dar el total del historial porque la consulta no devuelve un contador: es cosa de la herramienta, no de la pantalla. Este turno enseñó tres detalles, sin cambiar (ver «Pendiente y límites»): el texto «Tarda más de lo normal» a los 30 s, un parpadeo al acabar y los asteriscos de una negrita sin cerrar mientras llega el texto.
+  - **Con herramientas** (19/11 a las 17:51, Pixel, sobre la vc225 de AXEL Link, que contiene esta rama; la vc224 ya no estaba instalada): se le pidió buscar en la Biblioteca las imágenes más recientes de un proyecto y consultar el historial de generaciones, sin generar nada. 9 pasos en 55 s: 4 esperas al modelo y 5 llamadas a herramientas (`search_assets` dos veces, `get_generation_history` dos veces, `list_library_assets`). La cabecera fue enseñando el paso en curso, las filas entraron una a una con su orden resumida y su duración, la lista siguió el final, la respuesta llegó como texto que va entrando (alrededor de 1 s) y al acabar la actividad quedó plegada («9 pasos · 55 s»). Sin errores en el registro de la app ni cierres; ninguna herramienta devolvió una incidencia. El modelo dio los tres nombres y dijo que no podía dar el total del historial porque la consulta no devuelve un contador: es cosa de la herramienta, no de la pantalla. Este turno enseñó tres detalles, arreglados el 20/11 en la vc226 (ver «Arreglos del 20/11»): el texto «Tarda más de lo normal» a los 30 s, un parpadeo al acabar y los asteriscos de una negrita sin cerrar mientras llega el texto.
   - Las capturas y los vídeos de los dos turnos no van al repositorio: enseñan nombres de proyectos y de archivos de Vidal.
 
 ### Guion local sin modelo (`assistant/AgentChatQa.kt`)
@@ -208,9 +299,7 @@ El cambio de los avisos (vc224) pasó otras dos revisiones de solo lectura. La p
 - **«Recuperar» con un encargo real**: probado en JVM (`OrderBookTest`, `OrderCardLogicTest`) y en la prueba instrumentada de la tarjeta; no con un trabajo real pausado.
 - **S25**: lleva la vc225 de AXEL Link, que contiene esta rama, pero no se ha abierto ni probado en él (no se toca la pantalla de Vidal). Cut premium va dentro. Ni esta rama ni la vc225 llevan el arreglo del reintento de 5 h de la sincronización del guion (la vc220 que tenía tampoco).
 - **Turno real con herramientas**: hecho el 19/11 sobre la vc225 (ver «Pruebas»). Con un modelo real sigue sin verse un paso con incidencia devuelta por una herramienta ni un turno de más de un minuto.
-- **«Tarda más de lo normal»** (`AgentActivityLive`): sale cuando el turno entero lleva 30 s, aunque el agente siga avanzando paso a paso. En el turno real con herramientas estuvo a la vista desde el segundo 30 hasta el final (55 s) sin que nada fuera mal. Sin cambiar; lo razonable es medir el paso en curso, no el turno.
-- **Parpadeo al acabar el turno**: el texto que ha ido llegando se quita de golpe y la respuesta guardada entra con la animación de fila nueva (`EntranceSpring`), así que lo que se estaba leyendo desaparece unos 70 a 100 ms y vuelve en otros 100 ms. Medido fotograma a fotograma en los vídeos de los dos turnos reales (vc224 y vc225). El mecanismo ya estaba en el commit base (`72207c98`), no lo introduce el rediseño; no se ha comprobado con un vídeo de la versión anterior. Sin cambiar.
-- **Negrita sin cerrar**: mientras llega la respuesta, un `**` sin su pareja se ve tal cual hasta que llega el cierre (alrededor de 1 s en el turno real). Sin cambiar.
+- **Los tres detalles del turno real del 19/11** (el aviso «Tarda más de lo normal», el parpadeo al acabar y la negrita sin cerrar): arreglados en la vc226; ver «Arreglos del 20/11».
 - **Instrumentadas**: pasaron sobre `926698f7` y no se han repetido sobre el código final (ver «Pruebas»).
 - **Avisos con acción**: el de un turno fallido lleva «Reintentar» y se queda hasta que se cierra; mientras está, ocupa el pie de la zona de lectura (la lista le hace sitio).
 - **Seguimiento del final con un aviso a la vista**: dos riesgos teóricos de la revisión, sin reproducir y sin cambiar (ver «Revisión independiente»).
