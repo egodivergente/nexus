@@ -92,7 +92,7 @@
             "failure": "una sola tarjeta, sin aviso emergente",
             "retry": "reenvía el mismo mensaje, la tarjeta anterior se pliega a una línea, el turno nuevo acaba con respuesta",
             "failureWhileScrolledUp": "el botón de bajar al final lleva el punto",
-            "stuckStep40s": "sin aviso a los 28,5 ni a los 30,2 s; a la vista a los 34 s; se va al empezar el paso siguiente y vuelve a los 34 s de ese paso",
+            "stuckStep40s": "segunda compilación: sin aviso con el paso en 26 y 29 s; a la vista en 33 y 37 s; se va al empezar el paso siguiente (4 y 8 s); en ese paso, sin aviso a los 28 s y a la vista a los 34 s. No repetido sobre la final",
             "crashes": 0
         },
         "instrumented": {
@@ -153,6 +153,7 @@
             "S25 (sigue en la vc225)",
             "llevar el Markdown a la rama de escritorio y desplegar Windows",
             "un fallo real del modelo y su reintento",
+            "el aviso de lentitud sobre la compilación final (probado en la segunda, antes del arreglo del hueco)",
             "la posición de la conversación al reabrir la app",
             "hallazgos menores de revisión",
             "merge y PR: de Vidal"

@@ -147,9 +147,10 @@ la vc226), y al acabar el turno el hueco aparecía de golpe.
   - **Reintento** (segunda y final): «Reintentar» reenvía el mismo mensaje, la tarjeta anterior se pliega sola a una
     línea y el turno nuevo acaba con su respuesta.
   - **Fallo con el lector arriba** (segunda): el botón de bajar al final lleva el punto.
-  - **Paso parado 40 s** (segunda): sin aviso con el paso en 28,5 y en 30,2 s; «Tarda más de lo normal. Puedes
-    detenerlo y volver a intentarlo.» a la vista a los 34 s; se va al empezar el paso siguiente y vuelve a los 34 s
-    de ese paso.
+  - **Paso parado 40 s** (segunda): sin aviso con el contador del paso en 26 y en 29 s; «Tarda más de lo normal.
+    Puedes detenerlo y volver a intentarlo.» a la vista en 33 y en 37 s; se va al empezar el paso siguiente (4 y 8 s);
+    en ese paso, sin aviso a los 28 s y a la vista a los 34 s. Esa compilación es anterior al arreglo del punto 6: el
+    aviso queda pegado al compositor.
   - Diez turnos en total, tres sobre la compilación final (turno que avanza, fallo y reintento). Sin cierres en
     ninguno; el registro de la app, sin errores en los que se revisó (el reintento de la segunda compilación y la
     compilación final).
@@ -191,6 +192,8 @@ Tres revisiones independientes, de solo lectura, con archivo y línea. Ninguna e
 - Un turno que falla en segundo plano, en otra conversación: solo pruebas JVM.
 - Los dos límites que quita el punto 3 (la fila que sale de pantalla y vuelve, el cambio de hora): solo pruebas JVM.
   En el dispositivo se ha visto el aviso con un paso parado, no esos dos casos.
+- El aviso de lentitud sobre la compilación final: el paso parado se probó con la segunda, antes del arreglo del
+  hueco (punto 6). Con la final no se ha visto ese aviso descansando sobre el hueco.
 - El punto 1 con las animaciones desactivadas: sin mirar en el dispositivo.
 - Las instrumentadas sobre el commit final: se ejecutaron sobre el anterior (ver «Pruebas de la vc227»).
 - Con un modelo real, un turno de más de un minuto o con una incidencia devuelta por una herramienta.
