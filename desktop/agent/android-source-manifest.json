@@ -32,7 +32,7 @@
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/chat/ChatMarkdown.kt",
     "target": "agent/core/src/main/kotlin/com/vidadomu/nexus/agent/core/chat/ChatMarkdown.kt",
-    "sha256": "415e5b6c539ee4b356d3a747c66aeb5e38423e1d4ee4cd7d5b6881033592339d"
+    "sha256": "9ed6e3d1ab4a7d408fae808229d2e66f36c45deb89f04619d91858a8203e7f4b"
   },
   {
     "source": "agent-core/src/main/kotlin/com/vidadomu/nexus/agent/core/config/AgentConfig.kt",
@@ -302,7 +302,7 @@
   {
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/ChatMarkdownTest.kt",
     "target": "agent/core/src/test/kotlin/com/vidadomu/nexus/agent/core/ChatMarkdownTest.kt",
-    "sha256": "f80782ce61d37c91248b04c645a79285782038ae1d995b6d4f3a368a19d268f9"
+    "sha256": "f66627224839bda8c4f5d5c44fefae4c7615c854fb2b1e15a31c0bab6b232431"
   },
   {
     "source": "agent-core/src/test/kotlin/com/vidadomu/nexus/agent/core/CodecRedactorTest.kt",
