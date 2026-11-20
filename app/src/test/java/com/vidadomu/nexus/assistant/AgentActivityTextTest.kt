@@ -59,7 +59,8 @@ class AgentActivityTextTest {
         assertEquals(listOf("Buscando en tu Biblioteca", "Preparando los encargos", "Usando herramienta nueva"), legacy.map { it.label })
         assertTrue(legacy.all { it.status == AgentStepStatus.DONE && it.kind == AgentStepKind.TOOL && it.durationMs == null })
         assertEquals("sin duración medida solo se dice cuántos fueron", "3 pasos", AgentActivityText.summary(legacy))
-        assertEquals("la fila enseña la herramienta como orden", "prepare_orders", legacy[1].command)
+        assertEquals("el detalle de la fila enseña la herramienta como orden", "prepare_orders", legacy[1].command)
+        assertTrue("y por eso la fila se puede abrir", legacy.all { it.hasDetail })
         assertTrue(AgentActivityText.legacy("a2", emptyList()).isEmpty())
     }
 

@@ -73,20 +73,24 @@ class AgentChatRedesignUiTest {
 
         // Icon, description and duration in one row; the state is said, not only painted.
         compose.onNode(hasText("Pensando") and hasText("1 s") and hasStateDescription("Completado")).assertIsDisplayed().assertHasNoClickAction()
-        val issue = hasText("Buscando en tu Biblioteca") and hasText("search_assets text=faro project=x") and hasText("0,2 s")
+        val issue = hasText("Buscando en tu Biblioteca") and hasText("0,2 s")
         compose.onNode(issue and hasStateDescription("Con incidencia. Detalle plegado")).assertIsDisplayed().assertHasClickAction()
             .assertHeightIsAtLeast(48.dp)
+        // The row says what the step did, in words: the command behind it waits in the detail.
+        compose.onNodeWithText("search_assets text=faro project=x").assertDoesNotExist()
         compose.onNode(hasText("Mostrando los archivos encontrados") and hasText("6 s") and hasStateDescription("Completado. Detalle plegado")).assertIsDisplayed()
 
         compose.onNodeWithText("No existe el proyecto x.").assertDoesNotExist()
         compose.onNode(issue).performClick()
         compose.onNode(issue and hasStateDescription("Con incidencia. Detalle desplegado")).assertIsDisplayed()
+        compose.onNodeWithText("search_assets text=faro project=x").assertIsDisplayed()
         compose.onNodeWithText("Incidencia").assertIsDisplayed()
         compose.onNodeWithText("No existe el proyecto x.").assertIsDisplayed()
         compose.onNodeWithText("Entrada").assertIsDisplayed()
         compose.onNodeWithText("Copiar").assertIsDisplayed().assertHasClickAction()
         compose.onNode(issue).performClick()
         compose.onNodeWithText("No existe el proyecto x.").assertDoesNotExist()
+        compose.onNodeWithText("search_assets text=faro project=x").assertDoesNotExist()
     }
 
     @Test fun liveActivityShowsWhatRunsNowAndWhatAlreadyEnded() {
@@ -99,7 +103,8 @@ class AgentChatRedesignUiTest {
         }
         compose.onNodeWithText("Preparando la respuesta").assertDoesNotExist()
         compose.onNode(hasText("Pensando") and hasStateDescription("Completado")).assertIsDisplayed()
-        compose.onNode(hasText("Buscando en tu Biblioteca") and hasText("search_assets text=faro") and hasStateDescription("En curso. Detalle plegado")).assertIsDisplayed()
+        compose.onNode(hasText("Buscando en tu Biblioteca") and hasStateDescription("En curso. Detalle plegado")).assertIsDisplayed()
+        compose.onNodeWithText("search_assets text=faro").assertDoesNotExist()
         // The same row, by its id, becomes the finished one: nothing is added or reordered.
         compose.runOnIdle { live = listOf(steps[0], steps[1].copy(command = "search_assets text=faro")) }
         compose.onNode(hasText("Buscando en tu Biblioteca") and hasStateDescription("Con incidencia. Detalle plegado")).assertIsDisplayed()

@@ -52,7 +52,9 @@ import com.vidadomu.nexus.agent.core.tools.AgentStep
 import com.vidadomu.nexus.agent.core.tools.AgentStepKind
 import com.vidadomu.nexus.agent.core.tools.AgentStepStatus
 import com.vidadomu.nexus.agent.core.tools.AgentSteps
+import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 import com.vidadomu.nexus.ui.theme.NexusTokens
+import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
 import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 
 /** The words of the activity timeline. Pure, so the same step always reads the same and is tested without a device. */
@@ -244,9 +246,13 @@ internal fun AgentActivitySaved(id: String, steps: List<AgentStep>, modifier: Mo
     val cancelled = steps.any { it.status == AgentStepStatus.CANCELLED }
     val summary = AgentActivityText.summary(steps)
     val motion = rememberNexusMotionAllowed()
+    val haptic = rememberNexusHaptics()
     Column(modifier.fillMaxWidth()) {
         Row(Modifier.clip(RoundedCornerShape(10.dp))
-            .clickable(onClickLabel = if (open) "Ocultar la actividad" else "Ver la actividad", role = Role.Button) { open = !open }
+            .clickable(onClickLabel = if (open) "Ocultar la actividad" else "Ver la actividad", role = Role.Button) {
+                haptic.perform(NexusHapticEvent.SELECTION)
+                open = !open
+            }
             .semantics(mergeDescendants = true) {
                 contentDescription = "Actividad del agente: " + listOfNotNull(summary, issues).joinToString(", ")
                 stateDescription = if (open) "Desplegada" else "Plegada"
@@ -283,16 +289,23 @@ private fun AgentTimeline(content: @Composable ColumnScope.() -> Unit) {
         .padding(start = 13.dp), content = content)
 }
 
-/** Icon on the left, what it did in the middle, how long on the right. A row with detail opens it on tap. */
+/**
+ * Icon on the left, what it did in the middle, how long on the right: one line a step, in words. The command behind
+ * it (`search_assets text=faro limit=3`) is technical detail: a row with detail opens it on tap, and there it is.
+ */
 @Composable
 private fun AgentStepRow(step: AgentStep) {
     var open by rememberSaveable(step.id) { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     val motion = rememberNexusMotionAllowed()
+    val haptic = rememberNexusHaptics()
     val state = AgentActivityText.state(step.status)
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-            .then(if (step.hasDetail) Modifier.clickable(onClickLabel = if (open) "Ocultar el detalle" else "Ver el detalle", role = Role.Button) { open = !open }
+            .then(if (step.hasDetail) Modifier.clickable(onClickLabel = if (open) "Ocultar el detalle" else "Ver el detalle", role = Role.Button) {
+                    haptic.perform(NexusHapticEvent.SELECTION)
+                    open = !open
+                }
                 else Modifier)
             .semantics(mergeDescendants = true) { stateDescription = if (step.hasDetail) "$state. Detalle " + (if (open) "desplegado" else "plegado") else state }
             // Only the rows that open something need a full touch target; the rest stay as tight as the reference.
@@ -310,14 +323,8 @@ private fun AgentStepRow(step: AgentStep) {
                 }
             }
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(step.label, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    color = if (step.status == AgentStepStatus.CANCELLED) colors.onSurfaceVariant else colors.onSurface)
-                step.command?.takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace), color = colors.outline,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
+            Text(step.label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                color = if (step.status == AgentStepStatus.CANCELLED) colors.onSurfaceVariant else colors.onSurface)
             StepDuration(step, Modifier.padding(start = NexusTokens.space8))
         }
         AnimatedVisibility(open && step.hasDetail,
