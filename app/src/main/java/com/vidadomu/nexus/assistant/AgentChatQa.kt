@@ -7,6 +7,7 @@ import com.vidadomu.nexus.agent.core.llm.LlmProvider
 import com.vidadomu.nexus.agent.core.llm.LlmRequest
 import com.vidadomu.nexus.agent.core.llm.LlmResponse
 import com.vidadomu.nexus.agent.core.llm.ScriptedLlmProvider
+import com.vidadomu.nexus.agent.core.llm.StreamingLlmProvider
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
@@ -33,7 +34,8 @@ internal object AgentChatQa {
         if (!BuildConfig.DEBUG) return null
         val next = armed ?: return null
         armed = null
-        return Paced(script(next.scenario), next.holdMs)
+        val inner = script(next.scenario)
+        return if (next.scenario == "streaming") Streamed(inner, next.holdMs) else Paced(inner, next.holdMs)
     }
 
     fun handle(input: JsonObject): JsonObject {
@@ -58,12 +60,34 @@ internal object AgentChatQa {
         }
     }
 
-    private val SCENARIOS = setOf("activity", "model_error")
+    private val SCENARIOS = setOf("activity", "model_error", "streaming")
 
     /** Each model call waits [holdMs] first, so «en curso» can be looked at on a device. */
     private class Paced(private val inner: LlmProvider, private val holdMs: Long) : LlmProvider {
         override val id = "qa-local"
         override suspend fun complete(request: LlmRequest): LlmResponse { delay(holdMs); return inner.complete(request) }
+    }
+
+    /**
+     * Like [Paced], and then the text arrives a few characters at a time, accumulated, as a real model streams it:
+     * the live reply, its half-written formatting and the end of the turn can be looked at on a device.
+     */
+    private class Streamed(private val inner: LlmProvider, private val holdMs: Long) : StreamingLlmProvider {
+        override val id = "qa-local"
+        override suspend fun complete(request: LlmRequest): LlmResponse = completeStreaming(request) { }
+        override suspend fun completeStreaming(request: LlmRequest, onTextDelta: (String) -> Unit): LlmResponse {
+            delay(holdMs)
+            val response = inner.complete(request)
+            val text = response.message.text()
+            var shown = 0
+            while (shown < text.length) {
+                // Seven characters a time also splits «**» in two, as the pieces of a real model do.
+                shown = (shown + 7).coerceAtMost(text.length)
+                onTextDelta(text.substring(0, shown))
+                delay(90L)
+            }
+            return response
+        }
     }
 
     private fun use(name: String, token: String, input: JsonObject) = ContentBlock.ToolUse("agent-qa-$name-$token", name, input)
@@ -81,6 +105,20 @@ internal object AgentChatQa {
             throw LlmException(LlmException.Kind.THROTTLED, "Prueba local: el modelo ha rechazado la petición por exceso de solicitudes. Espera un momento y reintenta.", 429)
         }
         if (scenario == "model_error") return ScriptedLlmProvider(listOf(first, refused))
+        // The turn of 19-11 in the Pixel: several short steps, more than 30 s in all, and an answer that streams.
+        if (scenario == "streaming") return ScriptedLlmProvider(listOf<(LlmRequest) -> LlmResponse>(
+            first,
+            { _ -> ScriptedLlmProvider.tools(use("search_assets", "$token-a", buildJsonObject { put("text", "faro"); put("limit", 3) }),
+                text = "Busco las imágenes más recientes.") },
+            { _ -> ScriptedLlmProvider.tools(use("get_generation_history", "$token-b", buildJsonObject { put("limit", 5) })) },
+            { _ -> ScriptedLlmProvider.text(
+                "Prueba local sin modelo externo: esta respuesta llega **poco a poco, como la de un modelo real**, para ver el texto mientras se escribe.\n\n" +
+                    "**Lo que he mirado**\n" +
+                    "He listado tus proyectos, he buscado *«faro» en la Biblioteca* y he consultado el historial con `get_generation_history`.\n\n" +
+                    "- **No he creado, movido ni borrado nada.**\n- No he preparado ni enviado ninguna generación.\n" +
+                    "- La negrita, la *cursiva*, el ~~tachado~~ y el `código` llevan su estilo desde que empiezan, sin asteriscos sueltos.\n\n" +
+                    "Al acabar, la conversación **no parpadea**: esta respuesta se queda donde está.") },
+        ))
         return ScriptedLlmProvider(listOf<(LlmRequest) -> LlmResponse>(
             first,
             // A project that does not exist: the tool itself reports it, which is what an incident looks like.

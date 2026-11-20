@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -144,6 +145,11 @@ private fun AssistantScreenContent(
     stage?.let { (results, index) -> ResultStage(results, index) { stage = null } }
     val motion = rememberNexusMotionAllowed()
     val seenRows = remember { mutableSetOf<String>().apply { vm.ui.value.items.forEach { add(it.id) } } }
+    // The reply that was being written is already on screen: once saved it takes the preview's place without entering again.
+    val wasStreaming = remember { booleanArrayOf(false) }
+    val streamingNow = ui.streamingText.isNotBlank()
+    settledReplyId(wasStreaming[0], streamingNow, ui.items)?.let(seenRows::add)
+    SideEffect { wasStreaming[0] = streamingNow }
     val presentation by rememberAssistantPresentationStore().state()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -416,7 +422,7 @@ private fun AssistantScreenContent(
                         val currencyNow by currency.state.collectAsState()
                         val plans = row.cards.mapNotNull { ui.plans[it.planId] }
                         val amounts = plans.mapNotNull { it.plan.estimate?.amountUsd }
-                        Card(Modifier.fillMaxWidth().animateItem(), shape = NexusTokens.card) {
+                        Card(Modifier.fillMaxWidth().then(rowPlacement()), shape = NexusTokens.card) {
                             Column(Modifier.padding(NexusTokens.space12), verticalArrangement = Arrangement.spacedBy(NexusTokens.space8)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
@@ -481,7 +487,7 @@ private fun AssistantScreenContent(
                                     "${t.model} · ${index + 1}")
                             } to ready.indexOfFirst { it.key == clicked.key }.coerceAtLeast(0)
                         }, onExpand = { expandedGroups = expandedGroups + row.cards.first().id },
-                            modifier = Modifier.animateItem())
+                            modifier = rowPlacement())
                         return@items
                     }
                     if (row is GroupHeader) {
@@ -489,7 +495,7 @@ private fun AssistantScreenContent(
                         return@items
                     }
                     val item = row as ChatItem
-                    EntranceSpring(item.id, seenRows, if (motion) Modifier.animateItem() else Modifier) {
+                    EntranceSpring(item.id, seenRows, if (motion) rowPlacement() else Modifier) {
                     when (item) {
                         is ChatItem.User -> Box { UserBubble(item) { copyMessageIds = setOf(item.id); showChatCopy = true } }
                         is ChatItem.Assistant -> Box {
@@ -521,7 +527,7 @@ private fun AssistantScreenContent(
                                 stage = orderOutputs.mapIndexed { i, uri -> Attachment("${order.id}:$i", uri,
                                     when (order.modality) { "VIDEO" -> "video/mp4"; "AUDIO" -> "audio/mpeg"; else -> "image/*" }, "Resultado ${i + 1}") } to index
                             }) {
-                            OrderCard(order, p, orderOutputs, assistantBusy = ui.thinking, modifier = Modifier.animateItem(), presentation = presentation,
+                            OrderCard(order, p, orderOutputs, assistantBusy = ui.thinking, modifier = rowPlacement(), presentation = presentation,
                                 onGenerate = { vm.generate(p.plan.id, p.plan.fingerprint()) },
                                 onApplyFix = { vm.applyFix(order.id) },
                                 onAskAgent = { vm.askAgentToFix(order.id) },
@@ -558,7 +564,9 @@ private fun AssistantScreenContent(
                     }
                 }
                 // The turn in progress, in the conversation itself: its real steps first, then the text as it arrives.
-                if (ui.thinking) item(key = "agent_activity_live") { AgentActivityLive(ui.steps, ui.thinkingStartedAtElapsedMs) }
+                if (ui.thinking) item(key = "agent_activity_live") {
+                    AgentActivityLive(ui.steps, ui.thinkingStartedAtElapsedMs, streamedChars = ui.streamingText.length)
+                }
                 if (ui.streamingText.isNotBlank()) {
                     item(key = "streaming_assistant_preview") {
                         AssistantBubble(ChatItem.Assistant("streaming_assistant_preview", ui.streamingText, emptyList(), "STREAMING"), onOpenHistory)
@@ -1961,3 +1969,17 @@ internal fun MediaPageDots(count: Int, current: Int) {
 /** Monotonic turn time: never depends on when a recycled LazyColumn indicator enters composition. */
 internal fun thinkingElapsedSeconds(nowElapsedMs: Long, startedAtElapsedMs: Long): Long =
     if (startedAtElapsedMs <= 0L) 0L else ((nowElapsedMs - startedAtElapsedMs).coerceAtLeast(0L) / 1000L)
+
+/**
+ * A row slides to its new place when the list changes and fades out when it is removed, but the list never fades it
+ * in. A jump (`scrollToItem`) makes the list forget every row it knew, so it replayed that fade on every row in view:
+ * when a turn ended the whole conversation went blank and came back. New rows still enter once, with [EntranceSpring].
+ */
+private fun LazyItemScope.rowPlacement(): Modifier = Modifier.animateItem(fadeInSpec = null)
+
+/**
+ * The reply that has just taken the place of the text that was being written. Its words were already on screen,
+ * so it must not play the entrance of a new row. Null while the text is still arriving, or when none was.
+ */
+internal fun settledReplyId(wasStreaming: Boolean, streamingNow: Boolean, items: List<ChatItem>): String? =
+    if (wasStreaming && !streamingNow) items.lastOrNull { it is ChatItem.Assistant }?.id else null

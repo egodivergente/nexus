@@ -100,4 +100,42 @@ class AgentActivityTextTest {
         assertFalse("un encargo fallido o por confirmar no es trabajo en curso",
             status(orders = listOf(order("o1", OrderStatus.FAILED), order("o2", OrderStatus.AWAITING_CONFIRMATION))).active)
     }
+
+    private fun timed(id: String, startedAt: Long, ms: Long? = null, kind: AgentStepKind = AgentStepKind.TOOL) =
+        AgentStep(id, kind, "Buscando en tu Biblioteca", if (ms == null) AgentStepStatus.RUNNING else AgentStepStatus.DONE,
+            startedAt = startedAt, durationMs = ms)
+
+    @Test fun aTurnThatKeepsMovingIsNotSlowHoweverLongItRuns() {
+        val t0 = 1_700_000_000_000L
+        // The turn of 19-11: nine steps of a few seconds each, 35 s in all, and the note came up at second 30.
+        val done = (0 until 8).map { timed("s$it", t0 + it * 4_000L, 3_900L) }
+        val steps = done + timed("s8", t0 + 32_000L)
+        assertFalse("35 s de turno con el paso en curso recién empezado", AgentActivityText.slow(t0 + 35_000L, steps, t0))
+        assertFalse(AgentActivityText.slow(t0 + 61_999L, steps, t0))
+        assertTrue("ese mismo paso, 30 s parado", AgentActivityText.slow(t0 + 62_000L, steps, t0))
+        assertEquals(t0 + 32_000L, AgentActivityText.lastSignOfLife(steps, t0))
+    }
+
+    @Test fun slowCountsFromTheLastSignOfLife() {
+        val t0 = 1_700_000_000_000L
+        assertFalse("antes del primer paso cuenta desde el inicio del turno", AgentActivityText.slow(t0 + 29_999L, emptyList(), t0))
+        assertTrue(AgentActivityText.slow(t0 + 30_000L, emptyList(), t0))
+        // Between two steps the clock runs from the end of the last one.
+        val ended = listOf(timed("a", t0 + 6_000L, 4_000L))
+        assertEquals(t0 + 10_000L, AgentActivityText.lastSignOfLife(ended, t0))
+        assertFalse(AgentActivityText.slow(t0 + 39_999L, ended, t0))
+        assertTrue(AgentActivityText.slow(t0 + 40_000L, ended, t0))
+        // One long step that is writing the reply: each piece of text is a sign of life.
+        val writing = listOf(timed("t", t0 + 1_000L, kind = AgentStepKind.THINK))
+        assertTrue("sin texto, el paso lleva 59 s", AgentActivityText.slow(t0 + 60_000L, writing, t0))
+        assertFalse("con texto hace 10 s", AgentActivityText.slow(t0 + 60_000L, writing, t0, lastTextAt = t0 + 50_000L))
+        assertTrue("el texto dejó de llegar hace 30 s", AgentActivityText.slow(t0 + 80_000L, writing, t0, lastTextAt = t0 + 50_000L))
+    }
+
+    @Test fun withoutAClockNothingIsCalledSlow() {
+        val legacy = AgentActivityText.legacy("a1", listOf("search_assets"))
+        assertEquals(0L, AgentActivityText.lastSignOfLife(legacy, 0L))
+        assertFalse(AgentActivityText.slow(1_700_000_000_000L, legacy, 0L))
+        assertFalse("un reloj que retrocede no dispara el aviso", AgentActivityText.slow(1_000L, emptyList(), 50_000L))
+    }
 }

@@ -3,7 +3,8 @@ package com.vidadomu.nexus.agent.core.chat
 /**
  * Markdown ligero para los bocadillos del asistente. Convierte lo que devuelve el LLM
  * en bloques tipográficos para que la app nunca muestre `**`, `#` ni `-` crudos.
- * Tolerante: un marcador sin cerrar se queda como texto literal, nunca rompe.
+ * Tolerante: un marcador sin cerrar se queda como texto literal, nunca rompe. La única excepción es el texto que
+ * todavía está llegando: lo que queda abierto al final se pinta ya con su estilo (ver [ChatMarkdown.parse]).
  */
 data class MdSpan(
     val text: String,
@@ -51,8 +52,10 @@ object ChatMarkdown {
     private val tableSep = Regex("^\\s*\\|?\\s*:?-{2,}:?\\s*(\\|\\s*:?-{2,}:?\\s*)*\\|?\\s*$")
 
     /**
-     * [streaming]: el texto aún se está recibiendo; un panel `nexus-ui` sin cerrar se oculta en vez de
-     * enseñar su JSON a medias.
+     * [streaming]: el texto aún se está recibiendo. Un panel `nexus-ui` sin cerrar se oculta en vez de enseñar su
+     * JSON a medias, y lo que queda abierto en la línea que se está escribiendo (`**negrita`, `*cursiva`,
+     * `~~tachado`, `==resalte` o código en línea) se pinta ya con su estilo y sin sus marcadores: el cierre aún no
+     * ha llegado. Un texto guardado nunca se trata así.
      */
     fun parse(text: String, streaming: Boolean = false): List<MdBlock> {
         val used = mutableSetOf<String>()
@@ -74,16 +77,32 @@ object ChatMarkdown {
         return scope(parseBlocks(text, streaming))
     }
 
-    private fun parseBlocks(text: String, streaming: Boolean): List<MdBlock> {
+    /** [openTail]: la última línea de [text] es la que se está escribiendo ahora mismo. */
+    private fun parseBlocks(text: String, streaming: Boolean, openTail: Boolean = streaming): List<MdBlock> {
         val lines = text.replace("\r\n", "\n").replace('\r', '\n').split('\n')
         val out = mutableListOf<MdBlock>()
         val para = mutableListOf<String>()
         val items = mutableListOf<ListItem>()
         val quote = mutableListOf<String>()
+        // La línea que se está escribiendo: la última, o la anterior si el texto acaba justo en un salto de línea
+        // (el párrafo puede seguir). Tras una línea en blanco ya no queda nada abierto.
+        val tail = when {
+            !openTail -> -1
+            lines.last().isEmpty() && lines.size >= 2 -> lines.size - 2
+            else -> lines.lastIndex
+        }
+        var paraOpen = false
+        var quoteOpen = false
 
-        fun flushPara() { if (para.isNotEmpty()) { out += MdBlock.Paragraph(inline(para.joinToString("\n"))); para.clear() } }
+        fun flushPara() {
+            if (para.isNotEmpty()) { out += MdBlock.Paragraph(inline(para.joinToString("\n"), paraOpen)); para.clear() }
+            paraOpen = false
+        }
         fun flushList() { if (items.isNotEmpty()) { out += MdBlock.ListBlock(items.toList()); items.clear() } }
-        fun flushQuote() { if (quote.isNotEmpty()) { out += MdBlock.Quote(inline(quote.joinToString("\n"))); quote.clear() } }
+        fun flushQuote() {
+            if (quote.isNotEmpty()) { out += MdBlock.Quote(inline(quote.joinToString("\n"), quoteOpen)); quote.clear() }
+            quoteOpen = false
+        }
         fun flushAll() { flushPara(); flushList(); flushQuote() }
         fun depthOf(indent: String): Int = (indent.replace("\t", "    ").length / 2).coerceAtMost(3)
 
@@ -126,7 +145,7 @@ object ChatMarkdown {
                 // Sin cierre: el recuadro llega hasta la primera línea en blanco (o el final) para no tragarse la respuesta.
                 val stop = end ?: (i + 1 until lines.size).firstOrNull { lines[it].isBlank() || calloutOpen.matches(lines[it]) } ?: lines.size
                 val inner = lines.subList(i + 1, stop).joinToString("\n")
-                out += MdBlock.Callout(kind, parseBlocks(inner, streaming))
+                out += MdBlock.Callout(kind, parseBlocks(inner, streaming, openTail = tail in (i + 1) until stop))
                 i = if (end != null) end + 1 else stop
                 continue
             }
@@ -141,31 +160,35 @@ object ChatMarkdown {
                 continue
             }
             val h = heading.matchEntire(line)
-            if (h != null) { flushAll(); out += MdBlock.Heading(h.groupValues[1].length, inline(h.groupValues[2])); i++; continue }
+            if (h != null) { flushAll(); out += MdBlock.Heading(h.groupValues[1].length, inline(h.groupValues[2], i == tail)); i++; continue }
             if (rule.matches(line)) { flushAll(); out += MdBlock.Rule; i++; continue }
-            val bl = if (para.isEmpty() && items.isEmpty()) boldLine.matchEntire(line) else null
+            // Mientras llega, una línea en negrita puede seguir («**Sobre el historial**, no puedo…»): no se da por
+            // etiqueta hasta que hay otra línea detrás, para que el párrafo no cambie de tamaño dos veces.
+            val bl = if (para.isEmpty() && items.isEmpty() && i != tail) boldLine.matchEntire(line) else null
             if (bl != null) { flushAll(); out += MdBlock.Heading(3, inline(bl.groupValues[2].trim().removeSuffix(":"))); i++; continue }
             if (line.trimStart().startsWith(">")) {
                 flushPara(); flushList()
                 quote += line.trimStart().removePrefix(">").removePrefix(" ")
+                if (i == tail) quoteOpen = true
                 i++; continue
             }
             val b = bullet.matchEntire(line)
             val o = if (b == null) ordered.matchEntire(line) else null
             if (b != null || o != null) {
                 flushPara(); flushQuote()
-                items += if (b != null) ListItem(depthOf(b.groupValues[1]), null, inline(b.groupValues[2].replaceFirst(strayBullet, "")))
-                else ListItem(depthOf(o!!.groupValues[1]), o.groupValues[2], inline(o.groupValues[3].replaceFirst(strayBullet, "")))
+                items += if (b != null) ListItem(depthOf(b.groupValues[1]), null, inline(b.groupValues[2].replaceFirst(strayBullet, ""), i == tail))
+                else ListItem(depthOf(o!!.groupValues[1]), o.groupValues[2], inline(o.groupValues[3].replaceFirst(strayBullet, ""), i == tail))
                 i++; continue
             }
             if (items.isNotEmpty()) {
                 // continuación de la última viñeta
                 val last = items.removeAt(items.lastIndex)
-                items += last.copy(spans = last.spans + MdSpan(" ") + inline(line.trim()))
+                items += last.copy(spans = last.spans + MdSpan(" ") + inline(line.trim(), i == tail))
                 i++; continue
             }
             if (quote.isNotEmpty()) flushQuote()
             para += line.trimEnd()
+            if (i == tail) paraOpen = true
             i++
         }
         flushAll()
@@ -188,16 +211,27 @@ object ChatMarkdown {
         return result.map {inline(it.trim())}
     }
 
-    /** Inline: `código`, **negrita**, __negrita__, *cursiva*, _cursiva_, ~~tachado~~, [texto](url). */
-    fun inline(text: String): List<MdSpan> {
+    /**
+     * Inline: `código`, **negrita**, __negrita__, *cursiva*, _cursiva_, ~~tachado~~, [texto](url).
+     * [openEnded]: [text] se está escribiendo todavía; un marcador que abre al empezar palabra y aún no tiene cierre
+     * vale hasta el final, y uno recién llegado sin nada detrás no se enseña.
+     */
+    fun inline(text: String, openEnded: Boolean = false): List<MdSpan> {
         val out = mutableListOf<MdSpan>()
-        parseInto(text, MdSpan(""), out)
+        parseInto(text, MdSpan(""), out, openEnded)
         return merge(out)
     }
 
-    private fun parseInto(s: String, style: MdSpan, out: MutableList<MdSpan>) {
+    private fun parseInto(s: String, style: MdSpan, out: MutableList<MdSpan>, open: Boolean = false) {
         val buf = StringBuilder()
         fun flush() { if (buf.isNotEmpty()) { out += style.copy(text = buf.toString()); buf.clear() } }
+        fun styled(marker: String) = when (marker) { "~~" -> style.copy(strike = true); "==" -> style.copy(mark = true); else -> style.copy(bold = true) }
+        // Un marcador sin cierre solo abre al empezar palabra y pegado a lo que marca (o al final, recién llegado):
+        // «2**10», «5 * 3», «a == b» y «snake_case» se quedan como están. Tampoco abre el resto de un marcador que
+        // ya se quedó literal (el segundo `*` de «2**10»).
+        fun opens(at: Int, length: Int): Boolean = open &&
+            (at == 0 || (!s[at - 1].isLetterOrDigit() && s[at - 1] != s[at])) &&
+            (at + length == s.length || !s[at + length].isWhitespace())
         var i = 0
         while (i < s.length) {
             val c = s[i]
@@ -205,6 +239,12 @@ object ChatMarkdown {
             if (c == '`') {
                 val end = s.indexOf('`', i + 1)
                 if (end > i + 1) { flush(); out += style.copy(text = s.substring(i + 1, end), code = true); i = end + 1; continue }
+                // Código que aún se está escribiendo: llega hasta el final.
+                if (end < 0 && opens(i, 1)) {
+                    flush()
+                    if (i + 1 < s.length) out += style.copy(text = s.substring(i + 1), code = true)
+                    i = s.length; continue
+                }
             }
             if (c == '[') {
                 val close = s.indexOf("](", i + 1)
@@ -226,8 +266,16 @@ object ChatMarkdown {
                 if (end > 0 && tight && ((two != "__" && two != "==") || boundary(s, i, end + 2))) {
                     flush()
                     val inner = s.substring(i + 2, end)
-                    parseInto(inner, when (two) { "~~" -> style.copy(strike = true); "==" -> style.copy(mark = true); else -> style.copy(bold = true) }, out)
+                    parseInto(inner, styled(two), out)
                     i = end + 2; continue
+                }
+                // Sin cierre todavía: lo que viene detrás ya lleva el estilo, y dentro puede abrirse otro. Un solo
+                // carácter del marcador al final es el cierre a medio llegar y tampoco se enseña.
+                if (end < 0 && opens(i, 2)) {
+                    flush()
+                    val rest = s.substring(i + 2)
+                    parseInto(if (rest.length > 1 && rest.last() == two[0]) rest.dropLast(1) else rest, styled(two), out, open = true)
+                    i = s.length; continue
                 }
             }
             if ((c == '*' || c == '_') && two != "**" && two != "__") {
@@ -237,6 +285,11 @@ object ChatMarkdown {
                     flush()
                     parseInto(s.substring(i + 1, end), style.copy(italic = true), out)
                     i = end + 1; continue
+                }
+                if (end < 0 && opens(i, 1)) {
+                    flush()
+                    parseInto(s.substring(i + 1), style.copy(italic = true), out, open = true)
+                    i = s.length; continue
                 }
             }
             buf.append(c); i++

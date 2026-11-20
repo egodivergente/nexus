@@ -174,4 +174,109 @@ class ChatMarkdownTest {
         assertEquals(6, compare.options.size)
         assertEquals(compare.id, assertIs<WidgetSpec.Compare>(ChatWidgets.parse("{\"type\":\"compare\",\"options\":[$many]}")).id)
     }
+
+    // --- Texto que todavía está llegando (turno real del 19-11: una negrita sin cerrar se veía con sus asteriscos) ---
+
+    private fun shown(blocks: List<MdBlock>): String = blocks.joinToString("\n") { b ->
+        when (b) {
+            is MdBlock.Paragraph -> raw(b.spans)
+            is MdBlock.Heading -> raw(b.spans)
+            is MdBlock.Quote -> raw(b.spans)
+            is MdBlock.ListBlock -> b.items.joinToString("\n") { raw(it.spans) }
+            is MdBlock.Callout -> shown(b.blocks)
+            else -> ""
+        }
+    }
+
+    @Test fun `mientras llega, la negrita abierta ya va en negrita y sin asteriscos`() {
+        val arriving = "Las tres imágenes son:\n\n**Sobre el historial de generaciones, no pue"
+        val live = ChatMarkdown.parse(arriving, streaming = true)
+        assertEquals(listOf(MdSpan("Sobre el historial de generaciones, no pue", bold = true)), (live[1] as MdBlock.Paragraph).spans)
+        // Guardado así, el marcador sin cerrar sigue siendo texto: solo lo que está llegando se da por cerrado.
+        assertEquals("**Sobre el historial de generaciones, no pue", raw((ChatMarkdown.parse(arriving)[1] as MdBlock.Paragraph).spans))
+        // Con el cierre ya puesto, en vivo y guardado se leen igual.
+        val closed = arriving + "do confirmarte el número**: la consulta no devuelve un contador."
+        assertEquals(ChatMarkdown.parse(closed), ChatMarkdown.parse(closed, streaming = true))
+    }
+
+    @Test fun `mientras llega, ningun corte del texto ensena marcadores`() {
+        val answer = "Las tres **imágenes más recientes** del proyecto son:\n\n" +
+            "- **qa-imagen.png**: de *ayer* mismo\n" +
+            "- `Imagen-Nexus-close_up.png`, que sustituye a ~~la anterior~~\n" +
+            "1. __Primero__ y _después_\n\n" +
+            "> Una *cita* con **peso**\n\n" +
+            "## Sobre el **historial**\n" +
+            "**Sobre el historial de generaciones**, no puedo confirmarte el *número total* exacto."
+        for (cut in 1..answer.length) {
+            val text = shown(ChatMarkdown.parse(answer.substring(0, cut), streaming = true))
+            assertFalse(text.contains('*') || text.contains('`') || text.contains("~~") || text.contains("__"),
+                "corte $cut: «${answer.substring(0, cut).takeLast(24)}» se pinta «${text.takeLast(40)}»")
+        }
+        // El texto completo se pinta igual en vivo que guardado.
+        assertEquals(ChatMarkdown.parse(answer), ChatMarkdown.parse(answer, streaming = true))
+    }
+
+    @Test fun `mientras llega, cursiva, tachado, resalte y codigo abiertos tambien valen, y anidados`() {
+        fun last(text: String) = (ChatMarkdown.parse(text, streaming = true).last() as MdBlock.Paragraph).spans
+        assertEquals(listOf(MdSpan("Es "), MdSpan("muy impor", italic = true)), last("Es *muy impor"))
+        assertEquals(listOf(MdSpan("Es "), MdSpan("muy impor", italic = true)), last("Es _muy impor"))
+        assertEquals(listOf(MdSpan("Ya no "), MdSpan("vale", strike = true)), last("Ya no ~~vale"))
+        assertEquals(listOf(MdSpan("Ojo: "), MdSpan("no borres nada", mark = true)), last("Ojo: ==no borres nada"))
+        assertEquals(listOf(MdSpan("Usa "), MdSpan("search_ass", code = true)), last("Usa `search_ass"))
+        assertEquals(listOf(MdSpan("negrita y ", bold = true), MdSpan("cod", bold = true, code = true)), last("**negrita y `cod"))
+        assertEquals(listOf(MdSpan("las dos", bold = true, italic = true)), last("***las dos"))
+        assertEquals(listOf(MdSpan("a ", bold = true), MdSpan("b", bold = true, italic = true)), last("**a *b*"))
+    }
+
+    @Test fun `mientras llega, el marcador recien llegado o el cierre a medias no se ensenan`() {
+        fun live(text: String) = shown(ChatMarkdown.parse(text, streaming = true))
+        assertEquals("Texto ", live("Texto **"))
+        assertEquals("Texto ", live("Texto *"))
+        assertEquals("Texto ", live("Texto `"))
+        assertEquals("negrita", live("**negrita*"))
+        assertEquals("tachado", live("~~tachado~"))
+        assertEquals("", live("**"))
+    }
+
+    @Test fun `mientras llega, lo que no abre al empezar palabra se queda literal`() {
+        for (literal in listOf("El total es 2**10", "Son 5 * 3 = 15", "Si a == b entonces", "usa snake_case_largo", "x==y", "precio*", "it`s", "uno ** dos")) {
+            assertEquals(literal, shown(ChatMarkdown.parse(literal, streaming = true)), literal)
+            assertEquals(ChatMarkdown.parse(literal), ChatMarkdown.parse(literal, streaming = true), literal)
+        }
+    }
+
+    @Test fun `mientras llega, solo la linea que se esta escribiendo queda abierta`() {
+        // Una viñeta anterior con el marcador sin cerrar ya no va a cerrarse: literal, como guardada.
+        val list = assertIs<MdBlock.ListBlock>(ChatMarkdown.parse("- **uno\n- dos y *tr", streaming = true).single())
+        assertEquals("**uno", raw(list.items[0].spans))
+        assertEquals(listOf(MdSpan("dos y "), MdSpan("tr", italic = true)), list.items[1].spans)
+        // Un salto de línea no cierra el párrafo (puede seguir); una línea en blanco, sí.
+        assertEquals("abierto", shown(ChatMarkdown.parse("**abierto\n", streaming = true)))
+        assertEquals("sigue en la otra línea", shown(ChatMarkdown.parse("**sigue en\nla otra línea", streaming = true)).replace("\n", " "))
+        assertEquals("**abierto", shown(ChatMarkdown.parse("**abierto\n\n", streaming = true)))
+        assertEquals("**abierto\nOtro párrafo", shown(ChatMarkdown.parse("**abierto\n\nOtro párrafo", streaming = true)))
+    }
+
+    @Test fun `mientras llega, vale en titulos, citas y recuadros sin cerrar`() {
+        assertEquals(MdBlock.Heading(2, listOf(MdSpan("Plan de ", bold = false), MdSpan("rodaje", bold = true))),
+            ChatMarkdown.parse("## Plan de **rodaje", streaming = true).single())
+        assertEquals(MdBlock.Quote(listOf(MdSpan("una "), MdSpan("cita", italic = true))), ChatMarkdown.parse("> una *cita", streaming = true).single())
+        val callout = assertIs<MdBlock.Callout>(ChatMarkdown.parse(":::warn\n**Ojo con", streaming = true).single())
+        assertEquals(listOf(MdSpan("Ojo con", bold = true)), (callout.blocks.single() as MdBlock.Paragraph).spans)
+        // Un recuadro ya cerrado no deja nada abierto dentro.
+        val closedBox = assertIs<MdBlock.Callout>(ChatMarkdown.parse(":::warn\n**Ojo con\n:::\nSigue", streaming = true).first())
+        assertEquals("**Ojo con", raw((closedBox.blocks.single() as MdBlock.Paragraph).spans))
+    }
+
+    @Test fun `mientras llega, una linea en negrita no se da por etiqueta hasta que hay otra detras`() {
+        // «**Sobre el historial**, no puedo…»: al llegar el cierre la frase puede seguir; no debe pasar a etiqueta y volver.
+        val label = "**Sobre el historial de generaciones**"
+        assertEquals(listOf(MdSpan("Sobre el historial de generaciones", bold = true)),
+            (ChatMarkdown.parse(label, streaming = true).single() as MdBlock.Paragraph).spans)
+        assertIs<MdBlock.Paragraph>(ChatMarkdown.parse(label + "\n", streaming = true).single())
+        assertIs<MdBlock.Paragraph>(ChatMarkdown.parse("$label, no puedo confirmarte", streaming = true).single())
+        // Con otra línea detrás, o ya guardada, es la etiqueta de siempre.
+        assertEquals(MdBlock.Heading(3, listOf(MdSpan("Sobre el historial de generaciones"))), ChatMarkdown.parse("$label\nTexto", streaming = true).first())
+        assertEquals(MdBlock.Heading(3, listOf(MdSpan("Sobre el historial de generaciones"))), ChatMarkdown.parse(label).single())
+    }
 }

@@ -102,6 +102,25 @@ internal object AgentActivityText {
         step.result?.takeIf { it.isNotBlank() }?.let { outcomeTitle(step.status) + "\n" + it },
     ).joinToString("\n\n")
 
+    /** How long the turn may go without a sign of life before the note about stopping it appears. */
+    const val SLOW_AFTER_MS = 30_000L
+
+    /**
+     * When the turn last showed a sign of life, in wall-clock ms: a step that started or ended, or text that arrived.
+     * Before the first report it is the start of the turn. Zero when there is no clock to go by.
+     */
+    fun lastSignOfLife(steps: List<AgentStep>, turnStartedAt: Long, lastTextAt: Long = 0L): Long =
+        maxOf(turnStartedAt, lastTextAt, steps.maxOfOrNull { if (it.startedAt > 0L) it.startedAt + (it.durationMs ?: 0L) else 0L } ?: 0L)
+
+    /**
+     * True once nothing has moved for [SLOW_AFTER_MS]. A turn that keeps reporting steps or writing is not slow,
+     * however long it runs: the note is for the step that got stuck, not for the agent that is working.
+     */
+    fun slow(now: Long, steps: List<AgentStep>, turnStartedAt: Long, lastTextAt: Long = 0L): Boolean {
+        val last = lastSignOfLife(steps, turnStartedAt, lastTextAt)
+        return last > 0L && now - last >= SLOW_AFTER_MS
+    }
+
     /** Messages saved before the timeline existed only kept the tool names: one finished row each, without a time. */
     fun legacy(messageId: String, toolCalls: List<String>): List<AgentStep> = toolCalls.mapIndexed { index, tool ->
         AgentStep("$messageId:tool:$index", AgentStepKind.TOOL, com.vidadomu.nexus.agent.core.agent.toolActivity(tool),
@@ -177,26 +196,30 @@ internal fun AgentChatHeader(
     }
 }
 
-/** The turn in progress: every step the orchestrator reports, on one quiet vertical line. */
+/**
+ * The turn in progress: every step the orchestrator reports, on one quiet vertical line. [streamedChars] is how much
+ * of the reply has arrived: text coming in is progress too, even inside one long step.
+ */
 @Composable
-internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long, modifier: Modifier = Modifier) {
-    val seconds by produceState(thinkingElapsedSeconds(android.os.SystemClock.elapsedRealtime(), startedAtElapsedMs), startedAtElapsedMs) {
-        while (true) {
-            value = thinkingElapsedSeconds(android.os.SystemClock.elapsedRealtime(), startedAtElapsedMs)
-            kotlinx.coroutines.delay(1_000L)
-        }
-    }
+internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long, modifier: Modifier = Modifier, streamedChars: Int = 0) {
     // Before the first report there is still something true to show: the turn started and nothing has come back yet.
     val preparing = remember(startedAtElapsedMs) {
         val waited = if (startedAtElapsedMs > 0L) (android.os.SystemClock.elapsedRealtime() - startedAtElapsedMs).coerceAtLeast(0L) else 0L
         AgentStep("preparing", AgentStepKind.THINK, "Preparando la respuesta", AgentStepStatus.RUNNING, startedAt = System.currentTimeMillis() - waited)
+    }
+    val lastTextAt = remember(startedAtElapsedMs, streamedChars) { if (streamedChars > 0) System.currentTimeMillis() else 0L }
+    val slow by produceState(false, steps, preparing.startedAt, lastTextAt) {
+        while (true) {
+            value = AgentActivityText.slow(System.currentTimeMillis(), steps, preparing.startedAt, lastTextAt)
+            kotlinx.coroutines.delay(1_000L)
+        }
     }
     Column(modifier.fillMaxWidth().semantics { contentDescription = "Actividad del agente" }) {
         AgentTimeline {
             if (steps.isEmpty()) AgentStepRow(preparing)
             else steps.forEach { step -> key(step.id) { AgentStepRow(step) } }
         }
-        if (seconds >= 30) Text("Tarda más de lo normal. Puedes detenerlo y volver a intentarlo.",
+        if (slow) Text("Tarda más de lo normal. Puedes detenerlo y volver a intentarlo.",
             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 47.dp, top = 2.dp))
     }
