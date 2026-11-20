@@ -123,6 +123,12 @@ data class AssistantUiState(
     val steps: List<AgentStep> = emptyList(),
     /** «Añade algo mientras trabaja»: the draft (text and attachments) goes out as the next message when this answer ends. */
     val queuedSend: Boolean = false,
+    /**
+     * The failure notice whose message the app still holds in memory: that one, and only that one, offers
+     * «Reintentar», and it sends the same text and attachments. Null once anything else is sent or the conversation
+     * changes; a notice restored from disk never has it.
+     */
+    val retryNoticeId: String? = null,
     /** Orders whose job is no longer tracked but still exists at the provider: their card offers «Recuperar». */
     val recoverable: Set<String> = emptySet(),
     /** Respuestas rápidas de la última respuesta del agente; se borran al enviar cualquier mensaje. */
@@ -262,7 +268,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         thinking = chat.thinking, thinkingStartedAtElapsedMs = chat.thinkingStartedAtElapsedMs,
         lastActivityAtElapsedMs = chat.lastActivityAtElapsedMs,
         streamingText = chat.streamingText, activity = chat.activity, steps = chat.steps, queuedSend = chat.queuedSend,
-        replies = chat.replies, conversationId = chat.conversationId,
+        retryNoticeId = chat.retryNoticeId, replies = chat.replies, conversationId = chat.conversationId,
         activeProjectId = chat.activeProjectId, workingIn = null, scrollRequest = scrollRequest + 1)
 
     private fun chatTitle(chat: AssistantUiState) = chat.items.filterIsInstance<ChatItem.User>().firstOrNull()?.text?.take(40) ?: "Nueva conversación"
@@ -271,6 +277,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private fun finishBackground() {
         val bg = background ?: return
         background = null; backgroundConversation = null
+        // Saved and off the screen: when it is opened again its notices come from disk, without a message to resend.
+        failedTurns.remove(bg.conversationId)
         val parked = parkedOrders; parkedOrders = null
         viewModelScope.launch {
             runCatching { chatStore.archive(bg, runtime.orders.snapshot()) }
@@ -284,6 +292,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private fun resumeBackground() {
         val bg = background ?: return
         val leaving = _ui.value
+        // As in any other way out of a conversation: its failed turn no longer has a message to send again.
+        failedTurns.remove(leaving.conversationId)
         viewModelScope.launch {
             runCatching { chatStore.archive(leaving, parkedOrders) }
             background = null; parkedOrders = null
@@ -296,12 +306,16 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     // ---- conversación -------------------------------------------------------------------------
 
-    private var failedTurn: Pair<String,List<Attachment>>? = null
-    fun canRetryTurn() = failedTurn != null
-    fun retryTurn() {
-        val request=failedTurn ?: return
-        if(_ui.value.thinking) return
-        send(request.first,request.second)
+    /** The message of a turn that failed, kept in memory for the notice that closed it ([AssistantUiState.retryNoticeId]). */
+    private class FailedTurn(val noticeId: String, val text: String, val attachments: List<Attachment>)
+    /** By conversation: a turn that fails in the background must not hand its message to the conversation on screen. */
+    private val failedTurns = mutableMapOf<String, FailedTurn>()
+    /** «Reintentar» on the notice [noticeId]: only while it is the one that holds the message of its turn. */
+    fun retryTurn(noticeId: String) {
+        val state = _ui.value
+        val request = failedTurns[state.conversationId]?.takeIf { it.noticeId == noticeId && state.retryNoticeId == noticeId } ?: return
+        if (state.thinking) return
+        send(request.text, request.attachments)
     }
     /** [note] reaches the agent with the message but is not shown in the user's bubble (e.g. what changed on a board). */
     fun send(text: String, retryAttachments: List<Attachment>? = null, note: String = "",
@@ -324,7 +338,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             _ui.update {it.copy(message=msg("Tu límite actual es de ${limits.maxDocumentsPerTurn} documentos por mensaje (se cambia en Ajustes → Límites). Quita alguno y envíalo en el siguiente; tu borrador se conserva."))}
             return false
         }
-        failedTurn = null
+        failedTurns.remove(_ui.value.conversationId)
         conversation.session.clearRenderedMedia()
         val latestSettings = runtime.settings.load()
         val storySelectionForTurn = com.vidadomu.nexus.assistant.story.StorySelectionStore.selection.value
@@ -346,7 +360,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val carriedNote = carried.joinToString("\n\n") { "Contexto traído de la conversación «${it.from}» (resumen):\n${it.summary}" }
         val started = android.os.SystemClock.elapsedRealtime()
         _ui.update { it.copy(items = it.items.map { item -> if (item is ChatItem.Context && item in carried) item.copy(sent = true) else item } +
-            ChatItem.User(newId(), shown, atts, System.currentTimeMillis(), widgetAnswer = widgetAnswer), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, thinkingStartedAtElapsedMs = started, lastActivityAtElapsedMs = started, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
+            ChatItem.User(newId(), shown, atts, System.currentTimeMillis(), widgetAnswer = widgetAnswer), pendingAttachments = if(retryAttachments==null) emptyList() else it.pendingAttachments, thinking = true, thinkingStartedAtElapsedMs = started, lastActivityAtElapsedMs = started, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, retryNoticeId = null, replies = emptyList(), scrollRequest = it.scrollRequest + 1) }
         val conv = conversation
         conv.session.mode = _ui.value.mode
         conv.session.activeProjectId = _ui.value.activeProjectId
@@ -388,20 +402,16 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 if (r.stop == "MAX_ROUNDS") notice("He parado: demasiados pasos seguidos en un solo mensaje. Dime cómo seguir.", error = false, chatId = chatId)
                 completed = true
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                failedTurn = clean to atts
-                notice("La petición ha superado el tiempo de espera. Tus archivos se conservan; puedes reintentar.", error=true, chatId = chatId,
-                    closing = AgentStepStatus.ISSUE to "Tiempo de espera superado.")
+                failedNotice(chatId, clean, atts, "La petición ha superado el tiempo de espera. Tus archivos se conservan; puedes reintentar.",
+                    reason = "Tiempo de espera superado.")
             } catch (e: CancellationException) {
                 stopped = true
                 notice("Cancelado.", chatId = chatId, closing = AgentStepStatus.CANCELLED to null)
                 throw e
             } catch (e: LlmException) {
-                failedTurn = clean to atts
-                notice(Redactor.redact(e.message ?: "El asistente no respondió."), error = true, chatId = chatId, closing = AgentStepStatus.ISSUE to null)
+                failedNotice(chatId, clean, atts, Redactor.redact(e.message ?: "El asistente no respondió."))
             } catch (e: Exception) {
-                failedTurn = clean to atts
-                notice("Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}", error = true, chatId = chatId,
-                    closing = AgentStepStatus.ISSUE to null)
+                failedNotice(chatId, clean, atts, "Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}")
             } finally {
                 turnChat = null
                 var queued = false
@@ -528,8 +538,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     fun newConversation() = switchConversation(null)
 
     fun continueFailedTurnInNewChat() {
-        val request = failedTurn ?: return
-        switchConversation(null, request)
+        val request = failedTurns[_ui.value.conversationId] ?: return
+        switchConversation(null, request.text to request.attachments)
     }
 
     private val _conversationIndex = MutableStateFlow<List<AssistantChatEntry>>(emptyList())
@@ -567,7 +577,9 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val answering = current.thinking && turnChat == current.conversationId && turnJob?.isActive == true
         if(current.thinking && !answering) return
         if(answering && background != null) return
-        failedTurn = null
+        // Leaving a conversation lets go of the message of its failed turn: its notice no longer offers to send it.
+        failedTurns.remove(current.conversationId)
+        _ui.update { it.copy(retryNoticeId = null) }
         if(!answering) _ui.update { it.copy(thinking = true, thinkingStartedAtElapsedMs = android.os.SystemClock.elapsedRealtime()) }
         viewModelScope.launch {
             try {
@@ -586,7 +598,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 synced.clear()
                 if(background != null) parkedOrders = com.vidadomu.nexus.agent.core.orders.OrderBookState()
                 else runtime.orders.restore(com.vidadomu.nexus.agent.core.orders.OrderBookState())
-                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = listOfNotNull(carry), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, thinkingStartedAtElapsedMs = 0L, lastActivityAtElapsedMs = 0L, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, replies = emptyList(),
+                _ui.update { it.copy(activeProjectId=targetProject,conversationId=saved?.conversationId ?: id ?: java.util.UUID.randomUUID().toString(),items = listOfNotNull(carry), plans = emptyMap(), pendingAttachments = emptyList(), thinking = false, thinkingStartedAtElapsedMs = 0L, lastActivityAtElapsedMs = 0L, streamingText = "", activity = emptyList(), steps = emptyList(), queuedSend = false, retryNoticeId = null, replies = emptyList(),
                     workingIn = background?.conversationId, scrollRequest = it.scrollRequest + 1) }
                 if(saved != null) restoreSavedChat(saved)
                 publishOrders()
@@ -1523,14 +1535,28 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun consumeMessage() = _ui.update { it.copy(message = null) }
 
-    /** [closing]: this notice ends the turn; its steps are closed with that status (and reason) and saved with it. */
+    /**
+     * [closing]: this notice ends the turn; its steps are closed with that status (and reason) and saved with it.
+     * [retryable]: it is the notice that can send the message of its failed turn again (see [failedNotice]).
+     */
     private fun notice(text: String, error: Boolean = false, chatId: String = _ui.value.conversationId,
-        closing: Pair<AgentStepStatus, String?>? = null) =
+        closing: Pair<AgentStepStatus, String?>? = null, id: String = newId(), retryable: Boolean = false) =
         updateChat(chatId) { state ->
             val steps = closing?.let { (status, reason) -> endedSteps(state.steps, status, reason) }.orEmpty()
-            state.copy(items = state.items + ChatItem.Notice(newId(), text, error, at = System.currentTimeMillis(), steps = steps),
-                steps = if (closing != null) emptyList() else state.steps)
+            state.copy(items = state.items + ChatItem.Notice(id, text, error, at = System.currentTimeMillis(), steps = steps),
+                steps = if (closing != null) emptyList() else state.steps,
+                retryNoticeId = if (retryable) id else state.retryNoticeId)
         }
+
+    /**
+     * The turn failed. Its notice closes the steps with the incident and keeps the message in memory, so that notice,
+     * and no other, can send the same text and attachments again: the failure is said and answered in one place.
+     */
+    private fun failedNotice(chatId: String, text: String, attachments: List<Attachment>, message: String, reason: String? = null) {
+        val id = newId()
+        failedTurns[chatId] = FailedTurn(id, text, attachments)
+        notice(message, error = true, chatId = chatId, closing = AgentStepStatus.ISSUE to reason, id = id, retryable = true)
+    }
 
     private fun msg(text: String) = (++msgSeq) to text
 

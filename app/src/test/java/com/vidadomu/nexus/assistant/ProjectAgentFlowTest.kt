@@ -514,13 +514,15 @@ class ProjectAgentFlowTest {
         val retry = agentErrorNoticeContent("java.net.UnknownHostException: Unable to resolve host bedrock", canRetry = true)
         assertEquals("No hay conexión. Comprueba la red y vuelve a intentarlo.", retry.cause)
         assertTrue(retry.technical.contains("UnknownHostException"))
+        assertEquals("Reintentar usa el mismo texto y los mismos adjuntos.", retry.status)
         val noRetry = agentErrorNoticeContent("algo raro", canRetry = false)
         assertEquals("El agente no ha podido completar esta respuesta.", noRetry.cause)
         listOf(retry, noRetry).forEach { c ->
-            val visible = (c.cause + " " + c.status).lowercase()
+            val visible = (c.cause + " " + c.status.orEmpty()).lowercase()
             listOf("enviad", "no se envió", "no llegó", "recibid", "entregad").forEach { assertFalse("«$it» en «$visible»", it in visible) }
         }
-        assertFalse(retry.status == noRetry.status)
+        // Sin reintento no se anuncia lo que no se puede hacer: la tarjeta dice la causa y nada más.
+        assertNull(noRetry.status)
     }
 
     @Test fun bedrockOffersTheCurrentClaudeTrioWithVerifiedProfiles() {

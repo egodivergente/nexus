@@ -22,8 +22,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -37,17 +39,17 @@ import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
 import com.vidadomu.nexus.ui.theme.rememberNexusMotionAllowed
 
-internal data class AgentErrorNoticeContent(val cause: String, val status: String, val technical: String)
+internal data class AgentErrorNoticeContent(val cause: String, val status: String?, val technical: String)
 
 /**
- * Causa y estado legibles sin abrir el detalle. El estado solo describe lo que la app sabe
- * (si conserva el mensaje para reintentar); nunca afirma si el mensaje llegó o no al proveedor.
+ * Causa legible sin abrir el detalle y, solo si hay algo que añadir, una línea de estado. El estado describe lo que
+ * la app sabe (conserva el mensaje y puede repetirlo); nunca afirma si el mensaje llegó o no al proveedor. Sin
+ * reintento no hay línea: anunciar lo que no se puede hacer solo añade ruido al aviso.
  */
 internal fun agentErrorNoticeContent(raw: String, canRetry: Boolean): AgentErrorNoticeContent =
     AgentErrorNoticeContent(
         cause = noticeMessage(raw, "El agente no ha podido completar esta respuesta."),
-        status = if (canRetry) "Reintentar usa el mismo texto y los mismos adjuntos."
-            else "Reintento no disponible para este aviso.",
+        status = if (canRetry) "Reintentar usa el mismo texto y los mismos adjuntos." else null,
         technical = raw,
     )
 
@@ -66,6 +68,14 @@ internal fun AgentErrorNotice(
     val content = remember(raw, onRetry != null) { agentErrorNoticeContent(raw, onRetry != null) }
     var expanded by rememberSaveable(id) { mutableStateOf(false) }
     var cardExpanded by rememberSaveable("$id:card") { mutableStateOf(!compact) }
+    // When the conversation moves on (another message, a newer failure) the notice steps back to one line by itself;
+    // a tap brings the whole card back. A notice that was already old keeps whatever the reader chose.
+    var wasCompact by rememberSaveable("$id:compact") { mutableStateOf(compact) }
+    if (wasCompact != compact) {
+        wasCompact = compact
+        cardExpanded = !compact
+        if (compact) expanded = false
+    }
     val colors = MaterialTheme.colorScheme
     val haptic = rememberNexusHaptics()
     val motion = rememberNexusMotionAllowed()
@@ -73,11 +83,11 @@ internal fun AgentErrorNotice(
     val errorBorder = BorderStroke(1.dp, colors.error.copy(alpha = 0.28f))
     val container = colors.surface
 
+    // One box for both shapes: the change from card to line (and back) is a single change of height.
+    Box(modifier.fillMaxWidth().animateContentSize(if (motion) spring(dampingRatio = 0.84f, stiffness = 460f) else snap())) {
     if (compact && !cardExpanded) {
         StudioTactileCard(
-            modifier = modifier
-                .fillMaxWidth()
-                .animateContentSize(if (motion) spring(dampingRatio = 0.84f, stiffness = 460f) else snap()),
+            modifier = Modifier.fillMaxWidth(),
             shape = NexusTokens.pill,
             containerColor = colors.surfaceContainerLow,
             border = studioSpecularBorder(accentTint = colors.error.copy(alpha = 0.35f)),
@@ -111,13 +121,8 @@ internal fun AgentErrorNotice(
                 Icon(Icons.Default.ExpandMore, contentDescription = "Expandir aviso", tint = colors.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }
-        return
-    }
-
-    StudioTactileCard(
-        modifier
-            .fillMaxWidth()
-            .animateContentSize(if (motion) spring(dampingRatio = 0.84f, stiffness = 460f) else snap()),
+    } else StudioTactileCard(
+        Modifier.fillMaxWidth(),
         shape = NexusTokens.card,
         containerColor = container,
         border = errorBorder,
@@ -134,9 +139,10 @@ internal fun AgentErrorNotice(
                         content.cause,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.semantics { heading() },
+                        // The card is the only message of the failure: the current one is announced as it appears.
+                        modifier = Modifier.semantics { heading(); if (!compact) liveRegion = LiveRegionMode.Polite },
                     )
-                    Text(content.status, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                    content.status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant) }
                 }
                 if (compact) {
                     IconButton(
@@ -190,5 +196,6 @@ internal fun AgentErrorNotice(
                 Text(content.technical, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
             }
         }
+    }
     }
 }

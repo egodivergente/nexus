@@ -325,18 +325,24 @@ private fun AssistantScreenContent(
         } }) {showProject=false}
 
     val latestFailure=ui.items.filterIsInstance<ChatItem.Notice>().lastOrNull {it.error}
-    // History is restored asynchronously. Only errors created during this visit may interrupt the
-    // screen; old notices remain in the conversation, including when returning to another chat.
+    // The failure the conversation is still about keeps its whole card; the earlier ones are one line each.
+    val currentFailure = remember(ui.items) { currentFailureId(ui.items) }
+    // A failure is said once, by its card in the conversation: no second notice repeats it over the composer with
+    // an action of its own. A new one is still made known: a tap in the hand and, when its card is out of sight, a
+    // mark on the way down. History is restored asynchronously and old notices are content: only errors created
+    // during this visit do this, including when returning to another chat.
     val failureSince=remember(ui.conversationId) {System.currentTimeMillis()}
     var shownFailure by rememberSaveable(ui.conversationId) {mutableStateOf(latestFailure?.id)}
+    var unseenFailure by rememberSaveable(ui.conversationId) { mutableStateOf(false) }
     LaunchedEffect(ui.conversationId,latestFailure?.id) {
         val failure=latestFailure ?: return@LaunchedEffect
         if(shouldAnnounceChatFailure(failure,failureSince,shownFailure)) {
             shownFailure=failure.id
-            val result=snackbar.showSnackbar(noticeMessage(failure.text),actionLabel=if(vm.canRetryTurn()) "Reintentar" else null,withDismissAction=true)
-            if(result==SnackbarResult.ActionPerformed) vm.retryTurn()
+            haptic.perform(NexusHapticEvent.ERROR)
+            if (!following) unseenFailure = true
         }
     }
+    LaunchedEffect(following) { if (following) unseenFailure = false }
     // Conversaciones a la izquierda: se abre arrastrando el dedo de izquierda a derecha sobre el chat.
     val drawer = rememberDrawerState(DrawerValue.Closed)
     ModalNavigationDrawer(drawerContent = { ConversationDrawer(ui, vm) { scope.launch { drawer.close() } } }, drawerState = drawer,
@@ -507,12 +513,16 @@ private fun AssistantScreenContent(
                                 widgetAnswer = answerAfter(ui.items, item)?.widgetAnswer,
                                 onReply = { vm.send(it) }, onWidgetReply = { vm.send(it.text, widgetAnswer = it.answer) })
                         }
-                        is ChatItem.Notice -> NoticeRow(item, onOpenHistory,
-                            onRetry = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn()) ({ vm.retryTurn() }) else null,
-                            onChangeModel = { showSettings = true },
-                            onNewChat = if (item.error && item.id == latestFailure?.id && vm.canRetryTurn() &&
-                                (item.text.contains("conversación nueva", true) || item.text.contains("razonamiento", true))) ({ vm.continueFailedTurnInNewChat() }) else null,
-                            compact = item.id != latestFailure?.id)
+                        is ChatItem.Notice -> {
+                            // «Reintentar» belongs to the notice that closed the failed turn, while the app holds its message.
+                            val canRetry = item.error && item.id == ui.retryNoticeId && !ui.thinking
+                            NoticeRow(item, onOpenHistory,
+                                onRetry = if (canRetry) ({ vm.retryTurn(item.id) }) else null,
+                                onChangeModel = { showSettings = true },
+                                onNewChat = if (canRetry && (item.text.contains("conversación nueva", true) || item.text.contains("razonamiento", true)))
+                                    ({ vm.continueFailedTurnInNewChat() }) else null,
+                                compact = item.id != currentFailure)
+                        }
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
                                 Text(item.text, style = MaterialTheme.typography.bodyMedium)
@@ -586,9 +596,16 @@ private fun AssistantScreenContent(
                     enter = if (motion) fadeIn() + scaleIn() else androidx.compose.animation.EnterTransition.None,
                     exit = if (motion) fadeOut() + scaleOut() else androidx.compose.animation.ExitTransition.None) {
                     // Matte and small: it is a way back, not the main action of the screen.
-                    Surface(onClick = { following = true; scope.launch { followLast() } }, shape = androidx.compose.foundation.shape.CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface) {
-                        Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { Icon(Icons.Default.KeyboardArrowDown, "Bajar al final", Modifier.size(22.dp)) }
+                    Box {
+                        Surface(onClick = { following = true; scope.launch { followLast() } }, shape = androidx.compose.foundation.shape.CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface) {
+                            Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.KeyboardArrowDown, if (unseenFailure) "Bajar al final: hay un aviso de error" else "Bajar al final", Modifier.size(22.dp))
+                            }
+                        }
+                        // A failure arrived below while the reader was further up: the way down says so.
+                        if (unseenFailure) Box(Modifier.align(Alignment.TopEnd).size(10.dp)
+                            .background(MaterialTheme.colorScheme.error, androidx.compose.foundation.shape.CircleShape))
                     }
                 }
             }
@@ -635,7 +652,8 @@ private fun AssistantScreenContent(
             }
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launchDevice(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
-                onSend = { if(vm.sendWithBoards(input.text)) {haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
+                // A message on its way closes whatever notice was still up: it spoke about the moment before.
+                onSend = { if(vm.sendWithBoards(input.text)) {snackbar.currentSnackbarData?.dismiss();haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { vm.send(it) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
                 // Mode and model sit in the composer, wired to the same settings as before.
                 reasoningControl = { ReasoningPicker(ui, vm); BridgeModelPicker(ui, vm) { showSettings = true } },
@@ -1366,8 +1384,9 @@ private fun NoticeRow(
 ) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
     Column(verticalArrangement = Arrangement.spacedBy(NexusTokens.space4)) {
-    // A turn that was stopped or failed keeps what it had done: the step with the incident is the explanation.
-    AgentActivitySaved(item.id + ":steps", item.steps, initiallyOpen = item.error && !compact)
+    // A turn that was stopped or failed keeps what it had done: the step with the incident is the explanation. They
+    // fold with their notice when the conversation moves on.
+    AgentActivitySaved(item.id + ":steps", item.steps, initiallyOpen = item.error && !compact, superseded = item.error && compact)
     // Todo error ofrece una salida directa: repetir, cambiar de modelo, continuar en chat nuevo o revisar el historial.
     if (item.error) AgentErrorNotice(
         item.id, item.text,

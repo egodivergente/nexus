@@ -239,12 +239,20 @@ internal fun AgentActivityLive(steps: List<AgentStep>, startedAtElapsedMs: Long,
 
 /**
  * The activity kept with a finished message: folded to one line («5 pasos · 34 s», plus the incidents if any) and
- * opened on demand, so a reopened conversation still shows how the answer was reached.
+ * opened on demand, so a reopened conversation still shows how the answer was reached. [superseded] turning true
+ * (the conversation moved on from a failed turn that showed its steps) folds them once; after that the reader's
+ * choice stands.
  */
 @Composable
-internal fun AgentActivitySaved(id: String, steps: List<AgentStep>, modifier: Modifier = Modifier, initiallyOpen: Boolean = false) {
+internal fun AgentActivitySaved(id: String, steps: List<AgentStep>, modifier: Modifier = Modifier, initiallyOpen: Boolean = false,
+    superseded: Boolean = false) {
     if (steps.isEmpty()) return
     var open by rememberSaveable(id) { mutableStateOf(initiallyOpen) }
+    var wasSuperseded by rememberSaveable("$id:superseded") { mutableStateOf(superseded) }
+    if (wasSuperseded != superseded) {
+        wasSuperseded = superseded
+        if (superseded) open = false
+    }
     val colors = MaterialTheme.colorScheme
     val issues = AgentActivityText.issues(steps)
     val cancelled = steps.any { it.status == AgentStepStatus.CANCELLED }
