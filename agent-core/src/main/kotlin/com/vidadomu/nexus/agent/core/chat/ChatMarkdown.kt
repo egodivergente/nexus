@@ -53,9 +53,10 @@ object ChatMarkdown {
 
     /**
      * [streaming]: el texto aún se está recibiendo. Un panel `nexus-ui` sin cerrar se oculta en vez de enseñar su
-     * JSON a medias, y lo que queda abierto en la línea que se está escribiendo (`**negrita`, `*cursiva`,
+     * JSON a medias, y lo que queda abierto en el bloque que se está escribiendo (`**negrita`, `*cursiva`,
      * `~~tachado`, `==resalte` o código en línea) se pinta ya con su estilo y sin sus marcadores: el cierre aún no
-     * ha llegado. Un texto guardado nunca se trata así.
+     * ha llegado. El bloque es la viñeta, el título o la cita en curso, o el párrafo entero: un énfasis puede
+     * cerrarse en una línea posterior del mismo párrafo. Un texto guardado nunca se trata así.
      */
     fun parse(text: String, streaming: Boolean = false): List<MdBlock> {
         val used = mutableSetOf<String>()
@@ -228,10 +229,11 @@ object ChatMarkdown {
         fun styled(marker: String) = when (marker) { "~~" -> style.copy(strike = true); "==" -> style.copy(mark = true); else -> style.copy(bold = true) }
         // Un marcador sin cierre solo abre al empezar palabra y pegado a lo que marca (o al final, recién llegado):
         // «2**10», «5 * 3», «a == b» y «snake_case» se quedan como están. Tampoco abre el resto de un marcador que
-        // ya se quedó literal (el segundo `*` de «2**10»).
+        // ya se quedó literal (el segundo `*` de «2**10») ni el que va pegado a un signo que no empieza nada
+        // («*.mp4», «==>»): eso no es énfasis y guardado se queda literal. El código sí puede empezar así («`.env»).
         fun opens(at: Int, length: Int): Boolean = open &&
             (at == 0 || (!s[at - 1].isLetterOrDigit() && s[at - 1] != s[at])) &&
-            (at + length == s.length || !s[at + length].isWhitespace())
+            (at + length == s.length || (!s[at + length].isWhitespace() && (s[at] == '`' || s[at + length] !in ".,;:!?)]}>=")))
         var i = 0
         while (i < s.length) {
             val c = s[i]
@@ -270,11 +272,12 @@ object ChatMarkdown {
                     i = end + 2; continue
                 }
                 // Sin cierre todavía: lo que viene detrás ya lleva el estilo, y dentro puede abrirse otro. Un solo
-                // carácter del marcador al final es el cierre a medio llegar y tampoco se enseña.
+                // carácter del marcador al final es el cierre a medio llegar y tampoco se enseña (salvo escapado: «\*»).
                 if (end < 0 && opens(i, 2)) {
                     flush()
                     val rest = s.substring(i + 2)
-                    parseInto(if (rest.length > 1 && rest.last() == two[0]) rest.dropLast(1) else rest, styled(two), out, open = true)
+                    val halfClose = rest.length > 1 && rest.last() == two[0] && rest[rest.length - 2] != '\\'
+                    parseInto(if (halfClose) rest.dropLast(1) else rest, styled(two), out, open = true)
                     i = s.length; continue
                 }
             }

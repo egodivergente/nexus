@@ -245,12 +245,27 @@ class ChatMarkdownTest {
         }
     }
 
-    @Test fun `mientras llega, solo la linea que se esta escribiendo queda abierta`() {
+    @Test fun `mientras llega, un marcador pegado a un signo que no empieza nada se queda literal`() {
+        // Un comodín de archivos o una flecha no son énfasis: guardados quedan literales y en vivo no deben cambiar.
+        for (literal in listOf("Busca *.mp4 en la carpeta", "Busca *.mp4 y *.mov", "A ==> B", "====", "===", "Vale **, sigue", "nota *) final")) {
+            assertEquals(literal, shown(ChatMarkdown.parse(literal, streaming = true)), literal)
+            assertEquals(ChatMarkdown.parse(literal), ChatMarkdown.parse(literal, streaming = true), literal)
+        }
+        // El código en línea sí puede empezar por un signo.
+        assertEquals(listOf(MdSpan("Abre "), MdSpan(".gitigno", code = true)),
+            (ChatMarkdown.parse("Abre `.gitigno", streaming = true).single() as MdBlock.Paragraph).spans)
+        // Un asterisco escapado al final de una negrita abierta no es su cierre a medias.
+        assertEquals(listOf(MdSpan("precio *", bold = true)),
+            (ChatMarkdown.parse("**precio \\*", streaming = true).single() as MdBlock.Paragraph).spans)
+    }
+
+    @Test fun `mientras llega, solo el bloque que se esta escribiendo queda abierto`() {
         // Una viñeta anterior con el marcador sin cerrar ya no va a cerrarse: literal, como guardada.
         val list = assertIs<MdBlock.ListBlock>(ChatMarkdown.parse("- **uno\n- dos y *tr", streaming = true).single())
         assertEquals("**uno", raw(list.items[0].spans))
         assertEquals(listOf(MdSpan("dos y "), MdSpan("tr", italic = true)), list.items[1].spans)
-        // Un salto de línea no cierra el párrafo (puede seguir); una línea en blanco, sí.
+        // Un salto de línea no cierra el párrafo (puede seguir, y el énfasis puede cerrarse en la línea siguiente);
+        // una línea en blanco, sí.
         assertEquals("abierto", shown(ChatMarkdown.parse("**abierto\n", streaming = true)))
         assertEquals("sigue en la otra línea", shown(ChatMarkdown.parse("**sigue en\nla otra línea", streaming = true)).replace("\n", " "))
         assertEquals("**abierto", shown(ChatMarkdown.parse("**abierto\n\n", streaming = true)))
