@@ -358,9 +358,19 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         // Whatever was already being written stays, below the message that comes back.
         draftPrefs.edit().putString(key, listOf(LastTurn.editableText(message), draft).filter { it.isNotBlank() }.joinToString("\n\n")).apply()
         failedTurns.remove(state.conversationId)
+        forgetInterruptedTurn(state.conversationId, state.items)
         _ui.update { it.copy(items = kept, pendingAttachments = (message.attachments + it.pendingAttachments).distinctBy { a -> a.id },
             retryNoticeId = null, draftRevision = it.draftRevision + 1) }
         return true
+    }
+
+    /** A cut-off turn that is taken back has nothing left to offer: its mark goes, so reopening the chat does not bring the notice back. */
+    private fun forgetInterruptedTurn(chatId: String, dropped: List<ChatItem>) {
+        val notices = dropped.map { it.id }.filter(InterruptedTurns::isNotice).toSet()
+        if (notices.isEmpty()) return
+        viewModelScope.launch { withContext(Dispatchers.IO) { runCatching {
+            interruptedTurns.get(chatId)?.takeIf { it.noticeId in notices }?.let { interruptedTurns.clear(chatId, it.turnId) }
+        } } }
     }
 
     /** «Otra respuesta»: the same message goes again, as if the last answer had not happened. */
@@ -370,6 +380,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val (kept, message) = LastTurn.takeBack(state.items) ?: return false
         if (!conversation.rewindLastTurn()) return false
         failedTurns.remove(state.conversationId)
+        forgetInterruptedTurn(state.conversationId, state.items)
         _ui.update { it.copy(items = kept, retryNoticeId = null) }
         val text = LastTurn.editableText(message)
         if (send(text, retryAttachments = message.attachments, widgetAnswer = message.widgetAnswer)) return true
