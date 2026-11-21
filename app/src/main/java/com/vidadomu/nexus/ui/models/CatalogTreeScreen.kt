@@ -94,7 +94,6 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
     var showSecondary by rememberSaveable {mutableStateOf(false)}
     // «Con referencias» empieza desactivado: activado ocultaba los modelos de imagen que solo aceptan texto.
     var imageReferences by rememberSaveable { mutableStateOf(false) }
-    var allImageFamilies by rememberSaveable { mutableStateOf(false) }
     var use by rememberSaveable { mutableStateOf<CreationUse?>(null) }
     val placementRev=CatalogPlacements.revision.intValue
     val visible = remember(placementRev,models, modality, query, use, favorites, favoritesOnly,providerFilter,imageReferences,toolsView,rules,showLegacy) {
@@ -305,13 +304,8 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                 } else if(loading && error!=null) item(span={GridItemSpan(maxLineSpan)}) {
                     Text(error.orEmpty(),style=MaterialTheme.typography.labelMedium,color=TextSecondary)
                 }
-                val priceRoutes=if(toolsView && family==null) emptyList() else if(rootLevel) visible else groups.flatMap {it.routes}
-                val priceNote=catalogPriceNote(priceRoutes,anyPrice=priceRoutes.any {(referencePrice(it) ?: 0.0)>0.0})
-                // La nota «Precios desde · por 5 s» se retiró: el precio se ve al abrir cada modelo.
                 if(rootLevel) {
-                    val prioritySections = sections.filter { it.family in ImageModelChoices.families || it.models.any { m -> modelBookmark(m) in favorites } || it.family in savedOrder }
-                    val shownSections = sections
-                    items(shownSections,key={it.family}) { section ->
+                    items(sections,key={it.family}) { section ->
                         val children=catalogModelGroups(section.models,favorites)
                         ReorderableItem(reorderState,key=section.family) { isDragging ->
                         val (moveUp,moveDown)=reorderActions(section.family)
@@ -322,9 +316,6 @@ fun ModelsScreen(onSelectModelAndCreate: (NexusModel) -> Unit,
                                     if(!dragMoved[0]) labelTarget=Triple("family:"+section.family,section.family,"")}) else null,
                             dragging=isDragging,onMoveUp=moveUp,onMoveDown=moveDown,title=labels.name("family:"+section.family,section.family),columns=rootColumns)
                         }
-                    }
-                    if(false) item(span={GridItemSpan(maxLineSpan)}) {
-                        TextButton(onClick={allImageFamilies=!allImageFamilies}, modifier=Modifier.fillMaxWidth()) {Text(if(allImageFamilies) "Ver solo mis familias" else "Otras familias")}
                     }
                 } else {
                     items(groups,key={it.key}) { group ->

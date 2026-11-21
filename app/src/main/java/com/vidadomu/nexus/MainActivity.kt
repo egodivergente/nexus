@@ -64,7 +64,6 @@ import com.vidadomu.nexus.ui.models.ModelsScreen
 import com.vidadomu.nexus.ui.navigation.NexusBottomBar
 import com.vidadomu.nexus.ui.navigation.revealBarOnSwipeUp
 import com.vidadomu.nexus.ui.navigation.adjacentTab
-import com.vidadomu.nexus.ui.navigation.tabSwipe
 import com.vidadomu.nexus.ui.navigation.tabEnter
 import com.vidadomu.nexus.ui.navigation.tabExit
 import androidx.navigation.NavGraph.Companion.findStartDestination
