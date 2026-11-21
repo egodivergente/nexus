@@ -14,6 +14,35 @@ class SyncWorkspaceTest {
     private fun workspace(index:AssetIndex,dir:File,cloud:SyncRemote)=SyncWorkspace(index,dir,cloud,open={uri->
         if(uri.startsWith("file:")){val source=File(URI(uri));SyncInput(source.extension,source.inputStream())}else null
     })
+    @Test fun montageRoundTripKeepsMediaAndHoldsIndependentEdits()=runTest {
+        val directory=root()
+        val cloud=SyncJournalTest.Cloud()
+        val key="montages:p"
+        val original=File(directory,"take.png").apply { writeBytes(byteArrayOf(7, 2, 0, 9)) }
+        fun row(uri:String, at:Long)=Json.parseToJsonElement(
+            """{"id":"p","projectId":"p","document":{"schema":1,"project":{"id":"p","media":[{"id":"m","uri":"$uri"}]},"links":{},"playheadUs":$at}}"""
+        ).jsonObject
+        val first=workspace(AssetIndex(null),File(directory,"windows"),cloud)
+        val second=workspace(AssetIndex(null),File(directory,"cut"),cloud)
+        var received:JsonObject?=null
+        var back:JsonObject?=null
+        val path=original.toURI().toString()
+        first.cycle(null,mapOf(key to row(path,1))) { assertEquals(row(path,1),it[key]) }
+        second.cycle(setOf("p")) { received=it[key] }
+        val transferred=received!!.getValue("document").jsonObject.getValue("project").jsonObject
+            .getValue("media").jsonArray.single().jsonObject.getValue("uri").jsonPrimitive.content
+        assertContentEquals(original.readBytes(),File(URI(transferred)).readBytes())
+        assertEquals(1,cloud.blobs.size)
+        second.cycle(setOf("p"),mapOf(key to row(transferred,2)))
+        first.cycle(null,mapOf(key to row(path,1))) { back=it[key] }
+        assertEquals(row(path,2),back)
+        first.cycle(null,mapOf(key to row(path,3)))
+        val conflict=second.cycle(setOf("p"),mapOf(key to row(transferred,4))) {
+            assertFalse(key in it)
+        }
+        assertEquals("conflicts",conflict.getValue("state").jsonPrimitive.content)
+        assertTrue(conflict.getValue("conflicts").jsonArray.any { it.jsonObject["key"]?.jsonPrimitive?.content==key })
+    }
     @Test fun peerUpdateCannotBeOverwrittenByInFlightDriveSnapshot()=runTest {
         val file=File(root(),"index.json").apply {writeText("""{"projects":[{"id":"p","name":"Proyecto","createdAt":1}]}""")}
         val index=AssetIndex(file);val expected=index.snapshot()

@@ -107,7 +107,11 @@ async function corteOpen(projectId){
 async function corteRefresh(){
  if(!Corte.projectId||Corte.busy)return;
  const r=await corteRpc('read_project',{project_id:Corte.projectId});
- if(r.revision!==Corte.snapshot?.revision||JSON.stringify(r.missing_media)!==JSON.stringify(Corte.snapshot?.missing_media)){Corte.snapshot=r;Corte.selected=new Set(r.selection);Corte.playhead=r.playhead_us;if(view==='editor')renderCorteTimeline();}
+ if(r.revision!==Corte.snapshot?.revision||r.playhead_us!==Corte.snapshot?.playhead_us||
+   JSON.stringify(r.missing_media)!==JSON.stringify(Corte.snapshot?.missing_media)){
+  Corte.snapshot=r;Corte.selected=new Set(r.selection);Corte.playhead=r.playhead_us;
+  if(view==='editor')renderCorteTimeline();
+ }
 }
 function renderCorte(){
  // Project/assistant initialization can complete after navigation has changed.

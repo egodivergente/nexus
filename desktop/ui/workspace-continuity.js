@@ -5,7 +5,7 @@
  const date = value => new Intl.DateTimeFormat('es',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
  function header() {
   const actions = document.querySelector('#header-actions');if (!actions || !['canvas','assistant','editor'].includes(view)) return;
-  if (!actions.querySelector('#workspace-save')) actions.insertAdjacentHTML('beforeend','<button id="workspace-save" type="button" data-workspace-save title="Guardar este punto de trabajo para continuar después">Guardar trabajo</button>');
+  if (!actions.querySelector('#workspace-save')) actions.insertAdjacentHTML('beforeend','<button id="workspace-save" type="button" data-workspace-save title="Guardar este punto de trabajo para continuar después">'+(view==='editor'?'Continuar en otro dispositivo':'Guardar trabajo')+'</button>');
  }
  function payload() {
   const draft = state.draft || {}, projectId = typeof Agent !== 'undefined' ? Agent.snapshot?.projectId || null : null;
@@ -20,9 +20,17 @@
  }
  async function capture() {
   if (busy || typeof Agent !== 'undefined' && Agent.busy || typeof Corte !== 'undefined' && Corte.busy) throw Error('Espera a que termine la operación actual para guardar el punto de trabajo.');
+  const montage = view==='editor' && Corte.projectId && Corte.snapshot;
+  if (montage) await corteFocus();
   await flush();
   const result = await call(payload());
-  toast(result.snapshot.missingReferences ? 'Trabajo guardado. Algunas referencias necesitan su original.' : 'Trabajo guardado. Puedes retomarlo desde Dispositivos.');
+  if (montage) {
+   const drive = await rpc('driveSync',{op:'status'});
+   if (drive.connected && drive.state!=='authorization_required') {
+    await rpc('driveSync',{op:'run'});
+    toast('Montaje guardado. Consulta en Dispositivos cuándo termine la sincronización.');
+   } else toast('Montaje guardado en este PC. Conecta Google Drive desde Dispositivos.');
+  } else toast(result.snapshot.missingReferences ? 'Trabajo guardado. Algunas referencias necesitan su original.' : 'Trabajo guardado. Puedes retomarlo desde Dispositivos.');
   await refresh();
   window.dispatchEvent(new CustomEvent('nexus:workspace-saved',{detail:result.snapshot}));
   return result;

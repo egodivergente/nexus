@@ -13,7 +13,7 @@ import urllib.request
 from unittest.mock import patch, Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from drive_sync import DriveSync, DriveAuthorizationRequired, SCOPE
+from drive_sync import DriveSync, DriveAuthorizationRequired, SCOPE, portable_montage
 
 
 class Host:
@@ -336,6 +336,28 @@ class DriveSyncTest(unittest.TestCase):
         self.assertEqual(installed['project']['media'][0]['uri'], image.resolve().as_uri())
         self.assertEqual(installed['links']['m']['original_uri'], uri)
         self.assertEqual(document['project']['media'][0]['uri'], uri)
+
+    def test_montage_resume_keeps_local_history_when_the_edit_has_not_changed(self):
+        document = {'schema': 1, 'project': {'id': 'p', 'modifiedAtMs': 10, 'media': []},
+                    'links': {}, 'revision': 7, 'undo': [{'id': 'local'}], 'playheadUs': 2_000_000}
+        root = self.root / 'projects'
+        path = root / 'p' / 'edit.json'
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(document), encoding='utf-8')
+        validate = Mock()
+        self.host.corte = SimpleNamespace(lock=threading.RLock(), projects=root, exchange=validate)
+        self.service.captured_montages = {'p': document}
+        outgoing = portable_montage(document)
+        self.assertNotIn('undo', outgoing)
+        self.service.apply_documents({'montages:p': {'document': outgoing}})
+        self.assertEqual(json.loads(path.read_text('utf-8')), document)
+        validate.assert_not_called()
+        incoming = {**outgoing, 'playheadUs': 3_000_000}
+        self.service.apply_documents({'montages:p': {'document': incoming}})
+        self.assertEqual(json.loads(path.read_text('utf-8'))['playheadUs'], 3_000_000)
+        self.assertEqual(json.loads((self.service.root / 'montage-backups/p.json').read_text('utf-8')), document)
+        with self.assertRaisesRegex(ValueError, 'cambió durante la transferencia'):
+            self.service.apply_documents({'montages:p': {'document': outgoing}})
 
 
 if __name__ == '__main__':

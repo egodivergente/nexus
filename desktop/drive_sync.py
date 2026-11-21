@@ -18,6 +18,14 @@ SCOPE = 'https://www.googleapis.com/auth/drive.file'
 AUTH_CALLBACK_TIMEOUT = 30 * 60
 
 
+def portable_montage(document):
+    """Share the project and position. Windows revisions and history stay local."""
+    project = dict(document['project'])
+    project['modifiedAtMs'] = 0
+    return {'schema': 1, 'project': project, 'links': document.get('links', {}),
+            'playheadUs': document.get('playheadUs', 0)}
+
+
 class DriveAuthorizationRequired(ValueError):
     """A rejected/revoked authorization, as distinct from a temporary network error."""
 
@@ -335,7 +343,11 @@ class DriveSync:
                 try:
                     result = self.host.exchange('driveSync', {'accessToken': token, 'rootId': self.config.get('folderId', ''),
                                                              'paths': paths, 'resolve': resolution,
-                                                             'chats': chats, 'montages': self.captured_montages,
+                                                             'chats': chats, 'montages': {
+                                                                 identifier: portable_montage(document)
+                                                                 for identifier, document in self.captured_montages.items()
+                                                                 if document.get('revision', 0) or document['project'].get('media')
+                                                             },
                                                              'storyEnabled': self.config.get('story', False)})
                     self.config['folderId'] = result['rootId']
                     atomic_json(self.config_file, self.config)
@@ -450,13 +462,31 @@ class DriveSync:
                     document = json.loads(json.dumps(row['document']))
                     # Corte renders filesystem URIs; the library serves those same bytes over /media/.
                     from native_operations import resolve_media
+                    project = document['project']
+                    if project.get('id', identifier) != identifier:
+                        raise ValueError('El montaje corresponde a otro proyecto.')
+                    local_media = {item['id']: item['uri']
+                                   for item in (current or {}).get('project', {}).get('media', [])}
                     for media in document.get('project', {}).get('media', []):
                         if str(media.get('uri', '')).startswith('/media/'):
-                            media['uri'] = resolve_media(self.host.data.parent, media['uri']).resolve().as_uri()
-                    if current == document:
+                            resolved = resolve_media(self.host.data.parent, media['uri']).resolve()
+                            if resolved.is_file():
+                                media['uri'] = resolved.as_uri()
+                                continue
+                        if local_media.get(media['id']) != media['uri'] or not str(media['uri']).startswith('file:'):
+                            raise ValueError('Faltan originales del montaje. La edición local se conserva.')
+                    document = portable_montage(document)
+                    previous_portable = portable_montage(current) if current else None
+                    if previous_portable == document:
                         continue
                     if current != self.captured_montages.get(identifier):
                         raise ValueError('El montaje cambió durante la transferencia.')
+                    if previous_portable and {**previous_portable, 'playheadUs': document['playheadUs']} == document:
+                        document = {**current, 'playheadUs': document['playheadUs']}
+                    else:
+                        document.update(revision=(current or {}).get('revision', 0) + 1,
+                                        undo=[], redo=[], receipts={}, selection=[])
+                        document['project']['modifiedAtMs'] = int(time.time() * 1000)
                     self.host.corte.exchange('validate_document', {'project_id': identifier, 'document': document})
                     targets.append((path, document, current))
                 elif kind == 'conversations':
