@@ -12,20 +12,6 @@ function syncVersionBadges(){
  const label=desktopVersionLabel();
  document.querySelectorAll('[data-nx-version]').forEach(node=>{if(node.textContent!==label)node.textContent=label;});
 }
-function mountStartupOnboarding(){
- if((typeof initial!=='undefined'&&initial?.qa)||document.getElementById('nx-startup-onboarding'))return;
- const overlay=document.createElement('div');
- overlay.id='nx-startup-onboarding';
- overlay.className='nx-startup-onboarding';
- overlay.setAttribute('role','status');
- overlay.setAttribute('aria-label','Bienvenida a NEXUS Studio');
- overlay.innerHTML='<div class="nx-startup-card"><img class="nx-startup-logo" src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="136" height="130"><span class="nx-version-badge" data-nx-version>'+desktopVersionLabel()+'</span><span class="nx-kicker">TU ESPACIO CREATIVO</span><h2>Las buenas ideas empiezan aquí.</h2><p>Estudio y agente multimodal</p></div>';
- const dismiss=()=>{if(!overlay.isConnected||overlay.classList.contains('is-hiding'))return;overlay.classList.add('is-hiding');setTimeout(()=>overlay.remove(),360);};
- overlay.addEventListener('click',dismiss,{once:true});
- document.addEventListener('keydown',dismiss,{once:true});
- setTimeout(dismiss,1850);
- document.body.append(overlay);
-}
 const desktopIdeas=[
  {id:'image',title:'Una imagen',subtitle:'De una idea a algo visual',icon:'library',text:'Quiero crear una imagen. Ayúdame a preparar un buen prompt y elegir el modelo.'},
  {id:'video',title:'Un vídeo',subtitle:'Una escena con movimiento',icon:'canvas',text:'Quiero crear un vídeo. Ayúdame a definir la escena y preparar sus opciones.'},
@@ -53,7 +39,11 @@ function desktopShell(){
 const desktopAssistantBefore=renderAssistant;
 renderAssistant=function(){
  desktopAssistantBefore();
- const empty=$('.agent-empty');if(empty){empty.classList.add('nx-assistant-welcome');empty.innerHTML=desktopWelcome('assistant')+desktopIdeaButtons('assistant');}
+ const empty=$('.agent-empty');
+ if(empty){
+  empty.classList.add('nx-assistant-welcome');
+  empty.innerHTML='<h2>¿En qué quieres trabajar?</h2>'+desktopIdeaButtons('assistant');
+ }
  const input=$('#agent-input');if(input){input.placeholder='Escribe un mensaje o describe lo que quieres crear…';input.setAttribute('aria-label','Tu idea para el asistente');}
  document.querySelectorAll('.agent-message .agent-author:not(:has(.nx-avatar))').forEach(author=>{
   author.insertAdjacentHTML('afterbegin','<span class="nx-avatar" aria-hidden="true">'+(author.closest('.user')?'<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M5 20v-2a7 7 0 0 1 14 0v2" stroke="currentColor" stroke-width="1.5"/></svg>':desktopSpark)+'</span>');
@@ -80,5 +70,5 @@ document.addEventListener('click',event=>{
  const idea=desktopIdeas.find(item=>item.id===button.dataset.desktopIdea);if(!idea||Agent.busy)return;
  Agent.draft=idea.text;const input=$('#agent-input');if(input){input.value=idea.text;input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();input.setSelectionRange(input.value.length,input.value.length);}
 });
-document.addEventListener('DOMContentLoaded',()=>{desktopShell();mountStartupOnboarding();DesktopDesign.ready=true;},{once:true});
+document.addEventListener('DOMContentLoaded',()=>{desktopShell();DesktopDesign.ready=true;},{once:true});
 

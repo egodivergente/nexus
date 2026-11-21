@@ -5,15 +5,15 @@ body.gallery-studio h1{font-size:var(--type-title);font-weight:500;letter-spacin
 body.gallery-studio .gallery-library .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(var(--gallery-size,240px),100%),1fr));gap:12px}
 body.gallery-studio .gallery-piece{position:relative;border:0;border-radius:var(--radius-lg);overflow:hidden;background:var(--nx-panel);min-width:0;box-shadow:none;transform:none}
 .gallery-piece.is-selected{outline:2px solid var(--accent);outline-offset:2px}
-.gallery-media{height:100%;aspect-ratio:4/3;overflow:hidden;cursor:pointer;display:grid;place-items:center;position:relative}
+.gallery-media{aspect-ratio:16/10;overflow:hidden;cursor:pointer;display:grid;place-items:center;position:relative;background:var(--t-s0)}
 .gallery-media img,.gallery-media video{width:100%;height:100%;object-fit:cover;display:block}
 .gallery-media p{padding:20px;max-height:100%;overflow:auto}.gallery-media audio{max-width:100%}
 .gallery-media:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
-.gallery-overlay{position:absolute;inset:auto 0 0;display:flex;align-items:end;gap:8px;padding:38px 14px 14px;background:linear-gradient(transparent,var(--color-media-overlay));opacity:0;transition:opacity 180ms;pointer-events:none}
-.gallery-overlay>div{flex:1;min-width:0}.gallery-overlay strong{display:block;font-size:var(--t-control);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--color-on-media)}
-.gallery-overlay small{display:block;font-size:var(--type-caption);color:var(--color-on-media);margin-top:4px}
-.gallery-overlay button{pointer-events:auto;background:var(--color-media-overlay)!important;border:0!important;min-width:34px;color:var(--color-on-media)}
-.gallery-piece:hover .gallery-overlay,.gallery-piece:focus-within .gallery-overlay{opacity:1}
+.gallery-overlay{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 12px;min-height:54px;background:var(--t-s2)}
+.gallery-overlay>div{flex:1;min-width:0}.gallery-overlay strong{display:block;font-size:var(--t-control);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.gallery-overlay small{display:block;font-size:var(--t-meta);color:var(--muted);margin-top:2px}
+.gallery-overlay button{background:transparent!important;border:0!important;min-width:34px;color:var(--muted)}
+.gallery-overlay button[aria-pressed="true"]{color:var(--accent)}
 .gallery-badges{position:absolute;top:12px;left:12px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none;font-size:var(--type-caption)}
 .gallery-badges span:empty{display:none}.gallery-badges span{background:var(--color-media-overlay);backdrop-filter:none;border-radius:var(--radius-xs);padding:4px 7px;color:var(--color-on-media)}
 .gallery-badges .warning{color:var(--color-warning-media)}.gallery-select{position:absolute;right:12px;top:12px;opacity:0;width:28px;height:28px;min-height:28px!important;padding:0!important;border:1px solid var(--color-on-media)!important;background:var(--color-media-overlay)!important;color:var(--color-on-media);border-radius:var(--radius-sm)!important}
@@ -34,7 +34,7 @@ body.gallery-studio dialog.gallery-lightbox{padding:0;border:0;border-radius:0;w
 #gallery-command-search{width:100%}#gallery-command-list{display:grid;gap:6px;margin-top:14px}#gallery-command-list button{text-align:left;display:flex;justify-content:space-between;gap:12px}#gallery-command-list small{color:var(--nx-muted)}
 #gallery-collections{margin-top:auto;padding:24px 12px 12px;max-height:40dvh;overflow:auto}#gallery-collections>button{display:block;width:100%;text-align:left;background:transparent!important;border:0!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#gallery-collections small{font-size:var(--type-caption);color:var(--nx-muted)}.gallery-collection-heading{display:flex;align-items:center;justify-content:space-between;font-size:var(--type-caption);text-transform:uppercase;letter-spacing:1px;color:var(--nx-muted)}#gallery-collections kbd{float:right;font-size:var(--type-caption);color:var(--nx-muted)}
 body.gallery-studio #account-balances.gallery-balances{gap:8px;padding:8px 0 14px;min-height:0;flex-wrap:wrap}.gallery-balances .balance-heading{display:none}body.gallery-studio .gallery-balances .account-balance{border:1px solid var(--t-line);border-radius:var(--radius-control);background:var(--nx-panel);padding:8px 10px;font-size:var(--t-meta);gap:8px}body.gallery-studio .gallery-balances .account-balance>span,body.gallery-studio .gallery-balances .account-balance strong{font-size:var(--t-meta)}body.gallery-studio .gallery-balances .account-balance strong{font-variant-numeric:tabular-nums}.gallery-balances .account-balance:before{content:'';width:5px;height:5px;border-radius:50%;background:var(--accent)}.gallery-balances .is-warning:before{background:var(--color-warning)}.gallery-balances .is-warning strong{color:var(--color-warning)!important}body.gallery-studio .gallery-balances button[data-refresh-flow]{width:auto;font-size:var(--type-caption)}
-@media(hover:none){.gallery-overlay,.gallery-select{opacity:1}.gallery-overlay{padding-top:28px}}
+@media(hover:none){.gallery-select{opacity:1}}
 @media(max-width:800px){.gallery-lightbox[open]{grid-template-columns:1fr;grid-template-rows:55dvh 45dvh}.gallery-stage>img,.gallery-stage>video{max-height:calc(55dvh - 110px)}.gallery-viewer-details{border-left:0;border-top:1px solid var(--t-line)}.gallery-selection{left:16px}.gallery-chips{order:3;width:100%}.gallery-filters>div{right:0}#gallery-collections{padding:8px 0}#gallery-collections>button{font-size:var(--type-caption)}}
 @media(max-width:600px){body.gallery-studio #gallery-collections{display:none}.gallery-grid{--gallery-size:160px!important}.gallery-player button{font-size:var(--type-caption)}.gallery-selection button{font-size:var(--type-caption)}}
 @media(prefers-reduced-motion:reduce){.gallery-overlay{transition:none}}
@@ -94,6 +94,13 @@ img[data-gallery-preview][hidden]{display:none!important;}
 /* Android's folders are real projects. Local collections remain a separate,
    explicitly device-local preference; folder filters never move an original. */
 .library-browser{display:grid;grid-template-columns:minmax(11rem,14rem) minmax(0,1fr);align-items:start;gap:var(--space-5);min-width:0;}
+.library-browser.library-folders-closed{grid-template-columns:minmax(0,1fr)}
+#library-projects[hidden]{display:none}
+.gallery-tools .gallery-search{flex-grow:1}
+.gallery-montage-form{display:grid;gap:var(--space-3);margin-top:var(--space-4)}
+.gallery-montage-form select{width:100%}
+#library-montage-status:empty{display:none}
+#library-montage-status[data-state="error"]{color:var(--danger)}
 .library-files{min-width:0;}
 #library-projects{display:grid;gap:var(--space-1);position:sticky;top:0;max-height:calc(100dvh - 14rem);overflow:auto;overscroll-behavior:contain;padding:var(--space-3);border:1px solid var(--t-line);border-radius:var(--radius-lg);background:var(--t-s1);min-width:0;}
 .library-projects-heading{display:grid;gap:var(--space-1);padding:var(--space-2) var(--space-2) var(--space-3);}

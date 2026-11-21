@@ -2,12 +2,19 @@
 const Corte={snapshot:null,projectId:null,jobs:[],selected:new Set(),playhead:0,zoom:70,busy:false,error:'',loaded:false,audioTrackId:null};
 const corteMediaAnalysis=new Map();
 const corteGlyph=name=>`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${({media:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="16" cy="8" r="1"/>',video:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/>',audio:'<path d="M9 18V5l11-2v13M9 7l11-2"/><ellipse cx="6" cy="18" rx="3" ry="3"/><ellipse cx="17" cy="16" rx="3" ry="3"/>',chat:'<path d="M21 12a8 8 0 0 1-8 8H5l-3 2V11a9 9 0 0 1 18-2"/><path d="m18 2 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z"/>',focus:'<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',plus:'<path d="M12 5v14M5 12h14"/>',search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',play:'<path d="m9 5 11 7-11 7Z"/>',export:'<path d="M12 15V3m-4 4 4-4 4 4M4 14v6h16v-6"/>'})[name]||''}</svg>`;
-let cortePanels={media:true,chat:true},corteSearch='';
+let cortePanels={media:true,chat:matchMedia('(min-width: 1450px)').matches},corteSearch='',corteInspectorOpen=false;
 try{const saved=JSON.parse(localStorage.getItem('corte-panels'));if(saved&&typeof saved.media==='boolean'&&typeof saved.chat==='boolean')cortePanels=saved;}catch{}
 function corteApplyPanels(){
  const layout=$('.corte-layout');if(!layout)return;
- for(const side of ['media','chat']){layout.classList.toggle('hide-'+side,!cortePanels[side]);document.querySelector(`[data-corte="${side}"]`)?.setAttribute('aria-pressed',String(cortePanels[side]));}
- document.querySelector('[data-corte="focus"]')?.setAttribute('aria-pressed',String(!cortePanels.media&&!cortePanels.chat));
+ const showChat=cortePanels.chat&&!corteInspectorOpen;
+ layout.classList.toggle('hide-media',!cortePanels.media);
+ layout.classList.toggle('hide-chat',!showChat&&!corteInspectorOpen);
+ $('#corte-chat').hidden=!showChat;
+ $('#corte-inspector').hidden=!corteInspectorOpen;
+ document.querySelector('[data-corte="media"]')?.setAttribute('aria-pressed',String(cortePanels.media));
+ document.querySelector('[data-corte="chat"]')?.setAttribute('aria-pressed',String(showChat));
+ document.querySelector('[data-corte="inspector"]')?.setAttribute('aria-pressed',String(corteInspectorOpen));
+ document.querySelector('[data-corte="focus"]')?.setAttribute('aria-pressed',String(!cortePanels.media&&!showChat&&!corteInspectorOpen));
 }
 function corteTimecode(){
  const node=$('#corte-timecode');if(!node)return;
@@ -64,7 +71,11 @@ function renderCorte(){
  <div class="corte-layout" style="--corte-media:${Number(localStorage.getItem('corte-media-width'))||224}px;--corte-chat:${Number(localStorage.getItem('corte-chat-width'))||320}px">
  <aside id="corte-media" class="corte-media"><div class="corte-divider" role="separator" aria-label="Ancho de medios" data-corte-resize="media"></div><div class="corte-panel-heading"><h3>Medios</h3><span id="corte-asset-count"></span></div><button data-corte="import" class="corte-import">${corteGlyph('plus')}Importar archivos</button><label class="corte-search">${corteGlyph('search')}<input id="corte-search" type="search" aria-label="Buscar medios del proyecto" placeholder="Buscar medios" value="${escape(corteSearch)}"></label><div id="corte-assets"></div></aside>
  <section class="corte-edit"><div class="corte-monitor"><div class="corte-monitor-bar"><span>VISOR</span><output id="corte-timecode" aria-label="Posición del cabezal">00:00.00</output><button data-corte="preview">${corteGlyph('play')}Preparar visor</button></div><div class="corte-viewer"><video id="corte-video" controls preload="metadata"></video><div class="corte-viewer-empty">${corteGlyph('video')}<strong>Tu historia empieza aquí</strong><span>Añade medios a la línea de tiempo.</span></div></div><div id="corte-preview-state">Prepara el visor para reproducir el montaje.</div></div><div class="corte-timeline-panel"><div class="corte-timeline-heading"><span>MONTAJE</span><div class="corte-audio-destination"><select id="corte-audio-target" aria-label="Pista de audio de destino"></select><button data-corte="add-audio-track" title="Añadir pista de audio" aria-label="Añadir pista de audio">${corteGlyph('plus')}Audio</button></div><span id="corte-selection-info"></span></div><div class="corte-controls"><div class="corte-control-group"><button data-corte="undo" title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button><button data-corte="redo" title="Rehacer (Ctrl+Mayús+Z)" aria-label="Rehacer">↷</button></div><div class="corte-control-group"><button data-corte="split" title="Dividir en el cabezal">Dividir</button><button data-corte="duplicate">Duplicar</button><button data-corte="delete" title="Eliminar selección (Supr)">Eliminar</button></div><div class="corte-control-group"><button data-corte="inspector">Inspector</button><button data-corte="title">Título</button></div><label class="corte-zoom">Zoom <input id="corte-zoom" type="range" min="15" max="250" value="${Corte.zoom}"></label></div><div id="corte-timeline" tabindex="0" aria-label="Línea de tiempo"></div></div><p id="corte-error" role="alert"></p><div id="corte-jobs" aria-live="polite"></div></section>
- <aside id="corte-chat" class="agent-view"></aside></div>`;
+ <aside id="corte-chat" class="agent-view" hidden></aside>
+ <aside id="corte-inspector" aria-labelledby="corte-inspector-title" hidden>
+  <div class="corte-panel-heading"><h3 id="corte-inspector-title">Inspector</h3><button type="button" data-corte="close-inspector" aria-label="Cerrar inspector">×</button></div>
+  <div id="corte-inspector-content"></div>
+ </aside></div>`;
  renderCorteTimeline();renderCorteAssets();renderAssistant();corteApplyPanels();
  const video=$('#corte-video');video.addEventListener('timeupdate',()=>{Corte.playhead=Math.round(video.currentTime*1e6);corteTimecode();const line=$('.corte-playhead');if(line)line.style.left=(100+Corte.playhead/1e6*Corte.zoom)+'px';});
  if(Corte.loaded&&Agent.snapshot?.projectId&&Agent.snapshot.projectId!==Corte.projectId&&!Corte.loading){Corte.loading=true;corteOpen(Agent.snapshot.projectId).catch(e=>toast(e.message)).finally(()=>Corte.loading=false);return;}
@@ -75,7 +86,11 @@ function renderCorteTimeline(){
  const scroll={left:timeline.scrollLeft,top:timeline.scrollTop},focusedClip=timeline.contains(document.activeElement)?document.activeElement.dataset.corteClip:null;
  corteTimecode();corteAudioTargets();
  const selected=corteClips().some(c=>Corte.selected.has(c.id));
- for(const action of ['split','duplicate','delete','inspector'])document.querySelector(`[data-corte="${action}"]`)?.toggleAttribute('disabled',!selected||Corte.busy);
+ for(const action of ['split','duplicate','delete'])document.querySelector(`[data-corte="${action}"]`)?.toggleAttribute('disabled',!selected||Corte.busy);
+ const inspector=document.querySelector('#content .corte-controls [data-corte="inspector"]');
+ inspector?.setAttribute('aria-controls','corte-inspector');
+ inspector?.toggleAttribute('disabled',!selected&&!corteInspectorOpen);
+ renderCorteInspector();
  for(const action of ['undo','redo'])document.querySelector(`[data-corte="${action}"]`)?.toggleAttribute('disabled',!Corte.snapshot?.[action+'_id']||Corte.busy);
  for(const action of ['preview','export','title'])document.querySelector(`[data-corte="${action}"]`)?.toggleAttribute('disabled',!Corte.snapshot||Corte.busy||(['preview','export'].includes(action)&&!corteClips().length));
  const info=$('#corte-selection-info');if(info)info.textContent=selected?Corte.selected.size+' seleccionado'+(Corte.selected.size>1?'s':''):corteClips().length+' clip'+(corteClips().length===1?'':'s');
@@ -121,10 +136,48 @@ async function corteFocus(){
  const video=$('#corte-video');if(video?.src)video.currentTime=Corte.playhead/1e6;
 }
 async function corteOps(ops,label){return corteMutate('apply_ops',{ops,label});}
+function renderCorteInspector(){
+ const content=$('#corte-inspector-content');
+ if(!content||!corteInspectorOpen)return;
+ const clips=corteClips().filter(clip=>Corte.selected.has(clip.id));
+ const markup=clips.length?`<p class="hint">${clips.length===1?escape(clips[0].name||'1 clip'):`${clips.length} clips seleccionados`}</p>
+   <div class="corte-inspector-tools">
+    <button data-corte-color="bw">Blanco y negro</button><button data-corte-color="blue">Azul</button>
+    <button data-corte-color="green">Verde</button><button data-corte-color="reset">Restablecer color</button>
+    <button data-corte="fades">Fundidos</button><button data-corte="transition">Transición a negro</button>
+    <button data-corte="marker">Añadir marcador</button>
+   </div>`:'<p class="hint">Selecciona un clip en la línea de tiempo.</p>';
+ if(content.innerHTML!==markup)content.innerHTML=markup;
+}
+async function cortePlaceAsset(assetId,atUs=Corte.playhead){
+ const asset=Agent.snapshot?.index.assets.find(item=>item.id===assetId);
+ return corteMutate('import_media',{asset_ids:[assetId],audio_track_id:Corte.audioTrackId,
+  ...(asset?.type==='AUDIO'?{mode:'mix'}:{}),at_us:atUs});
+}
+function corteShowError(error){
+ const status=$('#corte-error');
+ if(view!=='editor'||!status){toast(error.message);return;}
+ Corte.error=error.message;
+ if(Corte.snapshot)renderCorteTimeline();
+ else status.textContent=error.message;
+}
 async function corteAction(action){
  if(action==='chat'||action==='media'||action==='focus'){
-  if(action==='focus'){const focus=cortePanels.media||cortePanels.chat;cortePanels={media:!focus,chat:!focus};}else cortePanels[action]=!cortePanels[action];
+  if(action==='focus'){
+   const focus=cortePanels.media||cortePanels.chat||corteInspectorOpen;
+   cortePanels={media:!focus,chat:!focus};corteInspectorOpen=false;
+  }else if(action==='chat'&&corteInspectorOpen){
+   corteInspectorOpen=false;cortePanels.chat=true;
+  }else cortePanels[action]=!cortePanels[action];
   localStorage.setItem('corte-panels',JSON.stringify(cortePanels));corteApplyPanels();return;
+ }
+ if(action==='inspector'||action==='close-inspector'){
+  corteInspectorOpen=action==='inspector'&&!corteInspectorOpen;
+  if($('#dialog').open)$('#dialog').close();
+  renderCorteInspector();corteApplyPanels();
+  if(corteInspectorOpen)$('#corte-inspector [data-corte="close-inspector"]')?.focus();
+  else $('#content .corte-controls [data-corte="inspector"]')?.focus();
+  return;
  }
  if(action==='add-audio-track'){modal(`<h2>Nueva pista de audio</h2><form id="corte-audio-new"><label>Nombre<input name="name" maxlength="80" value="Audio ${(Corte.snapshot?.project.timeline.audioTracks.length||0)+1}" required></label><label>Uso<select name="role"><option value="GENERIC_AUDIO">Audio</option><option value="MUSIC">Música</option><option value="VOICE_OVER">Voz en off</option><option value="DIALOGUE">Diálogo</option><option value="AMBIENCE">Ambiente</option><option value="SFX">Efectos</option></select></label><p class="corte-form-error" role="alert"></p><button class="primary" type="submit">Crear pista</button></form>`);return;}
  if(action==='new'){const name=prompt('Nombre del proyecto');if(!name?.trim())return;await agentCall('createProject',{name});await corteOpen(Agent.snapshot.projectId);return;}
@@ -138,10 +191,6 @@ async function corteAction(action){
  if(action==='split')return corteOps([{op:'split',clip_ids:ids,at_us:Corte.playhead}],'Dividir');
  if(action==='duplicate'||action==='delete')return corteOps([{op:action,clip_ids:ids,ripple:true}],action==='delete'?'Eliminar':'Duplicar');
  if(action==='title'){const text=prompt('Texto del título');if(text)return corteOps([{op:'add_title',at_us:Corte.playhead,duration_us:3000000,text}],'Título');return;}
- if(action==='inspector'){
-  if(!ids.length)throw Error('Selecciona un clip.');
-  modal(`<h2>Inspector</h2><p>${ids.length} clips seleccionados</p><button data-corte-color="bw">Blanco y negro</button><button data-corte-color="blue">Azul</button><button data-corte-color="green">Verde</button><button data-corte-color="reset">Restablecer color</button><button data-corte="fades">Fundidos de entrada y salida</button><button data-corte="transition">Transición a negro</button><button data-corte="marker">Marcador</button>`);return;
- }
  if(action==='marker'){const label=prompt('Nombre del marcador');if(label!=null)return corteOps([{op:'add_marker',at_us:Corte.playhead,label}],'Marcador');return;}
  if(action==='fades')return corteOps([{op:'set_video',clip_ids:ids,fade_in_us:250000,fade_out_us:250000},{op:'set_audio',clip_ids:ids,fade_in_us:250000,fade_out_us:250000}],'Fundidos');
  if(action==='transition'){
@@ -150,7 +199,10 @@ async function corteAction(action){
   return corteOps([{op:'set_transition',track_id:track.id,left_clip_id:track.clips[index].id,right_clip_id:track.clips[index+1].id,kind:track.kind==='VIDEO'?'DIP_TO_BLACK':'AUDIO_CROSSFADE',duration_us:500000}],'Transición');
  }
  if(action==='preview'||action==='export'){
-  await corteMutate(action);toast(action==='preview'?'Preparando el montaje del visor…':'Exportación en cola');cortePollJobs();return;
+  await corteMutate(action);
+  const status=$('#corte-preview-state');
+  if(action==='preview'&&status)status.textContent='Preparando el visor…';
+  cortePollJobs();return;
  }
 }
 async function cortePollJobs(){
@@ -182,21 +234,77 @@ document.addEventListener('click',async e=>{
   if(button.dataset.cortePlace||button.dataset.corteAfter){
    const selected=corteClips().find(c=>Corte.selected.has(c.id));
    if(button.dataset.corteAfter&&!selected)throw Error('Selecciona el clip después del que insertar.');
-   const assetId=button.dataset.cortePlace||button.dataset.corteAfter,asset=Agent.snapshot?.index.assets.find(a=>a.id===assetId);
-   return await corteMutate('import_media',{asset_ids:[assetId],audio_track_id:Corte.audioTrackId,...(asset?.type==='AUDIO'?{mode:'mix'}:{}),at_us:button.dataset.corteAfter?selected.timelineStartUs+selected.durationUs:Corte.playhead});
+   const at=button.dataset.corteAfter?selected.timelineStartUs+selected.durationUs:Corte.playhead;
+   return await cortePlaceAsset(button.dataset.cortePlace||button.dataset.corteAfter,at);
   }
   if(button.dataset.corteColor){const colors={bw:{saturation:-1},blue:{temperature:-1},green:{tint:-1},reset:{exposure:0,contrast:0,saturation:0,temperature:0,tint:0,fade:0}};return await corteOps([{op:'set_color',clip_ids:[...Corte.selected],...colors[button.dataset.corteColor]}],'Color');}
   if(button.dataset.corteCancel)return await corteRpc('cancel_export',{job_id:button.dataset.corteCancel});
   await corteAction(button.dataset.corte);
- }catch(error){toast(error.message);}
+ }catch(error){corteShowError(error);}
 });
 document.addEventListener('change',e=>{if(e.target.id==='corte-audio-target'){Corte.audioTrackId=e.target.value;renderCorteTimeline();}if(e.target.id==='corte-project'&&e.target.value)corteOpen(e.target.value).catch(e=>toast(e.message));});
 document.addEventListener('change',e=>{if(view==='editor'&&e.target.id==='agent-project'){e.stopImmediatePropagation();if(e.target.value)corteOpen(e.target.value).catch(e=>toast(e.message));else{e.target.value=Corte.projectId;toast('Abre otro proyecto para cambiar el montaje.');}}},true);
 document.addEventListener('input',e=>{if(e.target.id==='corte-zoom'){Corte.zoom=Number(e.target.value);renderCorteTimeline();}if(e.target.id==='corte-search'){corteSearch=e.target.value;renderCorteAssets();}});
 let corteDrag;
-document.addEventListener('dragstart',e=>{const c=e.target.closest('[data-corte-clip]');if(c){corteDrag={id:c.dataset.corteClip,x:e.clientX};e.dataTransfer.setData('text/plain',corteDrag.id);}});
-document.addEventListener('dragover',e=>{if(e.target.closest('#corte-timeline'))e.preventDefault();});
-document.addEventListener('drop',e=>{if(!corteDrag||!e.target.closest('#corte-timeline'))return;e.preventDefault();const drag=corteDrag;corteDrag=null;corteOps([{op:'move',clip_ids:[drag.id],delta_us:Math.round((e.clientX-drag.x)/Corte.zoom*1e6),mode:'insert'}],'Mover clip').catch(e=>toast(e.message));});
+function corteDropPosition(drag,x,timeline){
+ const pixelsToUs=1e6/Corte.zoom;
+ const start=Math.max(0,drag.startUs+Math.round((x-drag.x+timeline.scrollLeft-drag.scrollLeft)*pixelsToUs));
+ const end=start+drag.durationUs;
+ let distance=8*pixelsToUs,target=null,delta=0;
+ for(const guide of drag.guides){
+  for(const edge of [start,end]){
+   const shift=guide-edge;
+   if(Math.abs(shift)>distance||start+shift<0)continue;
+   distance=Math.abs(shift);target=guide;delta=shift;
+  }
+ }
+ const insertion=start+delta;
+ // In insert mode, dropping inside the dragged clip's own span keeps its position.
+ if(insertion>=drag.startUs&&insertion<=drag.startUs+drag.durationUs)return {deltaUs:0,target:null};
+ return {deltaUs:insertion-drag.startUs,target};
+}
+function corteClearDrag(){
+ corteDrag=null;
+ $('#corte-snap-guide')?.remove();
+}
+document.addEventListener('dragstart',e=>{
+ const timeline=e.target.closest('#corte-timeline'),node=e.target.closest('[data-corte-clip]');
+ const clip=node&&corteClips().find(item=>item.id===node.dataset.corteClip);
+ if(!timeline||!clip||Corte.busy)return;
+ const guides=new Set([0,Corte.playhead]);
+ for(const marker of Corte.snapshot.project.timeline.markers||[])guides.add(marker.timeUs);
+ for(const other of corteClips()){
+  if(other.id!==clip.id){guides.add(other.timelineStartUs);guides.add(other.timelineStartUs+other.durationUs);}
+ }
+ corteDrag={id:clip.id,x:e.clientX,scrollLeft:timeline.scrollLeft,projectId:Corte.projectId,revision:Corte.snapshot.revision,
+  startUs:clip.timelineStartUs,durationUs:clip.durationUs,guides};
+ e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',clip.id);
+});
+document.addEventListener('dragover',e=>{
+ const timeline=e.target.closest('#corte-timeline');
+ if(!timeline||!corteDrag||Corte.busy||Corte.snapshot?.revision!==corteDrag.revision||Corte.projectId!==corteDrag.projectId)return;
+ e.preventDefault();e.dataTransfer.dropEffect='move';
+ const {target}=corteDropPosition(corteDrag,e.clientX,timeline);
+ let guide=$('#corte-snap-guide');
+ if(target===null){guide?.remove();return;}
+ if(!guide){
+  guide=document.createElement('div');guide.id='corte-snap-guide';guide.setAttribute('aria-hidden','true');timeline.append(guide);
+ }
+ guide.style.left=(100+target/1e6*Corte.zoom)+'px';
+});
+document.addEventListener('dragleave',e=>{
+ const timeline=e.target.closest('#corte-timeline');
+ if(timeline&&!timeline.contains(e.relatedTarget))$('#corte-snap-guide')?.remove();
+});
+document.addEventListener('drop',e=>{
+ const timeline=e.target.closest('#corte-timeline'),drag=corteDrag;
+ if(!timeline||!drag)return;
+ e.preventDefault();corteClearDrag();
+ if(Corte.busy||Corte.snapshot?.revision!==drag.revision||Corte.projectId!==drag.projectId)return;
+ const {deltaUs}=corteDropPosition(drag,e.clientX,timeline);
+ if(deltaUs)corteOps([{op:'move',clip_ids:[drag.id],delta_us:deltaUs,mode:'insert'}],'Mover clip').catch(corteShowError);
+});
+document.addEventListener('dragend',corteClearDrag);
 document.addEventListener('keydown',e=>{
  if(view!=='editor'||e.target.closest('input,textarea,select,button,summary,a,[contenteditable="true"]'))return;
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();corteAction(e.shiftKey?'redo':'undo').catch(e=>toast(e.message));}

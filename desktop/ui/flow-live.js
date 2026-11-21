@@ -3,7 +3,18 @@ const client={socket:null,token:null,phase:'idle',message:'Conecta para ver y co
 const escapeText=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const el=id=>document.getElementById(id);
 function active(){return typeof view!=='undefined'&&view==='flow';}
-function status(message,phase=client.phase){client.message=message;client.phase=phase;if(el('flow-live-status'))el('flow-live-status').textContent=message;const frame=el('flow-live-canvas');if(frame)frame.setAttribute('aria-disabled',String(phase!=='live'));if(el('flow-live-connect'))el('flow-live-connect').textContent=phase==='live'?'Desconectar':phase==='connecting'?'Conectando…':'Conectar';}
+function status(message,phase=client.phase){
+ client.message=message;client.phase=phase;
+ const workspace=el('flow-live-workspace');if(!workspace)return;
+ const live=phase==='live',connecting=phase==='connecting',frame=el('flow-live-canvas'),connect=el('flow-live-connect');
+ workspace.dataset.phase=phase;
+ el('flow-live-status').textContent=message;
+ frame.setAttribute('aria-disabled',String(!live));frame.tabIndex=live?0:-1;
+ if(!live)el('flow-live-placeholder').hidden=false;
+ connect.textContent=live?'Desconectar':connecting?'Conectando…':'Conectar';
+ connect.disabled=connecting;connect.classList.toggle('primary',!live);
+ workspace.querySelectorAll('[data-flow-command],#flow-live-desktop,#flow-live-type').forEach(button=>button.disabled=!live);
+}
 function send(event){if(client.phase==='live'&&client.socket?.readyState===WebSocket.OPEN)client.socket.send(JSON.stringify(event));}
 async function session(){const response=await fetch('/session',{cache:'no-store'});if(!response.ok)throw Error('No se pudo abrir la sesión local.');const value=await response.json();client.token=value.token;return value.token;}
 const url=path=>'/flow-live/'+path+(path.includes('?')?'&':'?')+'token='+encodeURIComponent(client.token||'');
@@ -31,7 +42,7 @@ async function draw(bytes,socket){
  const sequence=++client.frame;
  try{const bitmap=await createImageBitmap(new Blob([bytes],{type:'image/jpeg'}));
   if(sequence!==client.frame||client.socket!==socket||!active()){bitmap.close();return;}
-  const canvas=el('flow-live-canvas');if(canvas){canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext('2d',{alpha:false}).drawImage(bitmap,0,0);el('flow-live-placeholder')?.remove();}bitmap.close();
+  const canvas=el('flow-live-canvas');if(canvas){canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext('2d',{alpha:false}).drawImage(bitmap,0,0);el('flow-live-placeholder').hidden=true;}bitmap.close();
  }catch{status('No se pudo mostrar el último fotograma. Puedes actualizar la vista.','error');}
 }
 function message(data){

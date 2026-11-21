@@ -29,9 +29,9 @@ function setText(node,text){if(node&&node.textContent!==text)node.textContent=te
 
 /* ---------- Vocabulary, header and navigation ---------- */
 const VIEWS={
- editor:['Corte · Montaje','Monta y edita tus medios locales con el agente'],
- assistant:['Agente','Planifica y prepara tus creaciones conversando'],
- canvas:['ArtBox','Describe tu idea, elige un modelo y revisa el coste antes de generar'],
+ editor:['Montaje','Visor y línea de tiempo del proyecto'],
+ assistant:['Agente','Conversaciones y encargos'],
+ canvas:['ArtBox','Imagen, vídeo y audio'],
  story:['Guion','Historia, storyboard y material del mismo proyecto'],
  flow:['Flow','Tu sesión de Flow en directo, con sus controles y encargos'],
  catalog:['Modelos','Elige por lo que quieres conseguir'],
@@ -61,7 +61,7 @@ function header(){
  if(wantsContinuity&&!continuity)actions.insertAdjacentHTML('beforeend',`<button type="button" id="continuity-shortcut" data-continuity-open title="Continuar en otro dispositivo" aria-label="Continuar en otro dispositivo">${svg('<rect x="3" y="4" width="12" height="9" rx="1.5"/><path d="M6 17h6M9 13v4"/><rect x="17" y="8" width="4" height="11" rx="1"/>')}<span>Dispositivos</span></button>`);
  else if(!wantsContinuity&&continuity)continuity.remove();
  if(!actions.querySelector('#nx-tools')){
-  actions.insertAdjacentHTML('beforeend',`<details id="nx-tools" class="nx-menu nx-tools"><summary title="Herramientas locales">${glyph.tools}<span>Herramientas</span></summary><div class="nx-menu-panel" role="group" aria-label="Herramientas locales">${TOOLS.map(([id,label,hint])=>`<button type="button" class="nx-menu-item" data-parity="${id}"><strong>${label}</strong><small>${hint}</small></button>`).join('')}</div></details>`);
+  actions.insertAdjacentHTML('beforeend',`<details id="nx-tools" class="nx-menu nx-tools"><summary title="Herramientas locales" aria-label="Herramientas locales">${glyph.tools}<span>Herramientas</span></summary><div class="nx-menu-panel" role="group" aria-label="Herramientas locales">${TOOLS.map(([id,label,hint])=>`<button type="button" class="nx-menu-item" data-parity="${id}"><strong>${label}</strong><small>${hint}</small></button>`).join('')}</div></details>`);
  }
  const chip=$('#parity-balance-chip');
  if(chip){chip.classList.add('nx-balance');if(chip.parentElement===actions&&actions.lastElementChild!==chip)actions.append(chip);}
@@ -88,10 +88,10 @@ const stageKey=()=>{const j=stageJob();return JSON.stringify([j?.id,j?.status,me
 function stageMarkup(){
  const j=stageJob(),url=mediaOf(j),label=j?(j.name||models.find(m=>m.id===j.modelId)?.displayName||j.modelId):'';
  if(busy&&!j)return `<div class="nx-stage-frame is-working" role="status"><span class="loading"></span><strong>Enviando la petición…</strong><span>Espera la confirmación del proveedor.</span></div>`;
- if(!j)return `<div class="nx-stage-frame is-empty"><img class="nx-stage-logo" src="branding/nexus-logo.png" alt="Logo oficial de NEXUS" width="88" height="84"><strong>Tu creación aparecerá aquí</strong><span>${loaded?'Describe la escena, revisa el coste y pulsa Generar.':'Elige un modelo, describe la escena y revisa el coste.'} El resultado se mostrará en este espacio y quedará en tu biblioteca.</span></div>`;
+ if(!j)return `<div class="nx-stage-frame is-empty">${glyph.image}<strong>Vista previa</strong><span>El resultado aparecerá aquí al generar.</span></div>`;
  if(activeJob(j))return `<div class="nx-stage-frame is-working" role="status"><span class="loading"></span><strong>${j.status==='SENDING'?'Enviando la petición…':'Generando con '+escape(label)}</strong><span>${escape(String(j.prompt||'').slice(0,140))}</span><small>El estado se actualiza solo. Puedes seguir trabajando.</small></div>`;
  if(j.status==='FAILED')return `<div class="nx-stage-frame is-error" role="status"><strong>No se completó la última creación</strong><span>${escape(String(j.error||'El proveedor no completó la tarea.').slice(0,180))}</span><button type="button" data-creative-job="${escape(j.id)}">Ver detalles</button></div>`;
- const poster=stagePoster(j),visual=url&&isMediaUrl(url)&&poster?`<img data-gallery-preview="thumbnail" data-stage-poster="${escape(poster)}" alt="${escape(label)}" decoding="async">`:'<span class="nx-stage-missing">Resultado sin vista previa</span>';
+ const poster=stagePoster(j),visual=url&&isMediaUrl(url)&&poster?`<img data-gallery-preview="thumbnail" data-stage-poster="${escape(poster)}" alt="${escape(label)}" decoding="async"><span class="nx-stage-loading">Preparando vista previa…</span>`:'<span class="nx-stage-missing">Resultado sin vista previa</span>';
  return `<button type="button" class="nx-stage-frame is-result" data-creative-job="${escape(j.id)}" aria-label="Abrir ${escape(label)}">${visual}<span class="nx-stage-caption"><strong>${escape(label)}</strong><small>Última creación · abrir detalles</small></span></button>`;
 }
 function create(){
@@ -130,7 +130,7 @@ function create(){
  if(motor){motor.classList.toggle('is-empty',!loaded);if(!loaded)setText(motor,'Elegir modelo');}
  const refs=command.querySelector('.creative-references');
  if(refs&&loaded)refs.querySelector('.nx-ref-hint')?.remove();
- if(refs&&!loaded&&!refs.querySelector('.nx-ref-hint'))refs.insertAdjacentHTML('beforeend','<p class="nx-ref-hint">Referencias: al elegir un modelo verás qué imágenes, vídeos o audios admite.</p>');
+ if(refs&&!loaded&&!refs.querySelector('.nx-ref-hint'))refs.insertAdjacentHTML('beforeend','<p class="nx-ref-hint">Elige un modelo para adjuntar referencias.</p>');
  const footer=command.querySelector('.creative-command-footer'),generate=$('#generate');
  let reason=command.querySelector('#nx-generate-reason');
  if(footer&&generate&&!reason){reason=document.createElement('p');reason.id='nx-generate-reason';reason.className='nx-generate-reason';reason.setAttribute('aria-live','polite');footer.append(reason);}
@@ -140,7 +140,8 @@ function create(){
   const validation=$('#validation')?.textContent.trim();
   const why=busy?'Enviando… espera la confirmación del proveedor.':!loaded?'Elige un modelo para poder generar.':generate.disabled?(validation?'':'Vuelve a consultar el coste para poder generar.'):'';
   setText(reason,why);reason.hidden=!why;
-  if(generate.getAttribute('aria-describedby')!=='nx-generate-reason')generate.setAttribute('aria-describedby','nx-generate-reason');
+  const description=validation?'validation':'nx-generate-reason';
+  if(generate.getAttribute('aria-describedby')!==description)generate.setAttribute('aria-describedby',description);
  }
  if(guide&&!guide.dataset.ten){
   guide.dataset.ten='1';guide.classList.add('nx-guide');

@@ -1,7 +1,12 @@
 'use strict';
 // Presentation layer: retain original controls, schema validation and dispatch handlers.
 (()=>{
- let scheduled=false,dockExpanded=false,dockSynced=false;
+ let scheduled=false,dockPreference=null;
+ const dockWidth=matchMedia('(min-width: 1150px)');
+ try {
+  const saved=localStorage.getItem('nexus-dock-expanded');
+  if(saved==='true'||saved==='false')dockPreference=saved==='true';
+ } catch {}
  let trayKey='';
  const el=(tag,cls,html='')=>{const n=document.createElement(tag);n.className=cls;n.innerHTML=html;return n;};
  const text=(n,s)=>{if(n&&n.textContent!==s)n.textContent=s;};
@@ -14,17 +19,20 @@
  }
  function shell(){
   document.body.classList.add('creative-engine');
-  if(!dockSynced&&typeof initial!=='undefined'&&initial){
-   dockSynced=true;
-   if(!initial.qa)dockExpanded=true;
-  }
+  const dockExpanded=dockPreference??dockWidth.matches;
   document.body.classList.toggle('creative-dock-expanded',dockExpanded);
   const brand=$('.sidebar .brand');
   let toggle=$('#creative-dock-toggle');
   if(!toggle&&brand){
    toggle=el('button','creative-dock-toggle','<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>');
    toggle.id='creative-dock-toggle';toggle.type='button';
-   toggle.onclick=e=>{e.stopPropagation();dockSynced=true;dockExpanded=!dockExpanded;document.body.classList.toggle('creative-dock-expanded',dockExpanded);toggle.setAttribute('aria-expanded',String(dockExpanded));toggle.setAttribute('aria-label',dockExpanded?'Contraer navegación':'Expandir navegación');toggle.title=toggle.getAttribute('aria-label');};
+   toggle.setAttribute('aria-controls','navigation');
+   toggle.onclick=e=>{
+    e.stopPropagation();
+    dockPreference=!(dockPreference??dockWidth.matches);
+    try {localStorage.setItem('nexus-dock-expanded',String(dockPreference));} catch {}
+    shell();
+   };
    brand.append(toggle);
   }
   if(toggle){
@@ -34,6 +42,8 @@
    toggle.title=toggle.getAttribute('aria-label');
   }
   document.querySelectorAll('.sidebar button[data-nav],#studio-settings').forEach(b=>{
+   if(b.dataset.nav===view)b.setAttribute('aria-current','page');
+   else b.removeAttribute('aria-current');
    if(b.dataset.creativeLabel)return;
    const label=b.textContent.trim();b.dataset.creativeLabel=label;b.title=label;b.setAttribute('aria-label',label);
    const span=el('span','creative-nav-label');[...b.childNodes].filter(n=>n.nodeType===3).forEach(n=>span.append(n));b.append(span);
@@ -57,22 +67,50 @@
   const canvasRoot=$('.canvas');if(canvasRoot)canvasRoot.classList.add('creative-layout');
   const command=el('section','creative-command');command.id='creative-command';command.dataset.provider=loaded?.providerId||'';command.setAttribute('aria-label','Crear con tus modelos');
   if(!loaded)command.classList.add('studio-start','nx-create-start');
-  if(loaded){const marker=el('span','nx-selected-label sr-only','MODELO');command.append(marker);}
+  const modelRow=el('div','creative-model-row');
+  const modelField=el('div','creative-model-field');
+  const motor=el('button','creative-motor');
+  motor.type='button';motor.dataset.studio='picker';motor.textContent=loaded?family(loaded):'Elegir modelo';
+  motor.title=loaded?'Cambiar modelo · '+loaded.displayName:'Elegir modelo';
+  modelField.append(el('span','creative-field-caption','Modelo'),motor);modelRow.append(modelField);
+  if(loaded){
+   const choices=studioVariantRows(loaded),variantField=el('div','creative-model-field creative-variant-field');
+   if(choices.length>1){
+    const label=el('label','creative-field-caption','Variante');label.htmlFor='creative-variant';
+    const select=el('select','creative-variant');select.id='creative-variant';
+    for(const m of choices){
+     const name=studioVariantName(m);
+     const routeLabel=choices.some(x=>x.id!==m.id&&studioVariantName(x)===name)?name+' · '+(providers[m.providerId]||m.providerId):name;
+     select.add(new Option(routeLabel,m.id,false,m.id===loaded.id));
+    }
+    variantField.append(label,select);
+   } else {
+    const value=el('span','creative-variant-value');value.textContent=studioVariantName(loaded);
+    variantField.append(el('span','creative-field-caption','Variante'),value);
+   }
+   modelRow.append(variantField);
+  }
+  const variantStatus=el('p','creative-variant-status');variantStatus.id='creative-variant-status';variantStatus.setAttribute('role','status');variantStatus.hidden=true;
   const input=el('div','creative-input');prompt.setAttribute('aria-label','Describe tu creación');prompt.placeholder='Describe la escena, iluminación, composición o movimiento…';prompt.rows=3;input.append(prompt);
   const chips=el('div','creative-chips');
-  const motor=el('button','creative-motor');motor.type='button';motor.dataset.studio='picker';motor.textContent=loaded?loaded.displayName:'Elegir modelo';motor.title=loaded?loaded.displayName+' · Cambiar modelo':'Elegir modelo';chips.append(motor);
-  const extras=el('details','creative-parameters','<summary>Más parámetros</summary><div class="creative-parameter-body"></div>');
+  const extras=el('details','creative-parameters','<summary>Avanzado</summary><div class="creative-parameter-body"></div>');
   const parameterBody=extras.lastElementChild;
   source.querySelectorAll('[data-param]').forEach(control=>{
    const field=control.closest('.field');if(!field)return;
    const p=loaded?.parameters.find(p=>p.key===control.dataset.param);
    // Promote schema fields, never invent aspect ratios, resolutions or durations.
-   const quick=control.tagName==='SELECT'&&/aspect|ratio|resolution|duration/i.test(p?.key||'');
+   const quick=!p?.isAdvanced&&control.tagName==='SELECT'&&/aspect|ratio|resolution|duration/i.test(p?.key||'');
    (quick?chips:parameterBody).append(field);if(quick)field.classList.add('creative-chip');
   });
   const references=el('div','creative-references');source.querySelectorAll('.drop').forEach(field=>{
-   const add=field.querySelector('[data-pick]');if(add){add.classList.add('creative-reference-action');add.title=field.querySelector('label')?.textContent||'Añadir referencia';add.textContent='+ '+add.title;chips.append(add);}
-   if(!field.querySelector('.file'))field.classList.add('creative-reference-empty');references.append(field);
+   const add=field.querySelector('[data-pick]');
+   if(add){
+    const label=loaded?.fields.find(item=>item.key===add.dataset.pick)?.label;
+    add.classList.add('creative-reference-action');add.textContent='Adjuntar';
+    add.setAttribute('aria-label',label?'Adjuntar · '+label:'Adjuntar referencia');
+   }
+   if(!field.querySelector('.file'))field.classList.add('creative-reference-empty');
+   references.append(field);
   });
   const limits=$('#prompt-limits');if(limits)input.append(limits);
   source.querySelectorAll('.studio-more').forEach(n=>parameterBody.append(n));
@@ -84,8 +122,11 @@
   const multi=el('details','creative-multi','<summary aria-label="Opciones de generación" title="Opciones de generación">▾</summary><div><button type="button" data-action="chooseCompare">Multi-Run · varios modelos</button><small>Prompt y ajustes propios por modelo</small></div>');action.append(multi);
   source.querySelectorAll('[data-action="chooseCompare"]').forEach(n=>n.remove());
   const rightTools=el('div','creative-footer-actions');rightTools.append(send,action);
-  const footer=el('div','creative-command-footer');footer.append(chips,rightTools);
-  command.append(input,references);if(parameterBody.children.length)command.append(extras);command.append(footer);
+  const footer=el('div','creative-command-footer');footer.append(rightTools);
+  command.append(modelRow,variantStatus,input,references);
+  if(chips.childElementCount)command.append(chips);
+  if(parameterBody.children.length)command.append(extras);
+  command.append(footer);
   source.replaceWith(command);
   autoResizeTextarea(prompt);
   if(canvasRoot){canvasRoot.querySelector('.canvas-right')?.remove();canvasRoot.append(tray());}
@@ -129,7 +170,8 @@
  document.addEventListener('dragover',e=>{if(e.target.closest('#creative-command')&&e.dataTransfer?.types.includes('application/x-nexus-job')){e.preventDefault();e.dataTransfer.dropEffect='copy';}});
  document.addEventListener('drop',e=>{if(!e.target.closest('#creative-command'))return;const id=e.dataTransfer?.getData('application/x-nexus-job');if(id){e.preventDefault();attach(id,e.target.closest('[data-field]')?.dataset.field);}});
  document.addEventListener('keydown',e=>{
-  if(e.target.id==='prompt'&&e.key==='Enter'&&!e.shiftKey&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.isComposing&&!e.repeat){
+  if(!e.defaultPrevented&&view==='canvas'&&e.key==='Enter'&&!e.shiftKey&&!e.altKey&&!e.isComposing&&!e.repeat&&
+    (e.target.id==='prompt'||(e.ctrlKey&&!e.metaKey&&e.target.closest('#creative-command')))){
    e.preventDefault();const b=$('#generate');if(b&&!b.disabled&&!$('#dialog').open)b.click();
   }
   if(e.key==='Escape'){
@@ -150,6 +192,7 @@
   if(view==='canvas'&&current&&key!==trayKey)current.replaceWith(tray());
  }
  function schedule(){if(!scheduled){scheduled=true;setTimeout(mount,0);}}
+ dockWidth.addEventListener('change',schedule);
  new MutationObserver(schedule).observe($('main'),{childList:true,subtree:true});
  new MutationObserver(schedule).observe($('#navigation'),{childList:true});
  const previousResponse=parseResponse;parseResponse=function(...args){const result=previousResponse(...args);schedule();return result;};

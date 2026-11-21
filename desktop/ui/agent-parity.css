@@ -223,7 +223,7 @@ body.nexus-agent-studio :focus-visible {
 
 /* AppShell & Sidebar Architecture */
 body.nexus-agent-studio .sidebar {
-  width: 216px;
+  width: var(--desktop-nav-wide, 166px);
   background: var(--nx-sidebar, var(--panel));
   border-right: 1px solid var(--line);
   padding: 0 10px 10px !important;
@@ -234,7 +234,7 @@ body.nexus-agent-studio .sidebar {
 }
 
 body.nexus-agent-studio.creative-dock-expanded .sidebar {
-  width: 216px !important;
+  width: var(--desktop-nav-wide, 166px) !important;
   padding: 0 10px 10px !important;
 }
 
@@ -285,7 +285,7 @@ body.nexus-agent-studio.creative-dock-expanded .brand .nexus-brand-mark {
 
 body.nexus-agent-studio.creative-dock-expanded .brand .nexus-brand-logo {
   display: block !important;
-  width: 72px;
+  width: 36px;
   height: 26px;
   object-fit: contain;
   flex-shrink: 0;

@@ -1,7 +1,7 @@
 'use strict';
 (()=>{
  const themes=[
-  {id:'aurora',name:'Aurora',bg:'#0A0D12',sidebar:'#0A0D12',panel:'#131922',raised:'#1C2533',border:'#303C4D',text:'#F0F3F8',muted:'#ADB7C6',accent:'#4EBAE8'},
+  {id:'aurora',name:'Aurora',bg:'#121519',sidebar:'#16191D',panel:'#1C2025',raised:'#272D34',border:'#343C46',text:'#F2F5F7',muted:'#AFB9C4',accent:'#6ACBE5'},
   {id:'oled',name:'OLED',bg:'#000000',sidebar:'#000000',panel:'#131922',raised:'#1C2533',border:'#303C4D',text:'#F0F3F8',muted:'#ADB7C6',accent:'#4EBAE8'},
   {id:'quartz',name:'Quartz',bg:'#14110F',sidebar:'#14110F',panel:'#201B17',raised:'#302820',border:'#4C4137',text:'#F6EDE0',muted:'#C2B5A3',accent:'#E0C598'},
   {id:'ocean',name:'Océano',bg:'#0A1420',sidebar:'#0A1420',panel:'#122437',raised:'#1C3147',border:'#324C65',text:'#F0F3F8',muted:'#ADB7C6',accent:'#7DD3FC'},
@@ -12,10 +12,10 @@
  function apply(){
   const t=selected(),body=document.body;body.dataset.interfaceTheme=t.id;body.style.setProperty('--danger',t.id==='light'?'#9C3E42':'#E6A5AA');body.style.setProperty('--error-container',t.id==='light'?'#F7DEDF':'#35262B');
   body.style.colorScheme=t.id==='light'?'light':'dark';
-  for(const [key,value] of Object.entries({bg:t.bg,panel:t.panel,surface:t.raised,line:t.border,text:t.text,muted:t.muted,accent:t.accent}))body.style.setProperty('--'+key,value);
+  for(const [key,value] of Object.entries({bg:t.bg,nav:t.sidebar,panel:t.panel,surface:t.raised,line:t.border,text:t.text,muted:t.muted,accent:t.accent}))body.style.setProperty('--'+key,value);
   // Existing screens consume aliases of one palette, so native controls and
   // nested panels change theme together instead of retaining stale colours.
-  for(const [key,value] of Object.entries({border:'line','nx-bg':'bg','nx-sidebar':'bg','nx-panel':'panel','nx-raised':'surface','nx-border':'line','nx-text':'text','nx-muted':'muted','nx-soft':'muted','surface-0':'bg','surface-1':'panel','surface-2':'surface','surface-3':'surface','surface-4':'line'}))body.style.setProperty('--'+key,`var(--${value})`);
+  for(const [key,value] of Object.entries({border:'line','nx-bg':'bg','nx-sidebar':'nav','nx-panel':'panel','nx-raised':'surface','nx-border':'line','nx-text':'text','nx-muted':'muted','nx-soft':'muted','surface-0':'bg','surface-1':'panel','surface-2':'surface','surface-3':'surface','surface-4':'line'}))body.style.setProperty('--'+key,`var(--${value})`);
  }
  function markup(){return `<h2>Temas</h2><div class="interface-themes" role="group" aria-label="Tema de la interfaz">${themes.map(t=>`<button type="button" data-interface-theme="${t.id}" aria-pressed="${selected().id===t.id}" style="--swatch-bg:${t.bg};--swatch-panel:${t.raised};--swatch-accent:${t.accent}"><span class="theme-preview" aria-hidden="true"><i></i><i></i><i></i></span><span>${t.name}</span><span class="theme-selected" aria-hidden="true">✓</span></button>`).join('')}</div>`;}
  document.addEventListener('click',e=>{

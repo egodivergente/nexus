@@ -61,6 +61,44 @@ function studioModelList(){
  .sort((a,b)=>Number(state.favorites.includes(b.id))-Number(state.favorites.includes(a.id))||Number(state.recent.includes(b.id))-Number(state.recent.includes(a.id)));
  $('#studio-model-list').innerHTML=list.slice(0,50).map(m=>'<button class="studio-model-row" data-studio-model="'+escape(m.id)+'">'+logo(m)+'<span><strong>'+escape(m.displayName)+'</strong><small>'+escape(providers[m.providerId])+' · '+escape(description(m))+'</small></span><span class="studio-price">'+(m.basePriceUsd!=null?'Base '+money(m.basePriceUsd):'Consultar coste')+'</span></button>').join('')||'<p>Sin coincidencias</p>';
 }
+function studioVariantName(model){
+ const title=model.displayName,group=family(model);
+ return title.startsWith(group+' ')?title.slice(group.length).trim().replace(/^·\s*/, ''):title;
+}
+function studioVariantRows(model){
+ const matching=models.filter(item=>family(item)===family(model)&&item.modalities.includes(model.modalities[0])&&!state.hidden.includes(item.id));
+ return [...new Map([model,...matching].map(item=>[item.id,item])).values()];
+}
+async function studioChangeVariant(select){
+ const previous=loaded,targetId=select.value;
+ if(!previous||previous.id===targetId||busy||configuring){if(previous)select.value=previous.id;return;}
+ const status=$('#creative-variant-status');
+ select.value=previous.id;
+ select.disabled=true;
+ updateReadiness();
+ status.textContent='Cargando variante…';status.hidden=false;
+ try{
+  const target=await configuration(targetId);
+  if(view!=='canvas'||loaded!==previous||!select.isConnected)return;
+  if(busy||configuring)throw Error('Espera a que termine el envío antes de cambiar de variante.');
+  const references=state.draft.media||[];
+  for(const ref of references){
+   const field=target.fields.find(item=>item.key===ref.field);
+   if(!field||!String(ref.mime||'').startsWith(field.mime.split('/')[0]+'/')||
+      references.filter(item=>item.field===ref.field).length>(field.maximum||1)){
+    throw Error('Esta variante no admite las referencias adjuntas. El modelo y los archivos siguen en el borrador.');
+   }
+  }
+  state.modelValues={...state.modelValues,[previous.id]:structuredClone(state.draft.values)};
+  state.draft={...state.draft,modelId:targetId,values:{...E.defaults(target),...state.modelValues[targetId]}};
+  await openModel(targetId,false);
+  $('#creative-variant')?.focus({preventScroll:true});
+ }catch(error){
+  if(select.isConnected){select.value=previous.id;status.textContent=error.message;}
+ }finally{
+  if(select.isConnected){select.disabled=false;updateReadiness();}
+ }
+}
 const pcJobsBeforeStudio=pcJobs;
 pcJobs=function(){const previous=view;view=Studio.tab==='activity'?'history':'library';try{return pcJobsBeforeStudio();}finally{view=previous;}};
 const pcBeforeStudio=renderPC;
@@ -129,7 +167,10 @@ document.addEventListener('drop',e=>{
  studioAttach([...e.dataTransfer.files],e.target.closest('[data-field]')?.dataset.field).catch(error=>toast(error.message));
 });
 document.addEventListener('input',e=>{if(e.target.id==='studio-model-search'){Studio.pickerQuery=e.target.value;studioModelList();}});
-document.addEventListener('change',e=>{if(e.target.id==='studio-model-kind'){Studio.pickerKind=e.target.value;studioModelList();}});
+document.addEventListener('change',e=>{
+ if(e.target.id==='studio-model-kind'){Studio.pickerKind=e.target.value;studioModelList();}
+ if(e.target.id==='creative-variant')studioChangeVariant(e.target);
+});
 document.addEventListener('click',async e=>{
  const b=e.target.closest('button');if(!b||b.disabled)return;
  try{

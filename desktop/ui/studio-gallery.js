@@ -88,6 +88,68 @@
   return `<article class="gallery-piece result ${selected?'is-selected':''}" data-job="${escape(j.id)}"><div class="gallery-media" ${j.modality!=='AUDIO'?'tabindex="0" role="button"':''} aria-label="Abrir ${escape(name(j))}">${content}</div><div class="gallery-badges">${variants.count>1?`<button type="button" class="gallery-variant" data-gallery-group="${escape(variantGroup(j))}" title="Ver todos los resultados de esta creación" aria-label="Ver los ${variants.count} resultados de esta creación">${variants.index+1} de ${variants.count}</button>`:''}<span>${j.modality==='VIDEO'?'▷'+(duration?' '+escape(duration)+' s':''):j.modality==='AUDIO'?'Audio':j.modality==='CHAT'?'Texto':''}</span>${j.status!=='COMPLETED'||j.uncertain||j.pollError?`<span class="gallery-status ${j.status==='FAILED'?'warning':''}">${escape(status(j))}</span>`:''}</div><button class="gallery-select" data-gallery-select="${escape(j.id)}" aria-label="Seleccionar ${escape(name(j))}" aria-pressed="${selected}">${selected?'✓':''}</button><div class="gallery-overlay"><div><strong>${escape(name(j))}</strong><small>${escape(galleryProviders[j.providerId]||j.providerId)}${j.parameters?.aspect?' · '+escape(j.parameters.aspect):''}</small></div><button data-gallery-favorite="${escape(j.id)}" aria-label="${isFavorite?'Quitar de favoritos':'Favorito'}" aria-pressed="${isFavorite}">${isFavorite?'★':'☆'}</button></div><button class="gallery-open sr-only" data-studio-detail="${escape(j.id)}">Abrir ${escape(name(j))}</button></article>`;
  }
  const classificationFilters=()=>({project:G.project,source:G.source,role:G.role,sceneId:G.sceneId,shotId:G.shotId});
+ const folderWidth=matchMedia('(min-width: 1100px)');
+ let foldersPreference=null;
+ function syncFolders(){
+  const folders=$('#library-projects'),toggle=document.querySelector('[data-gallery="folders"]');
+  if(!folders||!toggle)return;
+  const open=foldersPreference??folderWidth.matches;
+  folders.hidden=!open;
+  folders.closest('.library-browser').classList.toggle('library-folders-closed',!open);
+  toggle.setAttribute('aria-expanded',String(open));
+ }
+ folderWidth.addEventListener('change',syncFolders);
+ const canMontage=item=>item?.status==='COMPLETED'&&['IMAGE','VIDEO','AUDIO'].includes(item.modality)&&
+  media(item)?.startsWith('/media/')&&isMediaUrl(media(item));
+ const montageMime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',
+  mp4:'video/mp4',mov:'video/quicktime',webm:'video/webm',mp3:'audio/mpeg',wav:'audio/wav',
+  m4a:'audio/mp4',ogg:'audio/ogg',flac:'audio/flac'};
+ function openMontage(item){
+  if(!canMontage(item))throw Error('Elige un archivo original disponible en este PC.');
+  const memberships=item._libraryEntry?.projectIds||[];
+  const projects=(G.librarySnapshot?.projects||[]).filter(project=>!project.archived&&
+   (!memberships.length||memberships.includes(project.id)));
+  if(!projects.length)throw Error('Elige primero una carpeta de proyecto activa para este archivo.');
+  const choices=projects.map(project=>[project.id,project.name||project.id]);
+  const preferred=[G.project,Corte.projectId].find(id=>projects.some(project=>project.id===id))||
+   (projects.length===1?projects[0].id:'');
+  modal(`<section><h2>Añadir a Montaje</h2><p>${escape(name(item))}</p>
+   <p class="hint">El clip se añade en la posición del cabezal.</p>
+   <form id="library-montage-form" class="gallery-montage-form" data-item="${escape(item.id)}">
+    <label for="library-montage-project">Proyecto</label>
+    <select id="library-montage-project" required>${pcOptions([['','Elige un proyecto…'],...choices],preferred)}</select>
+    <button type="submit" class="primary">Añadir al cabezal</button>
+    <p id="library-montage-status" role="status"></p>
+   </form></section>`);
+  $('#library-montage-project').focus();
+ }
+ async function addToMontage(form){
+  if(form.getAttribute('aria-busy')==='true')return;
+  const item=findItem(form.dataset.item),select=form.querySelector('select'),projectId=select.value;
+  if(!canMontage(item)||!projectId)return;
+  const status=$('#library-montage-status'),dialog=$('#dialog'),close=dialog.querySelector('[data-action="close"]');
+  form.setAttribute('aria-busy','true');select.disabled=true;
+  form.querySelector('button').disabled=true;close.disabled=true;
+  status.dataset.state='working';status.textContent='Preparando el montaje…';
+  try{
+   await corteOpen(projectId);
+   const uri=media(item),mime=item._libraryEntry?.mimeType||montageMime[uri.split('.').pop()];
+   const available=record=>record.uri===uri&&!record.libraryDeleted&&(!record.projectId||record.projectId===projectId);
+   let asset=Agent.snapshot?.index.assets.find(available);
+   if(!asset&&mime){
+    await agentCall('importReferences',{projectId,files:[{uri,mime,name:name(item)}]});
+    asset=Agent.snapshot?.index.assets.find(available);
+   }
+   if(!asset)throw Error('Este original no está disponible en el proyecto elegido.');
+   await cortePlaceAsset(asset.id);
+   dialog.close();closeViewer();navigate('editor');
+  }catch(error){
+   status.dataset.state='error';status.textContent=error.message;
+  }finally{
+   form.removeAttribute('aria-busy');select.disabled=false;
+   form.querySelector('button').disabled=false;close.disabled=false;
+  }
+ }
  const scopedProject=()=>!['__all__','__unassigned__'].includes(G.project);
  const projectName=()=>G.project==='__all__'?'Todas las carpetas':G.project==='__unassigned__'?'Sin proyecto':G.librarySnapshot?.projects?.find(project=>project.id===G.project)?.name||'Proyecto no disponible';
  function projectSidebar(){
@@ -102,7 +164,7 @@
   const options=(rows,selected,unavailable)=>{const values=rows.map(row=>[row.id,[row.code,row.title||row.description].filter(Boolean).join(' · ')||row.id]);if(selected&&!values.some(([id])=>id===selected))values.push([selected,unavailable]);return pcOptions([['','Todas'],...values],selected);};
   return `<label>Origen<select id="library-source">${pcOptions([['','Todos'],['GENERATED','Generado'],['IMPORTED','Importado'],['EDITED','Editado'],['SHARED','Compartido']],G.source)}</select></label><label>Función<select id="library-role">${pcOptions([['','Todas'],['KEYFRAME','Fotograma clave'],['REFERENCE','Referencia'],['OUTPUT','Resultado'],['FINAL','Final'],['SOURCE','Fuente'],['OTHER','Otro']],G.role)}</select></label><label>Escena<select id="library-scene">${options(scenes,G.sceneId,'Escena no disponible')}</select></label><label>Plano<select id="library-shot">${options(shots,G.shotId,'Plano no disponible')}</select></label>`;
  }
- function toolbar(jobs){return `<div class="gallery-tools"><div class="tabs studio-tabs"><button data-studio-tab="results" class="active">Archivos</button><button data-studio-tab="activity">Actividad</button></div><label class="gallery-search"><span aria-hidden="true">⌕</span><input id="pc-search" type="search" aria-label="Buscar archivos" placeholder="Buscar por nombre, prompt o modelo…" value="${escape(PC.search)}"></label><div class="gallery-chips">${[['','Todos'],['IMAGE','Imagen'],['VIDEO','Vídeo'],['AUDIO','Audio'],['CHAT','Documentos']].map(([k,l])=>`<button data-gallery-kind="${k}" aria-pressed="${PC.kind===k}">${l}</button>`).join('')}<button data-gallery="favorites" aria-pressed="${G.favorites}">☆ Favoritos</button></div><details class="gallery-filters"><summary>Filtros y orden</summary><div>${classificationControls()}<label>Proveedor<select id="pc-provider">${pcOptions([['','Todos'],...Object.entries(galleryProviders)],PC.provider)}</select></label><label>Estado<select id="pc-status">${pcOptions([['','Todos'],['COMPLETED','Completado'],['PROCESSING','Procesando'],['QUEUED','En cola'],['FAILED','Revisar envío']],PC.status)}</select></label><label>Orden<select id="gallery-sort">${pcOptions([['recent','Recientes'],['name','Por nombre']],G.sort)}</select></label><label>Tamaño de miniaturas<input id="gallery-size" type="range" min="160" max="360" step="20" value="${prefs().size}"></label>${button('save-view','Guardar vista')}</div></details></div><div class="library-scope"><div><h2>${escape(projectName())}</h2><span class="pc-results-count">${countLabel(jobs)}${G.collection?' · '+escape(prefs().collections.find(c=>c.id===G.collection)?.name||'Colección')+' · en este PC':''}</span></div><div class="library-scope-actions">${G.collection?button('all','Salir de colección')+`<button data-project-reference-collection="${escape(prefs().collections.find(c=>c.id===G.collection)?.name||'Colección')}">Archivos de referencia</button>`:''}${G.group?button('group-all','Salir de creación'):''}${PC.search||PC.provider||PC.status||PC.kind||G.favorites||G.source||G.role||G.sceneId||G.shotId?button('reset','Quitar filtros'):''}</div></div>`;}
+ function toolbar(jobs){return `<div class="gallery-tools"><button type="button" data-gallery="folders" aria-controls="library-projects" aria-expanded="false">Carpetas</button><div class="tabs studio-tabs"><button data-studio-tab="results" class="active">Archivos</button><button data-studio-tab="activity">Actividad</button></div><label class="gallery-search"><span aria-hidden="true">⌕</span><input id="pc-search" type="search" aria-label="Buscar archivos" placeholder="Buscar por nombre, prompt o modelo…" value="${escape(PC.search)}"></label><div class="gallery-chips">${[['','Todos'],['IMAGE','Imagen'],['VIDEO','Vídeo'],['AUDIO','Audio'],['CHAT','Documentos']].map(([k,l])=>`<button data-gallery-kind="${k}" aria-pressed="${PC.kind===k}">${l}</button>`).join('')}<button data-gallery="favorites" aria-pressed="${G.favorites}">☆ Favoritos</button></div><details class="gallery-filters"><summary>Filtros y orden</summary><div>${classificationControls()}<label>Proveedor<select id="pc-provider">${pcOptions([['','Todos'],...Object.entries(galleryProviders)],PC.provider)}</select></label><label>Estado<select id="pc-status">${pcOptions([['','Todos'],['COMPLETED','Completado'],['PROCESSING','Procesando'],['QUEUED','En cola'],['FAILED','Revisar envío']],PC.status)}</select></label><label>Orden<select id="gallery-sort">${pcOptions([['recent','Recientes'],['name','Por nombre']],G.sort)}</select></label><label>Tamaño de miniaturas<input id="gallery-size" type="range" min="160" max="360" step="20" value="${prefs().size}"></label>${button('save-view','Guardar vista')}</div></details></div><div class="library-scope"><div><h2>${escape(projectName())}</h2><span class="pc-results-count">${countLabel(jobs)}${G.collection?' · '+escape(prefs().collections.find(c=>c.id===G.collection)?.name||'Colección')+' · en este PC':''}</span></div><div class="library-scope-actions">${G.collection?button('all','Salir de colección')+`<button data-project-reference-collection="${escape(prefs().collections.find(c=>c.id===G.collection)?.name||'Colección')}">Archivos de referencia</button>`:''}${G.group?button('group-all','Salir de creación'):''}${PC.search||PC.provider||PC.status||PC.kind||G.favorites||G.source||G.role||G.sceneId||G.shotId?button('reset','Quitar filtros'):''}</div></div>`;}
  function selectionBar(){
   document.querySelector('.gallery-selection')?.remove();if(!G.selected.size)return;
   const bar=document.createElement('section');bar.className='gallery-selection';bar.setAttribute('aria-label','Acciones de selección');
@@ -259,7 +321,7 @@
   G.projection=null;ensureLibrary();G.observer?.disconnect();const jobs=entries();PC.limit=G.limit;
   $('#content').classList.add('studio-library','gallery-library');
   $('#content').innerHTML=`<div class="library-browser">${projectSidebar()}<section class="library-files" aria-label="Archivos de la carpeta">${toolbar(jobs)}${G.libraryError?`<div class="library-index-notice" role="status"><span>${escape(G.libraryError)} Se muestran los resultados locales disponibles.</span>${button('refresh-library','Reintentar')}</div>`:!G.librarySnapshot?'<p class="hint library-index-loading" role="status">Reuniendo tus archivos y resultados…</p>':''}<div class="gallery-grid results" style="--gallery-size:${prefs().size}px">${jobs.slice(0,G.limit).map(card).join('')}</div>${jobs.length>G.limit?'<div class="gallery-sentinel" role="status">Más creaciones al continuar</div>':''}${jobs.length?'':`<div class="empty"><h2>${state.jobs.length?'No hay coincidencias':'Tu galería empieza aquí'}</h2><p>${state.jobs.length?'Prueba otra búsqueda o quita los filtros.':'Elige un modelo y crea tu primera imagen o vídeo.'}</p>${state.jobs.length?button('reset','Quitar filtros'):'<button data-nav="canvas">Crear</button>'}</div>`}</section></div>`;
-  wireMedia();selectionBar();watchMore(jobs);
+  syncFolders();wireMedia();selectionBar();watchMore(jobs);
  }
  const oldRenderPC=renderPC;renderPC=renderGallery;renderLibrary=renderGallery;
  renderHistory=function(){Studio.tab='activity';oldRenderPC();};
@@ -286,7 +348,7 @@
   index=outputIndex(j,index);if(j.sourceJobId&&Number.isInteger(j._libraryEntry?.outputIndex))outputSelection.set(j.sourceJobId,j._libraryEntry.outputIndex);removeViewer();G.viewer={id,index};Studio.detail=id;outputSelection.set(id,index);
   const u=media(j,index),valid=isMediaUrl(u),variants=variant(j),textDocument=j.modality==='CHAT'&&(/^text\//.test(j._libraryEntry?.mimeType||'')||/\.(txt|md|csv|srt)(?:$|\?)/i.test(u||'')),dlg=document.createElement('dialog');dlg.className='gallery-lightbox';dlg.setAttribute('aria-label',name(j));
   const asset=active(j)?pendingMedia(j):j.modality==='CHAT'?`<pre id="gallery-document">${escape(textDocument?'Cargando documento…':j._libraryEntry?.mimeType==='application/pdf'||/\.pdf(?:$|\?)/i.test(u||'')?'Documento PDF. Descarga el original para abrirlo.':valid||j._libraryEntry?.assetId?'Documento disponible para descargar.':j.prompt||'Documento sin original disponible.')}</pre>`:previewable(j)?j.modality==='VIDEO'?`<video data-gallery-preview="original" src="${escape(previewUrl(j,index,true))}" poster="${escape(previewUrl(j,index))}" playsinline preload="metadata"></video><div class="gallery-player">${button('play','Reproducir / pausar')}<input id="gallery-seek" type="range" min="0" max="100" value="0" aria-label="Posición del vídeo">${button('mute','Activar sonido')}${button('fullscreen','Pantalla completa')}</div>`:`<img data-gallery-preview="original" src="${escape(previewUrl(j,index,true))}" alt="${escape(name(j))}">`:(valid||j._libraryEntry?.assetId)&&j.modality==='AUDIO'?`<audio src="${escape(j._libraryEntry?.assetId?previewUrl(j,0,true):u)}" controls preload="metadata"></audio>`:`<p>${escape(status(j))}</p>`;
-  dlg.innerHTML=`<div class="gallery-viewer-media"><div class="gallery-viewer-top">${button('prev','←','aria-label="Creación anterior"')}${button('next','→','aria-label="Creación siguiente"')}<span>${Math.max(0,viewerEntries().findIndex(x=>x.id===id&&x.index===index))+1} / ${Math.max(1,viewerEntries().length)}</span>${button('close-viewer','✕','aria-label="Cerrar visor"')}</div><div class="gallery-stage">${asset}</div>${variants.count>1?`<div class="gallery-output-nav">${button('prev-output','← Resultado')}<span>${variants.index+1} de ${variants.count}</span>${button('next-output','Resultado →')}</div>`:''}</div><aside class="gallery-viewer-details"><h2>${escape(name(j))}</h2><p class="hint">${escape(galleryProviders[j.providerId]||j.providerId)} · ${escape(status(j))}</p>${j.providerId==='google_flow'?`<p class="hint flow-model-evidence">Modelo ${j.modelConfirmed===true?'confirmado':'solicitado · atribución no confirmada por Google'}: ${escape(j.requestedModel||j.name||j.modelId)}</p>`:''}${j.prompt?`<h3>Prompt</h3><p class="gallery-prompt">${escape(j.prompt)}</p>`:'<p class="hint">Archivo disponible en tu biblioteca.</p>'}<div class="gallery-viewer-actions">${button('move-file','Mover a proyecto…')}${j.prompt?button('copy-prompt','Copiar prompt'):''}${models.some(model=>model.id===j.modelId)?button('reuse-library','Reutilizar ajustes'):''}${previewable(j)||j._libraryEntry?.assetId?button('download-original','Descargar'):valid?`<button ${u.startsWith('/media/')?'data-flow-save':'data-download'}="${escape(u)}">Descargar</button>`:''}${j.modality==='IMAGE'&&valid?`${button('use-reference','Usar como referencia')}${button('to-video','Preparar vídeo')}`:''}${j.providerId==='google_flow'&&j.status==='COMPLETED'&&(!j._libraryEntry||state.jobs.some(job=>job.id===j.sourceJobId))?`<button data-flow-improve="${escape(j.sourceJobId||id)}">Mejorar / exportar</button>`:''}<button data-gallery-favorite="${escape(id)}">${favorite(j)?'★ Favorito':'☆ Favorito'}</button></div>${j.error?`<div class="inline-notice" role="alert">No se pudo completar el encargo.<details><summary>Detalles</summary><pre>${escape(j.error)}</pre></details></div>`:''}${j.uncertain||j.pollError?'<p class="ux-notice">Estado pendiente de comprobar. Consulta el trabajo antes de repetir el envío.</p>':''}<h3>Parámetros</h3><dl>${Object.entries(j.parameters||{}).map(([k,v])=>`<dt>${escape(E.label(k))}</dt><dd>${escape(typeof v==='object'?JSON.stringify(v):v)}</dd>`).join('')}</dl><h3>Coste</h3><p>${j.estimated&&Number.isFinite(j.estimated.amount)?escape(amount(j.estimated))+' · estimación, cargo no verificado':'No registrado'}</p></aside>`;
+  dlg.innerHTML=`<div class="gallery-viewer-media"><div class="gallery-viewer-top">${button('prev','←','aria-label="Creación anterior"')}${button('next','→','aria-label="Creación siguiente"')}<span>${Math.max(0,viewerEntries().findIndex(x=>x.id===id&&x.index===index))+1} / ${Math.max(1,viewerEntries().length)}</span>${button('close-viewer','✕','aria-label="Cerrar visor"')}</div><div class="gallery-stage">${asset}</div>${variants.count>1?`<div class="gallery-output-nav">${button('prev-output','← Resultado')}<span>${variants.index+1} de ${variants.count}</span>${button('next-output','Resultado →')}</div>`:''}</div><aside class="gallery-viewer-details"><h2>${escape(name(j))}</h2><p class="hint">${escape(galleryProviders[j.providerId]||j.providerId)} · ${escape(status(j))}</p>${j.providerId==='google_flow'?`<p class="hint flow-model-evidence">Modelo ${j.modelConfirmed===true?'confirmado':'solicitado · atribución no confirmada por Google'}: ${escape(j.requestedModel||j.name||j.modelId)}</p>`:''}${j.prompt?`<h3>Prompt</h3><p class="gallery-prompt">${escape(j.prompt)}</p>`:'<p class="hint">Archivo disponible en tu biblioteca.</p>'}<div class="gallery-viewer-actions">${canMontage(j)?button('to-montage','Añadir a Montaje…','class="primary"'):''}${button('move-file','Mover a proyecto…')}${j.prompt?button('copy-prompt','Copiar prompt'):''}${models.some(model=>model.id===j.modelId)?button('reuse-library','Reutilizar ajustes'):''}${previewable(j)||j._libraryEntry?.assetId?button('download-original','Descargar'):valid?`<button ${u.startsWith('/media/')?'data-flow-save':'data-download'}="${escape(u)}">Descargar</button>`:''}${j.modality==='IMAGE'&&valid?`${button('use-reference','Usar como referencia')}${button('to-video','Preparar vídeo')}`:''}${j.providerId==='google_flow'&&j.status==='COMPLETED'&&(!j._libraryEntry||state.jobs.some(job=>job.id===j.sourceJobId))?`<button data-flow-improve="${escape(j.sourceJobId||id)}">Mejorar / exportar</button>`:''}<button data-gallery-favorite="${escape(id)}">${favorite(j)?'★ Favorito':'☆ Favorito'}</button></div>${j.error?`<div class="inline-notice" role="alert">No se pudo completar el encargo.<details><summary>Detalles</summary><pre>${escape(j.error)}</pre></details></div>`:''}${j.uncertain||j.pollError?'<p class="ux-notice">Estado pendiente de comprobar. Consulta el trabajo antes de repetir el envío.</p>':''}<h3>Parámetros</h3><dl>${Object.entries(j.parameters||{}).map(([k,v])=>`<dt>${escape(E.label(k))}</dt><dd>${escape(typeof v==='object'?JSON.stringify(v):v)}</dd>`).join('')}</dl><h3>Coste</h3><p>${j.estimated&&Number.isFinite(j.estimated.amount)?escape(amount(j.estimated))+' · estimación, cargo no verificado':'No registrado'}</p></aside>`;
   document.body.append(dlg);wireViewerPreview(dlg,j,index);dlg.showModal();dlg.querySelector('[data-gallery="close-viewer"]').focus();dlg.addEventListener('cancel',e=>{e.preventDefault();closeViewer();});
   if(textDocument&&(valid||j._libraryEntry?.assetId))fetch(j._libraryEntry?.assetId?previewUrl(j,0,true):u).then(r=>{if(!r.ok)throw Error('No se pudo cargar el texto.');return r.text();}).then(text=>{if(dlg.isConnected)dlg.querySelector('#gallery-document').textContent=text.slice(0,100000);}).catch(e=>{if(dlg.isConnected)dlg.querySelector('#gallery-document').textContent=e.message;});
   const image=dlg.querySelector('.gallery-stage img');if(image){
@@ -365,6 +427,8 @@
    switch(b.dataset.gallery){
     case 'move-files':await openMove([...G.selected.values()]);break;
     case 'move-file':await openMove([findItem(G.viewer?.id)]);break;
+    case 'to-montage':openMontage(findItem(G.viewer?.id));break;
+    case 'folders':foldersPreference=!(foldersPreference??folderWidth.matches);syncFolders();break;
     case 'retry-preview':if(G.viewer)showViewer(G.viewer.id,G.viewer.index);break;
     case 'download-original':if(G.viewer){const job=findItem(G.viewer.id);if(job)await download(job,G.viewer.index);}break;
     case 'close-viewer':closeViewer();break;
@@ -395,6 +459,13 @@
    if(b.dataset.galleryAssign){for(const id of G.selected.keys())prefs().members[id]=b.dataset.galleryAssign;persist();$('#dialog').close();toast('Colección actualizada.');}
   }catch(error){toast(error.message);}
  });
+ document.addEventListener('submit',event=>{
+  if(event.target.id!=='library-montage-form')return;
+  event.preventDefault();addToMontage(event.target);
+ });
+ document.addEventListener('cancel',event=>{
+  if(event.target===$('#dialog')&&$('#library-montage-form')?.getAttribute('aria-busy')==='true')event.preventDefault();
+ });
  document.addEventListener('submit',e=>{if(e.target.id!=='gallery-new-collection')return;e.preventDefault();const n=new FormData(e.target).get('name').trim();if(!n)return;const c={id:crypto.randomUUID(),name:n};prefs().collections.push(c);for(const id of G.selected.keys())prefs().members[id]=c.id;persist();$('#dialog').close();shell();});
  document.addEventListener('input',e=>{
   if(e.target.id==='pc-search')G.limit=36;
@@ -405,6 +476,7 @@
  document.addEventListener('change',e=>{const fields={'library-source':'source','library-role':'role','library-scene':'sceneId','library-shot':'shotId'};if(fields[e.target.id]){G[fields[e.target.id]]=e.target.value;if(e.target.id==='library-scene')G.shotId='';G.limit=36;renderGallery();const filters=document.querySelector('.gallery-filters');if(filters)filters.open=true;document.getElementById(e.target.id)?.focus({preventScroll:true});return;}if(['pc-provider','pc-status'].includes(e.target.id)){G.limit=36;renderGallery();}if(e.target.id==='gallery-sort'){G.sort=e.target.value;renderGallery();}});
  document.addEventListener('keydown',e=>{
   if($('#dialog')?.open&&$('#library-move-dialog')){if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();if(!G.moveTask?.busy)$('#dialog').close();}return;}
+  if($('#dialog')?.open&&$('#library-montage-form'))return;
   if(e.key==='Escape'&&G.viewer){e.preventDefault();e.stopImmediatePropagation();closeViewer();return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();e.stopImmediatePropagation();commands();return;}
   if(e.target.matches('input,textarea,select')||e.target.isContentEditable)return;
