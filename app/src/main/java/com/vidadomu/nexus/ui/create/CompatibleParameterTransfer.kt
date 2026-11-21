@@ -150,7 +150,7 @@ internal fun transferCompatibleParameters(
     val result = base + accepted
     val adaptations = requested.filter { (key, value) -> key !in accepted && value.second != result[key] }.map { (key, value) ->
         ParameterTransferAdaptation(key, value.first.displayName, value.second, result[key].orEmpty(),
-            "El contrato de destino conserva su ajuste compatible; el valor anterior sigue guardado en el modelo de origen.")
+            "Este modelo no admite el valor anterior y usa el suyo; el anterior sigue guardado en el modelo de antes.")
     }
     val retained = restoredParameterAdaptations(result, inherited + fallbackAdaptations,
         accepted.keys + editedValues.keys + adaptations.map { it.key })

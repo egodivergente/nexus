@@ -349,10 +349,11 @@ fun CreateScreen(
             }
             if(state.parameterAdaptations.isNotEmpty()) {
                 Text("Ajustes adaptados",style=MaterialTheme.typography.titleSmall)
-                state.parameterAdaptations.forEach {adapted ->
-                    Text("${adapted.label}: ${adapted.requestedValue} → ${adapted.actualValue}. ${adapted.reason}",
-                        style=MaterialTheme.typography.bodySmall,color=TextSecondary)
-                }
+                // One line per setting; the reason they share is said once, below them.
+                val (adaptedLines,sharedReason)=adaptationLines(
+                    state.parameterAdaptations.map {Triple(it.label,it.requestedValue,it.actualValue)},state.parameterAdaptations.map {it.reason})
+                adaptedLines.forEach {line -> Text(line,style=MaterialTheme.typography.bodyMedium)}
+                sharedReason?.let {Text(it,style=MaterialTheme.typography.bodySmall,color=TextSecondary)}
             }
             val textRoute=if(selected.pairedEditModelId!=null) selected else catalogModels.firstOrNull {it.providerId==selected.providerId && it.pairedEditModelId==selected.id}
             val editRoute=textRoute?.pairedEditModelId?.let {id -> catalogModels.firstOrNull {it.id==id && it.providerId==textRoute.providerId}}
@@ -371,23 +372,36 @@ fun CreateScreen(
                 onRemove=viewModel::removeMedia,onReorder=viewModel::reorderMedia)
         }
         if(state.retainedMedia.isNotEmpty()) ConservedMediaSection(state.retainedMedia,!state.isSubmitting,viewModel::removeRetainedMedia,viewModel::clearRetainedMedia)
-        if(state.schemaReady && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && capabilities?.promptVisible==true)
+        val quantityShown=state.schemaReady && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO) && capabilities?.promptVisible==true
+        if(quantityShown)
             GenerationQuantityControl(quantity.count,!state.isSubmitting,onCount={count ->
                 batchCount=count
                 if(countParam!=null) viewModel.updateParameter(countParam.key,if(nativeCountAllowed(countParam,count)) count.toString() else "1")
             },onModels={showAdvanced=false;viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true},
                 allowed={count -> countParam==null || nativeCountAllowed(countParam,count) || nativeCountAllowed(countParam,1)},
                 choices=(BATCH_COUNTS+listOf(quantity.count)+countParam?.options.orEmpty().mapNotNull {it.toIntOrNull()}).filter {it>0}.distinct().sorted())
-        TextButton(onClick={showAdvanced=false;showParameters=true},enabled=state.schemaReady) {Text("Todos los parámetros")}
-        TextButton(onClick={showAdvanced=false;showPersonalPresets=true},enabled=state.schemaReady && !state.isSubmitting) {Text("Mis ajustes guardados")}
-        TextButton(onClick={showAdvanced=false;viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true},enabled=state.schemaReady && !state.isSubmitting) {Text("Comparar modelos")}
-        if(state.selectedModality!=Modality.CHAT) TextButton(onClick={showAdvanced=false;showBatch=true}) {Text("Lote desde archivo…")}
-        if(comparisonState.phase==ComparisonPhase.SENDING) TextButton(onClick={showAdvanced=false;showComparison=true}) {Text("Ver lote en curso")}
-        TextButton(onClick={showAdvanced=false;showBytePlus=true}) {Text("Usar mi cuenta BytePlus")}
-        TextButton(onClick={showAdvanced=false;onBrowseModels()}) {Text("Todo el catálogo")}
-        if(com.vidadomu.nexus.BuildConfig.DEBUG && state.selectedModality!=Modality.CHAT) {
-            TextButton(onClick={showAdvanced=false;showRequestInspector=true}) {Text("Diagnóstico local")}
-            TextButton(onClick={clipboard.setText(AnnotatedString(maskedRequestPreview(state)));Toast.makeText(context,"Diagnóstico copiado",Toast.LENGTH_SHORT).show()}) {Text("Copiar diagnóstico")}
+        // The ways out of this sheet, grouped by what they are for and none of them twice.
+        AdvancedLinkGroup("Parámetros") {
+            AdvancedLink("Todos los parámetros",Icons.Default.Tune,enabled=state.schemaReady) {showAdvanced=false;showParameters=true}
+            AdvancedLink("Mis ajustes guardados",Icons.Default.BookmarkBorder,enabled=state.schemaReady && !state.isSubmitting) {showAdvanced=false;showPersonalPresets=true}
+        }
+        AdvancedLinkGroup("Varios a la vez") {
+            // With the quantity control above, its «Varios modelos» already opens the comparison.
+            if(!quantityShown) AdvancedLink("Comparar modelos",Icons.Default.Compare,enabled=state.schemaReady && !state.isSubmitting) {
+                showAdvanced=false;viewModel.comparison.open(state,withReferences=state.attachedMedia.isNotEmpty());showComparison=true
+            }
+            if(state.selectedModality!=Modality.CHAT) AdvancedLink("Lote desde archivo…",Icons.Default.UploadFile) {showAdvanced=false;showBatch=true}
+            if(comparisonState.phase==ComparisonPhase.SENDING) AdvancedLink("Ver lote en curso",Icons.Default.Pending) {showAdvanced=false;showComparison=true}
+        }
+        AdvancedLinkGroup("Modelos y cuenta") {
+            AdvancedLink("Todo el catálogo",Icons.Default.GridView) {showAdvanced=false;onBrowseModels()}
+            AdvancedLink("Usar mi cuenta BytePlus",Icons.Default.AccountBalanceWallet) {showAdvanced=false;showBytePlus=true}
+        }
+        if(com.vidadomu.nexus.BuildConfig.DEBUG && state.selectedModality!=Modality.CHAT) AdvancedLinkGroup("Diagnóstico") {
+            AdvancedLink("Diagnóstico local",Icons.Default.BugReport) {showAdvanced=false;showRequestInspector=true}
+            AdvancedLink("Copiar diagnóstico",Icons.Default.ContentCopy,opensSomething=false) {
+                clipboard.setText(AnnotatedString(maskedRequestPreview(state)));Toast.makeText(context,"Diagnóstico copiado",Toast.LENGTH_SHORT).show()
+            }
         }
     }
     if(showParameters) CanvasSheet("Parámetros",{showParameters=false}) {
