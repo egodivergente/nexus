@@ -62,12 +62,26 @@ class AgentConversation(val session: AgentSession) {
     internal val messages = mutableListOf<LlmMessage>()
     internal val mutex = Mutex()
     fun history(): List<LlmMessage> = messages.toList()
+    /** The history as it was before the last turn began, so that turn can be taken back once (edit it, answer again). */
+    internal var beforeLastTurn: List<LlmMessage>? = null
+    fun canRewindLastTurn(): Boolean = beforeLastTurn != null
+    /** Takes back the last turn whole (its message, every tool step and the answer) as if it had not been sent. */
+    fun rewindLastTurn(): Boolean {
+        val before = beforeLastTurn ?: return false
+        if (!mutex.tryLock()) return false // A turn is running: nothing is taken back under it.
+        try {
+            messages.clear(); messages.addAll(before); beforeLastTurn = null
+        } finally { mutex.unlock() }
+        return true
+    }
     /** Restore completed text turns; never replay old tool calls or submissions. */
     fun restoreTextHistory(turns: List<Pair<String, String>>) {
         check(messages.isEmpty())
         turns.takeLast(80).forEach { (role, text) ->
             messages += LlmMessage(if (role == "user") Role.USER else Role.ASSISTANT, listOf(ContentBlock.Text(text)))
         }
+        val lastUser = messages.indexOfLast { it.role == Role.USER }
+        beforeLastTurn = if (lastUser >= 0) messages.take(lastUser) else null
     }
 }
 
@@ -136,6 +150,8 @@ class AgentOrchestrator(
         newAttachments: List<Attachment> = emptyList(),
         onEvent: (UiEvent) -> Unit = {},
     ): TurnResult = conv.mutex.withLock { kotlinx.coroutines.withContext(com.vidadomu.nexus.agent.core.llm.LlmTurnContext(AssetIndex.newId("turn"))) {
+        // Before anything can fail: a turn refused here still takes the place of the last one in the chat.
+        conv.beforeLastTurn = conv.messages.toList()
         if (conv.reasoningModelId != null && conv.reasoningModelId != config.modelId)
             throw LlmException(LlmException.Kind.BAD_REQUEST, "Has cambiado el modelo. Abre una nueva conversación para usarlo; este chat se conserva.")
         if (conv.reasoningModelId != null && conv.messages.size > config.limits.messages)

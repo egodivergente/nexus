@@ -317,6 +317,57 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         if (state.thinking) return false
         return send(request.text, request.attachments)
     }
+
+    // ---- editar tu último mensaje u otra respuesta -----------------------------------------------
+
+    private var harmlessCache: Pair<AgentOrchestrator, Set<String>>? = null
+    /** Tools that change nothing in Nexus. Any other in the last turn keeps it done (if the list cannot be read, every tool does). */
+    private fun harmlessTools(): Set<String> {
+        val current = orchestrator
+        harmlessCache?.takeIf { it.first === current }?.let { return it.second }
+        val names = runCatching {
+            current.toolsFor(AgentMode.AGENT).filter { it.category != com.vidadomu.nexus.agent.core.tools.ToolCategory.ORGANIZE }.map { it.name }.toSet()
+        }.getOrDefault(emptySet())
+        harmlessCache = current to names
+        return names
+    }
+
+    /** Your last message and its answer can be taken back while nothing they produced went further ([LastTurn]). */
+    fun canTakeBackLastTurn(state: AssistantUiState = _ui.value): Boolean =
+        !state.thinking && background == null && conversation.canRewindLastTurn() &&
+            LastTurn.rewindable(state.items, harmlessTools()) { id -> state.plans[id]?.let { it.busy || it.state !in LastTurn.OPEN_PLANS } == true }
+
+    /** «Editar»: your last message goes back to the composer, with its attachments, and the agent forgets that exchange. */
+    fun editLastMessage(): Boolean {
+        val state = _ui.value
+        if (!canTakeBackLastTurn(state)) return false
+        val (kept, message) = LastTurn.takeBack(state.items) ?: return false
+        if (!conversation.rewindLastTurn()) return false
+        val key = "conversation:${state.conversationId}"
+        val draft = draftPrefs.getString(key, "").orEmpty()
+        // Whatever was already being written stays, below the message that comes back.
+        draftPrefs.edit().putString(key, listOf(LastTurn.editableText(message), draft).filter { it.isNotBlank() }.joinToString("\n\n")).apply()
+        failedTurns.remove(state.conversationId)
+        _ui.update { it.copy(items = kept, pendingAttachments = (message.attachments + it.pendingAttachments).distinctBy { a -> a.id },
+            retryNoticeId = null, draftRevision = it.draftRevision + 1) }
+        return true
+    }
+
+    /** «Otra respuesta»: the same message goes again, as if the last answer had not happened. */
+    fun answerAgain(): Boolean {
+        val state = _ui.value
+        if (!canTakeBackLastTurn(state)) return false
+        val (kept, message) = LastTurn.takeBack(state.items) ?: return false
+        if (!conversation.rewindLastTurn()) return false
+        failedTurns.remove(state.conversationId)
+        _ui.update { it.copy(items = kept, retryNoticeId = null) }
+        val text = LastTurn.editableText(message)
+        if (send(text, retryAttachments = message.attachments, widgetAnswer = message.widgetAnswer)) return true
+        // It could not go out (a limit, an archived project…): the message waits in the composer instead of vanishing.
+        restoreDraft(state.conversationId, text)
+        _ui.update { it.copy(pendingAttachments = (message.attachments + it.pendingAttachments).distinctBy { a -> a.id }) }
+        return false
+    }
     /** [note] reaches the agent with the message but is not shown in the user's bubble (e.g. what changed on a board). */
     fun send(text: String, retryAttachments: List<Attachment>? = null, note: String = "",
         widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null): Boolean {

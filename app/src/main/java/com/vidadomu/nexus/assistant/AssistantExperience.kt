@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -28,6 +27,10 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -188,11 +191,17 @@ internal fun InputBar(ui: AssistantUiState, text: TextFieldValue, onInput: (Text
             androidx.compose.foundation.text.BasicTextField(text, onInput, modifier = Modifier.fillMaxWidth()
                 .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = NexusTokens.space4)
                 .onFocusChanged { inputFocused = it.isFocused }
+                .onPreviewKeyEvent { event ->
+                    val send = event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && event.isCtrlPressed &&
+                        (event.key == androidx.compose.ui.input.key.Key.Enter || event.key == androidx.compose.ui.input.key.Key.NumPadEnter)
+                    if (send) { if (canSend) onSend() else if (canQueue) onQueue?.invoke() }
+                    send
+                }
                 .semantics { contentDescription = "Mensaje para Nexus" },
                 textStyle = style, cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.primary),
                 minLines = 1, maxLines = if(androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480) 2 else 6,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { if (canSend) onSend() else if (canQueue) onQueue?.invoke() }),
+                // Enter writes a new line, as in any long text; the arrow sends. A hardware keyboard sends with Ctrl+Enter.
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default, capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
                 decorationBox = { inner ->
                     Box(Modifier.heightIn(min = 28.dp), contentAlignment = Alignment.CenterStart) {
                         if (text.text.isEmpty()) Text(if (ui.thinking && onQueue != null) "Añade algo mientras trabaja" else "Escribe a Nexus…",

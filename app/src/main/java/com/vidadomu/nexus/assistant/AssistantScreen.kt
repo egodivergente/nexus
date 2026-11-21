@@ -171,7 +171,7 @@ private fun AssistantScreenContent(
     val draftPrefs = LocalContext.current.getSharedPreferences("assistant_draft_v1", android.content.Context.MODE_PRIVATE)
     val draftKey="conversation:${ui.conversationId}"
     var input by rememberSaveable(ui.conversationId, stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString(draftKey, draftPrefs.getString("text", "")).orEmpty())) }
-    LaunchedEffect(ui.draftRevision) {if(ui.draftRevision>0) input=androidx.compose.ui.text.input.TextFieldValue(draftPrefs.getString(draftKey,"").orEmpty())}
+    LaunchedEffect(ui.draftRevision) {if(ui.draftRevision>0) input=draftPrefs.getString(draftKey,"").orEmpty().let {androidx.compose.ui.text.input.TextFieldValue(it,androidx.compose.ui.text.TextRange(it.length))}}
     var showSettings by remember { mutableStateOf(false) }
     var copyMessageIds by remember(ui.conversationId) { mutableStateOf<Set<String>?>(null) }
     var showChatCopy by remember(ui.conversationId) { mutableStateOf(false) }
@@ -227,6 +227,8 @@ private fun AssistantScreenContent(
         if (snackbar.currentSnackbarData != null) noticeHeight else 0, label = "noticeRoom")
     val visibleItems=ui.items.filterNot {it is ChatItem.PlanCard && (ui.plans[it.planId]?.state==PlanState.DISCARDED ||
         it.orderId?.let { id -> ui.orders[id]?.status } == com.vidadomu.nexus.agent.core.orders.OrderStatus.DISCARDED)}
+    // Your last message and its answer: «Editar» and «Otra respuesta», while that exchange can still be taken back.
+    val takeBack = remember(ui.items, ui.plans, ui.thinking) { if (vm.canTakeBackLastTurn(ui)) LastTurn.ids(ui.items) else null }
     // Active and finished adjacent image/video orders share a live wall; failures keep their own actions.
     var expandedGroups by remember {mutableStateOf(setOf<String>())}
     var expandedPending by remember {mutableStateOf(setOf<String>())}
@@ -539,9 +541,11 @@ private fun AssistantScreenContent(
                     val item = row as ChatItem
                     EntranceSpring(item.id, seenRows, if (motion) rowPlacement(still) else Modifier) {
                     when (item) {
-                        is ChatItem.User -> Box { UserBubble(item) { copyMessageIds = setOf(item.id); showChatCopy = true } }
+                        is ChatItem.User -> Box { UserBubble(item,
+                            onEdit = if (takeBack?.first == item.id) ({ vm.editLastMessage() }) else null) { copyMessageIds = setOf(item.id); showChatCopy = true } }
                         is ChatItem.Assistant -> Box {
                             AssistantBubble(item, onOpenHistory,
+                                onAnswerAgain = if (takeBack?.second == item.id) ({ vm.answerAgain() }) else null,
                                 onSelectMessages = { copyMessageIds = setOf(item.id); showChatCopy = true },
                                 answered = answerAfter(ui.items, item)?.text,
                                 widgetAnswer = answerAfter(ui.items, item)?.widgetAnswer,
@@ -1092,7 +1096,7 @@ private fun ProjectSheet(ui:AssistantUiState,vm:AssistantViewModel,drafts:Mutabl
 }
 
 @Composable
-internal fun UserBubble(item:ChatItem.User, onSelectMessages: () -> Unit = {}) {
+internal fun UserBubble(item:ChatItem.User, onEdit: (() -> Boolean)? = null, onSelectMessages: () -> Unit = {}) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var actions by rememberSaveable(item.id) { mutableStateOf(false) }
@@ -1163,6 +1167,11 @@ internal fun UserBubble(item:ChatItem.User, onSelectMessages: () -> Unit = {}) {
                     clipboard.setText(AnnotatedString(item.text)); actions = false
                 })
                 DropdownMenuItem(text = { Text("Seleccionar mensajes") }, onClick = { actions = false; onSelectMessages() })
+                // Only on your last message, while its answer can still be taken back.
+                onEdit?.let { edit -> DropdownMenuItem(text = { Text("Editar") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = {
+                    actions = false
+                    if (edit()) bubbleHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
+                }) }
                 DropdownMenuItem(text = { Text("Compartir mensaje") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = {
                     actions = false
                     runCatching {
@@ -1247,6 +1256,8 @@ internal fun answerAfter(items: List<ChatItem>, item: ChatItem.Assistant): ChatI
 
 @Composable
 internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit = {}, answered: String? = null, onReply: ((String) -> Boolean)? = null, onSelectMessages: () -> Unit = {},
+    /** Only on the answer to your last message, while that exchange can still be taken back. */
+    onAnswerAgain: (() -> Boolean)? = null,
     widgetAnswer: com.vidadomu.nexus.agent.core.chat.WidgetAnswer? = null,
     onWidgetReply: ((com.vidadomu.nexus.agent.core.chat.WidgetReply) -> Boolean)? = null,
     /** This reply has just closed the turn that was on show; [textOnShow]: its words were already being written. */
@@ -1314,6 +1325,10 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
                         Toast.makeText(context, "Respuesta copiada", Toast.LENGTH_SHORT).show()
                     })
                     DropdownMenuItem(text = { Text("Seleccionar mensajes") }, onClick = { actionsExpanded = false; onSelectMessages() })
+                    onAnswerAgain?.let { again -> DropdownMenuItem(text = { Text("Otra respuesta") }, leadingIcon = { Icon(Icons.Default.Refresh, null) }, onClick = {
+                        actionsExpanded = false
+                        if (again()) responseHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION)
+                    }) }
                     DropdownMenuItem(text = { Text("Compartir respuesta") }, leadingIcon = { Icon(Icons.Default.Share, null) }, onClick = {
                         actionsExpanded = false
                         runCatching {
