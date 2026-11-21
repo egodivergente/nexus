@@ -23,7 +23,7 @@ internal data class AssistantChatEntry(val id: String, val title: String, val pr
 internal class AssistantChatStore(private val context: Context) {
     private val file = AtomicFile(File(context.filesDir, "assistant/chat-v1.json").apply { parentFile?.mkdirs() })
     private val json = Json { ignoreUnknownKeys = true }
-    private var previous: SavedAssistantChat? = null
+    private val savePolicy = ChatAutosave()
     private val lock = kotlinx.coroutines.sync.Mutex()
 
     fun load(): SavedAssistantChat? = runCatching {
@@ -86,6 +86,8 @@ internal class AssistantChatStore(private val context: Context) {
     private val indexFile = File(context.filesDir, "assistant/conversations-index-v1.json")
     private val index = java.util.concurrent.ConcurrentHashMap<String, IndexedConversation>()
     @Volatile private var indexLoaded = false
+    /** Entries newer in memory than in [indexFile]: the file still validates them by date and size. */
+    private val unsavedIndex = mutableSetOf<String>()
 
     private fun indexed(file: File, chat: SavedAssistantChat): IndexedConversation {
         val metadata=conversationMetadata(chat.items)
@@ -95,25 +97,33 @@ internal class AssistantChatStore(private val context: Context) {
 
     @Synchronized
     fun conversations(projectId: String? = null): List<AssistantChatEntry> {
+        val firstInProcess = !indexLoaded
         if (!indexLoaded) {
             runCatching { json.decodeFromString<ConversationIndexFile>(indexFile.readText()) }.getOrNull()
                 ?.takeIf {it.version>=3}?.let { index.putAll(it.entries) }
             indexLoaded = true
         }
         val files = File(context.filesDir,"assistant/conversations").listFiles().orEmpty().filter { it.extension == "json" }
-        var changed = index.keys.retainAll(files.map { it.nameWithoutExtension }.toSet())
+        val names = files.map { it.nameWithoutExtension }.toSet()
+        var structural = index.keys.retainAll(names)
+        unsavedIndex.retainAll(names)
         files.forEach { file ->
             val name = file.nameWithoutExtension
             val known = index[name]
             if (known != null && known.modified == file.lastModified() && known.length == file.length()) return@forEach
             val chat = runCatching { json.decodeFromString<SavedAssistantChat>(file.readText()) }.getOrNull()
-            if (chat == null) index.remove(name) else index[name] = indexed(file, chat)
-            changed = true
+            if (chat == null) { if (index.remove(name) != null) structural = true; unsavedIndex.remove(name); return@forEach }
+            val next = indexed(file, chat)
+            index[name] = next
+            // Only what the list shows without its file (a new entry, its title, its project) is worth 4 MB right away.
+            if (known == null || known.title != next.title || known.projectId != next.projectId) structural = true
+            else if (known != next) unsavedIndex += name
         }
-        if (changed) runCatching {
+        if (ConversationIndexPolicy.persist(firstInProcess, structural, unsavedIndex.size)) runCatching {
             val target = AtomicFile(indexFile); val out = target.startWrite()
             try { out.write(json.encodeToString(ConversationIndexFile(version = 3, entries = HashMap(index))).toByteArray(Charsets.UTF_8)); target.finishWrite(out) }
             catch (e: Exception) { target.failWrite(out); throw e }
+            unsavedIndex.clear()
         }
         return files.sortedByDescending { it.lastModified() }.mapNotNull { file ->
             index[file.nameWithoutExtension]?.let { AssistantChatEntry(file.nameWithoutExtension, it.title, it.projectId, it.updatedAt, it.preview,it.searchText) }
@@ -153,18 +163,41 @@ internal class AssistantChatStore(private val context: Context) {
         prefs.edit().putBoolean("migration_v2",true).commit()
     }}
 
-    suspend fun save(state: AssistantUiState, orders: com.vidadomu.nexus.agent.core.orders.OrderBookState? = null) = lock.withLock { withContext(Dispatchers.IO) {
+    private fun snapshotOf(state: AssistantUiState, orders: com.vidadomu.nexus.agent.core.orders.OrderBookState?): SavedAssistantChat {
         val items = state.items
         val ids = items.filterIsInstance<ChatItem.PlanCard>().map { it.planId }.toSet()
-        val snapshot = SavedAssistantChat(items, state.plans.filterKeys { it in ids }, state.pendingAttachments, knownAttachments(state), orders, state.activeProjectId, state.conversationId)
-        if (snapshot == previous) return@withContext
+        return SavedAssistantChat(items, state.plans.filterKeys { it in ids }, state.pendingAttachments, knownAttachments(state), orders, state.activeProjectId, state.conversationId)
+    }
+
+    suspend fun save(state: AssistantUiState, orders: com.vidadomu.nexus.agent.core.orders.OrderBookState? = null) = lock.withLock { withContext(Dispatchers.IO) {
+        write(snapshotOf(state, orders))
+    } }
+
+    /**
+     * Autosave of every UI state. Only a change in a job's progress may wait ([ChatAutosave]); the caller collects with
+     * collectLatest, so a newer state replaces a waiting one. Only the wait can be cut short: a state that must be written
+     * now is written even while fragments keep arriving (collectLatest waits for it before taking the next one).
+     */
+    suspend fun autosave(state: AssistantUiState, orders: com.vidadomu.nexus.agent.core.orders.OrderBookState?) {
+        val waiting = withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+            val snapshot = snapshotOf(state, orders)
+            val wait = savePolicy.waitMs(snapshot, android.os.SystemClock.elapsedRealtime())
+            if (wait > 0) snapshot to wait else { lock.withLock { write(snapshot) }; null }
+        } ?: return
+        kotlinx.coroutines.delay(waiting.second)
+        withContext(kotlinx.coroutines.NonCancellable) { lock.withLock { withContext(Dispatchers.IO) { write(waiting.first) } } }
+    }
+
+    private fun write(snapshot: SavedAssistantChat) {
+        if (snapshot == savePolicy.saved) return
+        val id = snapshot.conversationId ?: return
         val stream = file.startWrite()
         try {
             stream.write(json.encodeToString(snapshot).toByteArray(Charsets.UTF_8))
             file.finishWrite(stream)
-            writeConversation(state.conversationId,snapshot.copy(updatedAt=System.currentTimeMillis()))
-            context.getSharedPreferences("nexus_project_conversations",0).edit().putString(state.activeProjectId ?: "general",state.conversationId).apply()
-            previous = snapshot
+            writeConversation(id,snapshot.copy(updatedAt=System.currentTimeMillis()))
+            context.getSharedPreferences("nexus_project_conversations",0).edit().putString(snapshot.projectId ?: "general",id).apply()
+            savePolicy.written(snapshot, android.os.SystemClock.elapsedRealtime())
         } catch (error: Exception) { file.failWrite(stream); throw error }
-    } }
+    }
 }

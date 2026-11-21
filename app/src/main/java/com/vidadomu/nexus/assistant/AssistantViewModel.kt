@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -243,11 +244,19 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         } }
         removeOrderListener = runtime.orders.onChange { publishOrders() }
         publishOrders()
-        viewModelScope.launch { chatsReady.await(); ui.collect { state -> chatStore.save(state, if (background != null) parkedOrders else runtime.orders.snapshot()) } }
+        viewModelScope.launch { chatsReady.await(); ui.collectLatest { state -> chatStore.autosave(state, if (background != null) parkedOrders else runtime.orders.snapshot()) } }
         viewModelScope.launch { app.generationRepository.allJobs.collect { jobs -> onJobs(jobs) } }
     }
 
     override fun onCleared() { removeOrderListener(); super.onCleared() }
+
+    /** Leaving the app: a progress change the autosave is still holding back goes to disk now. */
+    fun flushChat() {
+        if (!chatsReady.isCompleted) return
+        val state = _ui.value
+        val orders = if (background != null) parkedOrders else runtime.orders.snapshot()
+        viewModelScope.launch { runCatching { chatStore.save(state, orders) } }
+    }
 
     private fun publishOrders() = _ui.update {
         val orders = (if (background != null) parkedOrders?.orders.orEmpty() else runtime.orders.all()).associateBy { o -> o.id }

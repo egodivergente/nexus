@@ -707,6 +707,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         getSharedPreferences("nexus_workspace",0).edit().putLong("leftAt",System.currentTimeMillis()).apply()
+        (application as NexusApplication).flushAssistantChat()
         super.onStop()
     }
 

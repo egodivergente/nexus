@@ -29,10 +29,14 @@ class NexusApplication : Application() {
     private val assistantOwner = object : androidx.lifecycle.ViewModelStoreOwner {
         override val viewModelStore = androidx.lifecycle.ViewModelStore()
     }
+    @Volatile private var assistant: com.vidadomu.nexus.assistant.AssistantViewModel? = null
     fun assistantViewModel(): com.vidadomu.nexus.assistant.AssistantViewModel =
         androidx.lifecycle.ViewModelProvider(assistantOwner,
             androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(this))[
-            com.vidadomu.nexus.assistant.AssistantViewModel::class.java]
+            com.vidadomu.nexus.assistant.AssistantViewModel::class.java].also { assistant = it }
+
+    /** Without creating the chat: if it never started there is nothing to save. */
+    fun flushAssistantChat() { assistant?.flushChat() }
 
 
     /**
