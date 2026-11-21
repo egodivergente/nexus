@@ -115,8 +115,10 @@ async function agentCall(op,args={}) {
  const interval=setInterval(pump,180);
  try{
   const response=await rpc('agent',{op,args,owner:Agent.owner});Agent.settings=response.settings;
+  const previousProject=Agent.snapshot?.projectId;
   if(response.result?.snapshot)Agent.snapshot=response.result.snapshot;
   else if(response.result?.index)Agent.snapshot=response.result;
+  if(previousProject!==Agent.snapshot?.projectId)window.dispatchEvent(new Event('nexus:project-changed'));
   return response.result;
  }finally{clearInterval(interval);Agent.busy=false;if(view==='assistant'||view==='editor')renderAssistant();}
 }
@@ -319,7 +321,9 @@ function renderAssistant(){
  if(!Agent.restored){Agent.restored=true;const saved=state.agentConversation;Agent.draft=saved?.draft||Agent.draft;if(!Agent.attachments.length&&Array.isArray(saved?.draftAttachments))Agent.attachments=saved.draftAttachments;if(saved?.items?.length){Agent.items=saved.items;for(const [key,index] of Object.entries(saved.anchors||{}))if(Agent.items[index])Agent.cardAnchors.set(key,Agent.items[index]);}}
  const content=(view==='editor'?$('#corte-chat'):$('#content')),oldMessages=$('.agent-messages'),oldCompose=$('#agent-compose');
  AgentViewport.capture(oldMessages);
- const s=Agent.snapshot,project=s?.index.projects.find(p=>p.id===s.projectId),busyUi=Agent.busy&&!Agent.initPromise,disabled=busyUi||Agent.generating?'disabled':'';
+ const s=Agent.snapshot,project=s?.index.projects.find(p=>p.id===s.projectId),busyUi=(Agent.busy&&!Agent.initPromise)||Agent.messageSending;
+ const queueing=Agent.messageSending||AgentQueue.isDraining()||AgentQueue.has();
+ const disabled=busyUi||Agent.generating||AgentQueue.isDraining()?'disabled':'';
  const ready=agentPendingEntries(),readyCount=ready.reduce((sum,e)=>sum+planOutputCount(e.plan),0),readyModels=[...new Set(ready.map(e=>e.plan.modelName))];
  for(const entry of s?.plans||[]){
   const id=entry.plan.id,key='plan:'+id;
@@ -340,7 +344,7 @@ function renderAssistant(){
  </div>
  <div class="agent-scroll-tools"><button type="button" data-agent-latest hidden aria-label="Ir al último mensaje">↓ Últimos mensajes</button></div>
  ${ready.length?`<div class="agent-ready-actions"><span>${escape(readyModels.length===1?readyModels[0]:readyModels.length+' modelos')} · ${readyCount} resultado${readyCount===1?'':'s'} preparado${readyCount===1?'':'s'}</span><button type="button" class="primary" data-agent="generate-ready" ${disabled}>${Agent.generating?'Enviando…':'Generar'+(readyCount>1?' '+readyCount:'')}</button></div>`:''}
- <form id="agent-compose"><div class="agent-attachments">${Agent.attachments.map(f=>`<button type="button" data-agent-remove="${escape(f.id)}" title="Quitar adjunto">${escape(f.name)} ×</button>`).join('')}</div><textarea id="agent-input" rows="2" aria-label="Mensaje al asistente" placeholder="Escribe tu idea…">${escape(Agent.draft)}</textarea><div class="agent-compose-actions">${busyUi?'<div class="agent-thinking" role="status"><span class="loading" aria-hidden="true"></span> Preparando respuesta…</div>':''}<div class="agent-compose-left">${aiButton('attach','Adjuntar imagen, vídeo o documento','clip',busyUi)}<div class="agent-session-info"><button type="button" class="small nx-meta-chip" data-agent="settings" title="Modelo y conexión del asistente" ${disabled}>${s?(s.offline?'Sin modelo conectado':escape(agentModelLabel())):'Conectando con el asistente'}</button><button type="button" class="small nx-meta-chip" data-agent="skills" title="Skills activas" ${disabled}>Skills · ${s?.skills.length||0}</button><span class="nx-meta-badge">${s?.tools?.length||0} herramientas</span></div></div>${aiButton('send','Enviar mensaje (Enter)','send',busyUi)}</div></form>${window.NexusChatContinuity?.panelPlaceholder()||''}`;
+ <form id="agent-compose">${AgentQueue.markup()}<div class="agent-attachments">${Agent.attachments.map(f=>`<button type="button" data-agent-remove="${escape(f.id)}" title="Quitar adjunto">${escape(f.name)} ×</button>`).join('')}</div><textarea id="agent-input" rows="2" aria-label="Mensaje al asistente" placeholder="Escribe tu idea…">${escape(Agent.draft)}</textarea><div class="agent-compose-actions">${busyUi?'<div class="agent-thinking" role="status"><span class="loading" aria-hidden="true"></span> Preparando respuesta…</div>':''}<div class="agent-compose-left">${aiButton('attach','Adjuntar imagen, vídeo o documento','clip',Agent.generating||Agent.busy&&!queueing)}<div class="agent-session-info"><button type="button" class="small nx-meta-chip" data-agent="settings" title="Modelo y conexión del asistente" ${disabled}>${s?(s.offline?'Sin modelo conectado':escape(agentModelLabel())):'Conectando con el asistente'}</button><button type="button" class="small nx-meta-chip" data-agent="skills" title="Skills activas" ${disabled}>Skills · ${s?.skills.length||0}</button><span class="nx-meta-badge">${s?.tools?.length||0} herramientas</span></div></div>${queueing?'<button type="button" class="primary agent-queue-submit" data-agent="send">Poner en cola</button>':aiButton('send','Enviar mensaje (Enter)','send',busyUi||Agent.generating)}</div></form>${window.NexusChatContinuity?.panelPlaceholder()||''}`;
  const messages=template.content.querySelector('.agent-messages');
  const messageNodes=[...messages.querySelectorAll('.agent-message')];
  // Anchor each card to the message present when it first appeared. Updates to
@@ -365,9 +369,12 @@ function renderAssistant(){
  else for(const child of messages.children)agentMarkup.set(child,child.outerHTML);
  if(oldCompose){
   const fresh=template.content.querySelector('#agent-compose');
-  for(const selector of ['.agent-attachments','.agent-compose-actions']){
+  for(const selector of ['.agent-queue','.agent-attachments','.agent-compose-actions']){
    const old=oldCompose.querySelector(selector),next=fresh.querySelector(selector),markup=next.outerHTML;
-   if(agentMarkup.get(old)!==markup){old.replaceWith(next);agentMarkup.set(next,markup);}
+   if(agentMarkup.get(old)!==markup){
+    if(old.querySelector('details[open]')&&next.querySelector('details'))next.querySelector('details').open=true;
+    old.replaceWith(next);agentMarkup.set(next,markup);
+   }
   }
   const input=oldCompose.querySelector('#agent-input');
   if(input.value!==Agent.draft)input.value=Agent.draft;
@@ -375,7 +382,10 @@ function renderAssistant(){
  }
  agentPatchChildren(content,template.content);
  AgentViewport.mount($('.agent-messages'));agentSizeInput();window.NexusChatContinuity?.afterRender();
- const currentResults=(s?.plans||[]).filter(e=>jobsForPlan(e.plan.id).length);
+ storeAgentConversation();
+}
+function storeAgentConversation(){
+ const currentResults=(Agent.snapshot?.plans||[]).filter(e=>jobsForPlan(e.plan.id).length);
  const previousResults=[...new Map([...(state.agentConversation?.flowPlans||[]),...(state.agentConversation?.resultPlans||[])].map(e=>[e.plan.id,e])).values()].filter(e=>!currentResults.some(c=>c.plan.id===e.plan.id));
  // Keep the archive id so later archives overwrite the same conversation instead of duplicating it.
  state.agentConversation={...(state.agentConversation?.id?{id:state.agentConversation.id}:{}),draft:Agent.draft,draftAttachments:Agent.attachments,items:Agent.items,resultPlans:[...previousResults,...currentResults],anchors:Object.fromEntries([...Agent.cardAnchors].map(([key,item])=>[key,Agent.items.indexOf(item)]))};persist();
@@ -399,24 +409,45 @@ async function ensureAssistantReady(){
  Agent.initPromise=(async()=>{try{await agentCall('snapshot');await agentCall('importHistory');return Agent.snapshot;}finally{Agent.initPromise=null;}})();
  return Agent.initPromise;
 }
+async function deliverAgentMessage(text,attachments,requestText){
+ const sent={role:'user',text,attachments};
+ Agent.error='';Agent.items.push(sent);AgentViewport.latest();
+ try{
+  const result=await agentCall('send',{text:requestText||text,attachments:attachments.map(f=>({id:f.id,uri:f.url,mimeType:f.mime,name:f.name}))});
+  Agent.items.push({role:'assistant',text:result.text,html:result.html,attachments:(result.viewedAssets||[]).map(a=>({id:a.id,url:a.uri,mime:a.mimeType,name:a.name})),usage:result.inputTokens||result.outputTokens?result.inputTokens+' entrada · '+result.outputTokens+' salida':null});
+ }catch(error){
+  sent.cancelled=error.message.startsWith('Turno detenido por el usuario.');
+  sent.failed=!sent.cancelled;Agent.error=error.message;
+ }finally{
+  if(view==='assistant'||view==='editor')renderAssistant();else storeAgentConversation();
+ }
+ return !sent.cancelled&&!sent.failed;
+}
 async function sendAgent(requestText){
- if(window.NexusChatContinuity?.isSwitching())return;
+ if(Agent.messageSending||AgentQueue.isDraining()||Agent.cancelDraining||window.NexusChatContinuity?.isSwitching())return;
  const text=Agent.draft.trim();if(!text||Agent.generating)return;
  if(Agent.initPromise){try{await Agent.initPromise;}catch{}}
- if(Agent.busy)return;
+ if(Agent.busy||Agent.messageSending)return;
  window.NexusModelSuggestions?.close();
- Agent.error='';
  if(!Agent.snapshot||Agent.snapshot.offline){
   try{await ensureAssistantReady();}catch(error){Agent.error=error.message;if(view==='assistant'||view==='editor')renderAssistant();return;}
-  if(Agent.snapshot.offline){toast('El asistente necesita una conexion LLM. Configurala en sus ajustes.');agentSettings();return;}
+  if(Agent.snapshot.offline){toast('El asistente necesita una conexión LLM. Configúrala en sus ajustes.');agentSettings();return;}
  }
- const attachments=Agent.attachments.slice(),sent={role:'user',text,attachments};Agent.items.push(sent);Agent.draft='';Agent.attachments=[];AgentViewport.latest();
- $('#agent-input')?.focus({preventScroll:true});
- try{const result=await agentCall('send',{text:requestText||text,attachments:attachments.map(f=>({id:f.id,uri:f.url,mimeType:f.mime,name:f.name}))});
-  Agent.items.push({role:'assistant',text:result.text,html:result.html,attachments:(result.viewedAssets||[]).map(a=>({id:a.id,url:a.uri,mime:a.mimeType,name:a.name})),usage:result.inputTokens||result.outputTokens?`${result.inputTokens} entrada · ${result.outputTokens} salida`:null});
- }catch(error){sent.cancelled=error.message.startsWith('Turno detenido por el usuario.');sent.failed=!sent.cancelled;Agent.error=error.message;if(!sent.cancelled&&!Agent.draft){Agent.draft=text;Agent.attachments=attachments;}}
- if(view==='assistant'||view==='editor')renderAssistant();
+ if(Agent.busy||Agent.messageSending||window.NexusChatContinuity?.isSwitching())return;
+ const attachments=Agent.attachments.slice();
+ Agent.messageSending=true;Agent.draft='';Agent.attachments=[];
+ let sent=false;
+ try{
+  sent=await deliverAgentMessage(text,attachments,requestText);
+  if(!sent&&!Agent.items.at(-1)?.cancelled&&!Agent.draft&&!Agent.attachments.length){Agent.draft=text;Agent.attachments=attachments;}
+  if(!sent)await AgentQueue.pause();
+ }finally{
+  Agent.messageSending=false;
+  if(view==='assistant'||view==='editor')renderAssistant();else storeAgentConversation();
+ }
+ if(sent)await AgentQueue.drain();
 }
+
 function agentSettings(){
  const s=Agent.settings;
  modal(`<h2>Ajustes del asistente</h2><form id="agent-settings"><div class="fields"><label>Conexión<select name="backend"><option value="direct">Bedrock directo</option><option value="proxy">Proxy Bedrock</option></select></label><label>Modelo<input name="modelId" value="${escape(s.modelId||'')}" required></label><label>Región<input name="region" value="${escape(s.region||'us-east-1')}" required></label><label>Máximo de tokens<input name="maxTokens" type="number" min="256" max="32000" value="${s.maxTokens||4096}"></label><label>URL del proxy<input name="endpoint" value="${escape(s.endpoint||'')}"></label><label>Familias excluidas<input name="excludedFamilies" value="${escape(s.excludedFamilies||'')}"></label>${[['accessKey','AWS Access Key'],['secretKey','AWS Secret Key'],['sessionToken','AWS Session Token'],['token','Token del proxy']].map(([id,label])=>`<label>${label}<input name="${id}" type="password" autocomplete="new-password" placeholder="${s.configured?.includes(id)?'Configurado':'Sin configurar'}"></label>`).join('')}</div><label class="agent-check"><input name="sendImages" type="checkbox" ${s.sendImages?'checked':''}> Enviar imágenes al asistente</label><button class="primary" type="submit">Guardar</button></form>`);
@@ -425,14 +456,15 @@ function agentSettings(){
 document.addEventListener('input',e=>{if(e.target.id==='agent-input'){Agent.draft=e.target.value;agentSizeInput();}});
 document.addEventListener('keydown',e=>{
  if(e.target.id!=='agent-input'||e.key!=='Enter'||e.shiftKey||e.altKey||e.metaKey||e.isComposing)return;
- e.preventDefault();if(!e.repeat)sendAgent();
+ e.preventDefault();if(!e.repeat)AgentQueue.submit().catch(error=>toast(error.message));
 });
 document.addEventListener('change',async e=>{if(e.target.id==='agent-project')try{await agentCall('project',{id:e.target.value});}catch(error){toast(error.message);}});
 document.addEventListener('submit',async e=>{
  const formId=e.target.getAttribute('id')||'';
  if(!formId.startsWith('agent-'))return;e.preventDefault();
  try{
-  if(formId==='agent-compose')return await sendAgent();
+  if(formId==='agent-compose')return await AgentQueue.submit();
+  if(formId==='agent-queue-edit'){await AgentQueue.saveEdit(e.target);$('#dialog').close();return;}
   const fields=Object.fromEntries(new FormData(e.target));
   if(formId==='agent-settings'){fields.maxTokens=Number(fields.maxTokens);fields.sendImages=e.target.elements.sendImages.checked;await agentCall('settings',fields);}
   if(formId==='agent-project-form')await agentCall('createProject',fields);
@@ -445,8 +477,11 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('click',async e=>{
  const b=e.target.closest('button');if(!b||b.disabled)return;
  if(b.hasAttribute('data-agent-latest')){AgentViewport.latest();return;}
- if(Agent.generating&&(b.dataset.agent||Object.keys(b.dataset).some(key=>key.startsWith('agent'))))return;
  try{
+  if(b.hasAttribute('data-agent-queue-resume'))return await AgentQueue.drain(true);
+  if(b.dataset.agentQueueEdit)return await AgentQueue.edit(b.dataset.agentQueueEdit);
+  if(b.dataset.agentQueueRemove)return await AgentQueue.remove(b.dataset.agentQueueRemove);
+  if(Agent.generating&&(b.dataset.agent||Object.keys(b.dataset).some(key=>key.startsWith('agent'))))return;
   if(b.dataset.nav==='assistant'&&!Agent.busy)await ensureAssistantReady();
   if(b.dataset.agentMode)await agentCall('mode',{mode:b.dataset.agentMode});
   if(b.dataset.agentRemove){Agent.attachments=Agent.attachments.filter(f=>f.id!==b.dataset.agentRemove);renderAssistant();}
@@ -467,10 +502,10 @@ document.addEventListener('click',async e=>{
   }
   switch(b.dataset.agent){
    case'reconnect':try{await rpc('init');await agentCall('snapshot');Agent.error='';toast('Conexión local comprobada. No se ha reenviado el mensaje.');}catch(error){Agent.error=error.message;}if(view==='assistant'||view==='editor')renderAssistant();break;
-   case'send':e.preventDefault();await sendAgent();break;
+   case'send':e.preventDefault();await AgentQueue.submit();break;
    case'generate-ready':await generateAgentEntries(agentPendingEntries());break;
    case'attach':e.preventDefault();Agent.attachments.push(...(await rpc('pick')).slice(0,Math.max(0,6-Agent.attachments.length)));renderAssistant();$('#agent-input')?.focus({preventScroll:true});break;
-   case'new':if(window.NexusChatContinuity?.isSwitching())throw Error('Espera a que se abra la conversación.');if(Agent.initPromise){try{await Agent.initPromise;}catch{}}if(window.NexusChatContinuity)await window.NexusChatContinuity.archiveCurrent();else if(Agent.items.length)await rpc('archiveChat',{...state.agentConversation,items:Agent.items,draft:Agent.draft});await agentCall('new');Agent.items=[];Agent.draft='';Agent.attachments=[];Agent.cardAnchors.clear();Agent.expandedBatches.clear();state.agentConversation=null;persist();AgentViewport.latest();renderAssistant();$('#agent-input')?.focus({preventScroll:true});break;
+   case'new':if(Agent.messageSending||AgentQueue.isDraining()||window.NexusChatContinuity?.isSwitching())throw Error('Espera a que se abra la conversación.');if(Agent.initPromise){try{await Agent.initPromise;}catch{}}if(window.NexusChatContinuity)await window.NexusChatContinuity.archiveCurrent();else if(Agent.items.length)await rpc('archiveChat',{...state.agentConversation,items:Agent.items,draft:Agent.draft});await agentCall('new');Agent.items=[];Agent.draft='';Agent.attachments=[];Agent.cardAnchors.clear();Agent.expandedBatches.clear();state.agentConversation=null;persist();AgentViewport.latest();renderAssistant();$('#agent-input')?.focus({preventScroll:true});break;
    case'settings':agentSettings();break;
    case'project-new':modal('<h2>Nuevo proyecto</h2><form id="agent-project-form"><label>Nombre<input name="name" maxlength="80" required></label><button class="primary">Crear proyecto</button></form>');break;
    case'memory':{const p=Agent.snapshot.index.projects.find(p=>p.id===Agent.snapshot.projectId),m=p.memory;

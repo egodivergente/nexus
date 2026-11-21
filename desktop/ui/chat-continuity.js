@@ -232,7 +232,7 @@
  // Load first, then archive, then reset the model session. Any failure restores the visible chat,
  // its draft and attachments; the archived copy keeps the same id so a retry never duplicates it.
  async function open(id){
-  if(Agent.busy||Agent.generating)throw Error('Espera a que termine el mensaje actual.');
+  if(Agent.busy||Agent.generating||Agent.messageSending||typeof AgentQueue!=='undefined'&&AgentQueue.isDraining())throw Error('Espera a que termine el mensaje actual.');
   if(switching)throw Error('Ya se está abriendo otra conversación.');
   if(id===currentId()){announce('Ya estás en esta conversación.');return false;}
   switching=true;
@@ -282,7 +282,7 @@
  async function retry(id){
   const index=Agent.items.findIndex(i=>String(i.id)===String(id)),item=Agent.items[index];
   if(!item?.failed)return;
-  if(Agent.busy||Agent.generating)throw Error('Espera a que termine el mensaje actual.');
+  if(Agent.busy||Agent.generating||Agent.messageSending||typeof AgentQueue!=='undefined'&&AgentQueue.isDraining())throw Error('Espera a que termine el mensaje actual.');
   const draft=String(Agent.draft||'').trim();
   if(draft&&draft!==String(item.text||'').trim())throw Error('Envía o borra primero el texto del campo de escritura. Tu borrador se conserva.');
   const before={draft:Agent.draft,attachments:Agent.attachments.slice(),count:Agent.items.length-1};

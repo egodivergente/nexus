@@ -1,5 +1,53 @@
 'use strict';
 const Corte={snapshot:null,projectId:null,jobs:[],selected:new Set(),playhead:0,zoom:70,busy:false,error:'',loaded:false,audioTrackId:null};
+const corteStill={timer:0,running:false,result:null};
+let cortePlayback=null;
+const corteRevision=()=>JSON.stringify([Corte.projectId,Corte.snapshot?.revision]);
+function corteStillTarget(){
+ if(view!=='editor'||!Corte.snapshot?.duration_us||!$('#corte-image')||$('#corte-video')?.hasAttribute('src'))return null;
+ const at=Math.max(0,Math.min(Corte.playhead,Corte.snapshot.duration_us-1));
+ return {key:JSON.stringify([corteRevision(),at]),at,projectId:Corte.projectId,revision:Corte.snapshot.revision};
+}
+function corteSetViewerStatus(message){
+ const node=$('#corte-preview-state');
+ if(node&&node.textContent!==message)node.textContent=message;
+}
+function corteUpdatePlayButton(){
+ const button=$('[data-corte="preview"]');if(!button)return;
+ const preparing=cortePlayback?.key===corteRevision()&&!$('#corte-video')?.hasAttribute('src');
+ button.disabled=preparing||!Corte.snapshot?.duration_us||Corte.busy;
+ const playing=$('#corte-video')?.paused===false;
+ button.innerHTML=corteGlyph('play')+(preparing?'Preparando…':playing?'Pausar':'Reproducir');
+}
+function corteShowStill(){
+ const target=corteStillTarget(),image=$('#corte-image'),empty=$('.corte-viewer-empty');
+ if(!image||!empty)return;
+ if(!target){
+  image.removeAttribute('src');
+  empty.querySelector('strong').textContent='Tu historia empieza aquí';
+  empty.querySelector('span').textContent='Añade medios a la línea de tiempo.';
+  return;
+ }
+ const result=corteStill.result?.key===target.key?corteStill.result:null;
+ if(result?.image){if(image.getAttribute('src')!==result.image)image.src=result.image;}
+ else image.removeAttribute('src');
+ empty.querySelector('strong').textContent=result?(result.error?'Fotograma no disponible':'Sin imagen en este punto'):'Cargando fotograma…';
+ empty.querySelector('span').textContent=result?.error||'';
+ if(result||corteStill.running)return;
+ clearTimeout(corteStill.timer);
+ corteStill.timer=setTimeout(corteReadStill,100);
+}
+async function corteReadStill(){
+ const target=corteStillTarget();
+ if(!target||corteStill.running||corteStill.result?.key===target.key)return;
+ corteStill.running=true;
+ try{
+  const result=await corteRpc('preview_frame',{project_id:target.projectId,expected_revision:target.revision,at_us:target.at});
+  if(result.stale)await corteRefresh();
+  else corteStill.result={key:target.key,image:result.image};
+ }catch(error){corteStill.result={key:target.key,error:error.message};}
+ finally{corteStill.running=false;corteShowStill();}
+}
 const corteMediaAnalysis=new Map();
 const corteGlyph=name=>`<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${({media:'<rect x="3" y="4" width="18" height="16" rx="3"/><path d="m3 16 5-5 4 4 3-3 6 6"/><circle cx="16" cy="8" r="1"/>',video:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/>',audio:'<path d="M9 18V5l11-2v13M9 7l11-2"/><ellipse cx="6" cy="18" rx="3" ry="3"/><ellipse cx="17" cy="16" rx="3" ry="3"/>',chat:'<path d="M21 12a8 8 0 0 1-8 8H5l-3 2V11a9 9 0 0 1 18-2"/><path d="m18 2 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z"/>',focus:'<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/>',plus:'<path d="M12 5v14M5 12h14"/>',search:'<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>',play:'<path d="m9 5 11 7-11 7Z"/>',export:'<path d="M12 15V3m-4 4 4-4 4 4M4 14v6h16v-6"/>'})[name]||''}</svg>`;
 let cortePanels={media:true,chat:matchMedia('(min-width: 1450px)').matches},corteSearch='',corteInspectorOpen=false;
@@ -51,7 +99,7 @@ async function corteOpen(projectId){
  if(Agent.busy||Corte.busy)throw Error('Espera a que termine el trabajo del proyecto actual.');
  await ensureAssistantReady();
  const p=Agent.snapshot.index.projects.find(p=>p.id===projectId);if(!p)throw Error('Proyecto desconocido.');
- await agentCall('project',{id:projectId});
+ if(Agent.snapshot.projectId!==projectId)await agentCall('project',{id:projectId});
  const snapshot=await corteRpc('create_project',{project_id:projectId,name:p.name});
  Corte.projectId=projectId;Corte.snapshot=snapshot;Corte.loaded=true;Corte.selected=new Set(snapshot.selection);Corte.playhead=snapshot.playhead_us;
  if(view==='editor')renderCorte();
@@ -70,14 +118,16 @@ function renderCorte(){
  content.innerHTML=`<div class="corte-top"><div class="corte-project-group"><span class="corte-kicker">PROYECTO</span><select id="corte-project" aria-label="Proyecto Nexus"><option value="">Selecciona un proyecto</option>${projects.map(p=>`<option value="${escape(p.id)}" ${Corte.projectId===p.id?'selected':''}>${escape(p.name)}</option>`).join('')}</select><button data-corte="new" class="corte-icon-button" title="Nuevo proyecto" aria-label="Nuevo proyecto">${corteGlyph('plus')}</button></div><span id="corte-revision" role="status"></span><div class="corte-panel-switches" role="group" aria-label="Paneles del espacio de trabajo"><button data-corte="media" aria-controls="corte-media" title="Mostrar u ocultar medios" aria-pressed="true">${corteGlyph('media')}<span>Medios</span></button><button data-corte="chat" aria-controls="corte-chat" title="Mostrar u ocultar agente" aria-pressed="true">${corteGlyph('chat')}<span>Agente</span></button><button data-corte="focus" class="corte-icon-button" title="Vista de enfoque" aria-label="Vista de enfoque" aria-pressed="false">${corteGlyph('focus')}</button></div><button data-corte="export" class="primary">${corteGlyph('export')}Exportar vídeo</button></div>
  <div class="corte-layout" style="--corte-media:${Number(localStorage.getItem('corte-media-width'))||224}px;--corte-chat:${Number(localStorage.getItem('corte-chat-width'))||320}px">
  <aside id="corte-media" class="corte-media"><div class="corte-divider" role="separator" aria-label="Ancho de medios" data-corte-resize="media"></div><div class="corte-panel-heading"><h3>Medios</h3><span id="corte-asset-count"></span></div><button data-corte="import" class="corte-import">${corteGlyph('plus')}Importar archivos</button><label class="corte-search">${corteGlyph('search')}<input id="corte-search" type="search" aria-label="Buscar medios del proyecto" placeholder="Buscar medios" value="${escape(corteSearch)}"></label><div id="corte-assets"></div></aside>
- <section class="corte-edit"><div class="corte-monitor"><div class="corte-monitor-bar"><span>VISOR</span><output id="corte-timecode" aria-label="Posición del cabezal">00:00.00</output><button data-corte="preview">${corteGlyph('play')}Preparar visor</button></div><div class="corte-viewer"><video id="corte-video" controls preload="metadata"></video><div class="corte-viewer-empty">${corteGlyph('video')}<strong>Tu historia empieza aquí</strong><span>Añade medios a la línea de tiempo.</span></div></div><div id="corte-preview-state">Prepara el visor para reproducir el montaje.</div></div><div class="corte-timeline-panel"><div class="corte-timeline-heading"><span>MONTAJE</span><div class="corte-audio-destination"><select id="corte-audio-target" aria-label="Pista de audio de destino"></select><button data-corte="add-audio-track" title="Añadir pista de audio" aria-label="Añadir pista de audio">${corteGlyph('plus')}Audio</button></div><span id="corte-selection-info"></span></div><div class="corte-controls"><div class="corte-control-group"><button data-corte="undo" title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button><button data-corte="redo" title="Rehacer (Ctrl+Mayús+Z)" aria-label="Rehacer">↷</button></div><div class="corte-control-group"><button data-corte="split" title="Dividir en el cabezal">Dividir</button><button data-corte="duplicate">Duplicar</button><button data-corte="delete" title="Eliminar selección (Supr)">Eliminar</button></div><div class="corte-control-group"><button data-corte="inspector">Inspector</button><button data-corte="title">Título</button></div><label class="corte-zoom">Zoom <input id="corte-zoom" type="range" min="15" max="250" value="${Corte.zoom}"></label></div><div id="corte-timeline" tabindex="0" aria-label="Línea de tiempo"></div></div><p id="corte-error" role="alert"></p><div id="corte-jobs" aria-live="polite"></div></section>
+ <section class="corte-edit"><div class="corte-monitor"><div class="corte-monitor-bar"><span>VISOR</span><output id="corte-timecode" aria-label="Posición del cabezal">00:00.00</output><button data-corte="preview">${corteGlyph('play')}Reproducir</button></div><div class="corte-viewer"><img id="corte-image" alt="Fotograma del cabezal"><video id="corte-video" controls preload="metadata"></video><div class="corte-viewer-empty">${corteGlyph('video')}<strong>Tu historia empieza aquí</strong><span>Añade medios a la línea de tiempo.</span></div></div><div id="corte-preview-state" role="status"></div></div><div class="corte-timeline-panel"><div class="corte-timeline-heading"><span>MONTAJE</span><div class="corte-audio-destination"><select id="corte-audio-target" aria-label="Pista de audio de destino"></select><button data-corte="add-audio-track" title="Añadir pista de audio" aria-label="Añadir pista de audio">${corteGlyph('plus')}Audio</button></div><span id="corte-selection-info"></span></div><div class="corte-controls"><div class="corte-control-group"><button data-corte="undo" title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button><button data-corte="redo" title="Rehacer (Ctrl+Mayús+Z)" aria-label="Rehacer">↷</button></div><div class="corte-control-group"><button data-corte="split" title="Dividir en el cabezal">Dividir</button><button data-corte="duplicate">Duplicar</button><button data-corte="delete" title="Eliminar selección (Supr)">Eliminar</button></div><div class="corte-control-group"><button data-corte="inspector">Inspector</button><button data-corte="title">Título</button></div><label class="corte-zoom">Zoom <input id="corte-zoom" type="range" min="15" max="250" value="${Corte.zoom}"></label></div><div id="corte-timeline" tabindex="0" aria-label="Línea de tiempo"></div></div><p id="corte-error" role="alert"></p><div id="corte-jobs" aria-live="polite"></div></section>
  <aside id="corte-chat" class="agent-view" hidden></aside>
  <aside id="corte-inspector" aria-labelledby="corte-inspector-title" hidden>
   <div class="corte-panel-heading"><h3 id="corte-inspector-title">Inspector</h3><button type="button" data-corte="close-inspector" aria-label="Cerrar inspector">×</button></div>
   <div id="corte-inspector-content"></div>
  </aside></div>`;
  renderCorteTimeline();renderCorteAssets();renderAssistant();corteApplyPanels();
- const video=$('#corte-video');video.addEventListener('timeupdate',()=>{Corte.playhead=Math.round(video.currentTime*1e6);corteTimecode();const line=$('.corte-playhead');if(line)line.style.left=(100+Corte.playhead/1e6*Corte.zoom)+'px';});
+ const video=$('#corte-video');
+ for(const event of ['play','pause','ended'])video.addEventListener(event,corteUpdatePlayButton);
+ video.addEventListener('timeupdate',()=>{if(!video.hasAttribute('src'))return;Corte.playhead=Math.round(video.currentTime*1e6);corteTimecode();const line=$('.corte-playhead');if(line)line.style.left=(100+Corte.playhead/1e6*Corte.zoom)+'px';});
  if(Corte.loaded&&Agent.snapshot?.projectId&&Agent.snapshot.projectId!==Corte.projectId&&!Corte.loading){Corte.loading=true;corteOpen(Agent.snapshot.projectId).catch(e=>toast(e.message)).finally(()=>Corte.loading=false);return;}
  if(!Corte.loaded&&!Corte.loading){Corte.loading=true;ensureAssistantReady().then(()=>{if(view!=='editor')return;const id=Agent.snapshot.projectId;if(id)return corteOpen(id);renderCorte();}).catch(e=>toast(e.message)).finally(()=>Corte.loading=false);}
 }
@@ -92,14 +142,17 @@ function renderCorteTimeline(){
  inspector?.toggleAttribute('disabled',!selected&&!corteInspectorOpen);
  renderCorteInspector();
  for(const action of ['undo','redo'])document.querySelector(`[data-corte="${action}"]`)?.toggleAttribute('disabled',!Corte.snapshot?.[action+'_id']||Corte.busy);
- for(const action of ['preview','export','title'])document.querySelector(`[data-corte="${action}"]`)?.toggleAttribute('disabled',!Corte.snapshot||Corte.busy||(['preview','export'].includes(action)&&!corteClips().length));
+ for(const action of ['export','title'])document.querySelector(`[data-corte="${action}"]`)?.toggleAttribute('disabled',!Corte.snapshot||Corte.busy||(['preview','export'].includes(action)&&!corteClips().length));
+ corteUpdatePlayButton();
  const info=$('#corte-selection-info');if(info)info.textContent=selected?Corte.selected.size+' seleccionado'+(Corte.selected.size>1?'s':''):corteClips().length+' clip'+(corteClips().length===1?'':'s');
  if(!Corte.snapshot){timeline.innerHTML='<p>Crea o abre un proyecto Nexus para montar.</p>';return;}
  const duration=Math.max(10,Corte.snapshot.duration_us/1e6+2),width=duration*Corte.zoom;
  $('#corte-revision').textContent=Corte.busy?'Guardando…':'Guardado';
  $('#corte-revision').title='Revisión '+Corte.snapshot.revision;
- const empty=$('.corte-viewer-empty');if(empty){empty.querySelector('strong').textContent=corteClips().length?'Tu montaje, listo para el visor':'Tu historia empieza aquí';empty.querySelector('span').textContent=corteClips().length?'Pulsa Preparar visor para reproducirlo.':'Añade medios a la línea de tiempo.';}
- const viewer=$('#corte-video');if(viewer?.getAttribute('src')&&Number(viewer.dataset.revision)!==Corte.snapshot.revision)$('#corte-preview-state').textContent='Visor de revisión '+viewer.dataset.revision+' · prepara el visor para ver la revisión actual '+Corte.snapshot.revision;
+ const video=$('#corte-video'),key=corteRevision();
+ if(cortePlayback&&cortePlayback.key!==key){cortePlayback=null;corteSetViewerStatus('');}
+ if(video?.hasAttribute('src')&&video.dataset.revision!==key){video.pause();video.removeAttribute('src');video.load();}
+ corteShowStill();
  $('#corte-error').innerHTML=escape(Corte.error)+(Corte.snapshot.missing_media||[]).map(m=>`<span>Medio ausente: ${escape(m.name)} <button data-corte-relink="${escape(m.id)}">Revincular</button></span>`).join('');
  const step=Math.max(1,Math.ceil(48/Corte.zoom));
  timeline.innerHTML=`<div class="corte-ruler" style="width:${width+100}px">${Array.from({length:Math.ceil(duration/step)},(_,i)=>`<button data-corte-time="${i*step*1e6}" style="left:${100+i*step*Corte.zoom}px" aria-label="Ir a ${i*step} segundos">${i*step}s</button>`).join('')}</div>${corteTracks().map(track=>`<div class="corte-track ${track.kind==='AUDIO'?'audio':'video'}" style="width:${width+100}px">${corteTrackHeading(track)}${track.clips.map(clip=>`<button draggable="true" data-corte-clip="${escape(clip.id)}" class="corte-clip ${clip.kind==='AUDIO'?'audio':clip.kind==='TITLE'?'title':'video'} ${Corte.selected.has(clip.id)?'selected':''}" aria-pressed="${Corte.selected.has(clip.id)}" style="left:${100+clip.timelineStartUs/1e6*Corte.zoom}px;width:${Math.max(12,clip.durationUs/1e6*Corte.zoom)}px" title="${escape(clip.name||clip.text?.text||clip.id)} · ${corteSeconds(clip.timelineStartUs)} · ${corteSeconds(clip.durationUs)}">${escape(clip.name||clip.text?.text||clip.id)}<small>${corteSeconds(clip.durationUs)}</small></button>`).join('')}</div>`).join('')}<div class="corte-playhead" style="left:${100+Corte.playhead/1e6*Corte.zoom}px"></div>`;
@@ -133,7 +186,7 @@ function renderCorteAssets(){
 }
 async function corteFocus(){
  await corteMutate('focus',{playhead_us:Corte.playhead,selection:[...Corte.selected]});
- const video=$('#corte-video');if(video?.src)video.currentTime=Corte.playhead/1e6;
+ const video=$('#corte-video');if(video?.hasAttribute('src')&&video.dataset.revision===corteRevision())video.currentTime=Corte.playhead/1e6;
 }
 async function corteOps(ops,label){return corteMutate('apply_ops',{ops,label});}
 function renderCorteInspector(){
@@ -198,12 +251,40 @@ async function corteAction(action){
   if(!track||index<0||!track.clips[index+1])throw Error('Selecciona el clip anterior a un corte.');
   return corteOps([{op:'set_transition',track_id:track.id,left_clip_id:track.clips[index].id,right_clip_id:track.clips[index+1].id,kind:track.kind==='VIDEO'?'DIP_TO_BLACK':'AUDIO_CROSSFADE',duration_us:500000}],'Transición');
  }
- if(action==='preview'||action==='export'){
-  await corteMutate(action);
-  const status=$('#corte-preview-state');
-  if(action==='preview'&&status)status.textContent='Preparando el visor…';
-  cortePollJobs();return;
+ if(action==='preview'){
+  const video=$('#corte-video'),key=corteRevision();
+  if(!video||!Corte.snapshot.duration_us||cortePlayback?.key===key)return;
+  if(video.hasAttribute('src')&&video.dataset.revision===key){
+   if(video.paused)await video.play();else video.pause();
+   return;
+  }
+  const cached=Corte.jobs.find(j=>j.project_id===Corte.projectId&&j.revision===Corte.snapshot.revision&&j.kind==='preview'&&j.state==='COMPLETED');
+  if(cached){cortePlayVideo(cached);return;}
+  const request={key,id:null};cortePlayback=request;
+  corteUpdatePlayButton();corteSetViewerStatus('Preparando reproducción…');
+  try{
+   const job=await corteMutate('preview');
+   if(cortePlayback===request){request.id=job.id;cortePollJobs();}
+  }catch(error){
+   if(cortePlayback===request){cortePlayback=null;corteSetViewerStatus('');corteUpdatePlayButton();}
+   throw error;
+  }
+  return;
  }
+ if(action==='export'){await corteMutate(action);cortePollJobs();}
+
+}
+function cortePlayVideo(preview){
+ const video=$('#corte-video');if(!video)return;
+ video.dataset.revision=corteRevision();
+ video.src=preview.url;
+ const at=Corte.playhead/1e6;
+ video.addEventListener('loadedmetadata',()=>{
+  if(video.getAttribute('src')===preview.url)video.currentTime=Math.min(at,Math.max(0,video.duration-.04));
+ },{once:true});
+ corteSetViewerStatus('');
+ corteUpdatePlayButton();
+ video.play().catch(()=>corteUpdatePlayButton());
 }
 async function cortePollJobs(){
  try{
@@ -211,8 +292,15 @@ async function cortePollJobs(){
   const node=$('#corte-jobs');if(!node)return;
   const markup=jobs.filter(j=>j.project_id===Corte.projectId).slice(0,6).map(j=>`<div>${j.kind==='preview'?'Visor':'Exportación'} · ${escape(({QUEUED:'En cola',RUNNING:'Preparando',COMPLETED:'Listo',FAILED:'Error',CANCELLED:'Cancelado'})[j.state]||j.state)} ${Math.round(j.progress*100)} % ${j.url?`<a href="${escape(j.url)}" download="Nexus-montaje.mp4">Guardar vídeo</a>`:['QUEUED','RUNNING'].includes(j.state)?`<button data-corte-cancel="${escape(j.id)}">Cancelar</button>`:''}${j.error?`<p role="alert">${escape(j.error)}</p>`:''}</div>`).join('');
   if(node.innerHTML!==markup)node.innerHTML=markup;
-  const preview=jobs.find(j=>j.project_id===Corte.projectId&&j.revision===Corte.snapshot?.revision&&j.kind==='preview'&&j.state==='COMPLETED');
-  const video=$('#corte-video');if(preview&&video&&video.getAttribute('src')!==preview.url){video.src=preview.url;video.dataset.revision=String(preview.revision);$('#corte-preview-state').textContent='Montaje · revisión '+preview.revision;}
+  if(cortePlayback?.id&&cortePlayback.key===corteRevision()){
+   const preview=jobs.find(j=>j.id===cortePlayback.id);
+   if(preview?.state==='COMPLETED'){cortePlayback=null;cortePlayVideo(preview);}
+   else if(['FAILED','CANCELLED'].includes(preview?.state)){
+    cortePlayback=null;corteUpdatePlayButton();
+    corteSetViewerStatus(preview.error||'Reproducción cancelada.');
+   }
+  }
+
  }catch(e){toast(e.message);}
 }
 const beforeCorteRender=render;
@@ -308,7 +396,7 @@ document.addEventListener('dragend',corteClearDrag);
 document.addEventListener('keydown',e=>{
  if(view!=='editor'||e.target.closest('input,textarea,select,button,summary,a,[contenteditable="true"]'))return;
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();corteAction(e.shiftKey?'redo':'undo').catch(e=>toast(e.message));}
- if(e.code==='Space'){e.preventDefault();const video=$('#corte-video');if(video?.src)(video.paused?video.play():video.pause());}
+ if(e.code==='Space'&&Corte.snapshot?.duration_us){e.preventDefault();corteAction('preview').catch(corteShowError);}
  if(e.key==='Delete'){e.preventDefault();corteAction('delete').catch(e=>toast(e.message));}
 });
 setInterval(()=>{if(view==='editor'&&!document.hidden){corteRefresh().catch(e=>{Corte.error=e.message;});cortePollJobs();}},2000);

@@ -147,7 +147,7 @@ class CorteHost:
         op = args.get('method', 'status')
         if op=='status':
             result=self.exchange('status',{})
-            result['methods']=['status','list_projects','read_project','find_silences','apply_ops','undo','redo','import_media','media_analysis','preview','export','cancel_export','jobs','relink']
+            result['methods']=['status','list_projects','read_project','find_silences','apply_ops','undo','redo','import_media','media_analysis','preview_frame','preview','export','cancel_export','jobs','relink']
             result['active_project']=(self.agent_context or {}).get('project_id')
             return result
         if op=='read_project':
@@ -182,6 +182,17 @@ class CorteHost:
             return {'ok':True,'clips':details,'suggested_op':{'op':'delete_ranges','ranges':ranges,'ripple':True},'revision':snapshot['revision']}
         if op == 'import_media':
             return self.import_media(args, assets if assets is not None else self.native.assets({}))
+        if op == 'preview_frame':
+            from base64 import b64encode
+            from corte_render import render_preview_frame
+            at_us = args.get('at_us')
+            if type(at_us) is not int or at_us < 0:
+                raise ValueError('Posición del cabezal no válida.')
+            snapshot = self.exchange('read_project', {'project_id': args['project_id']})
+            if snapshot['revision'] != args.get('expected_revision'):
+                return {'stale': True}
+            frame = render_preview_frame(self, snapshot, at_us)
+            return {'image': 'data:image/jpeg;base64,' + b64encode(frame).decode('ascii') if frame else None}
         if op in {'preview', 'export'}:
             project = self.exchange('read_project', args)
             if project['revision'] != args.get('expected_revision'):

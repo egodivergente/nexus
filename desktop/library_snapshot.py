@@ -35,6 +35,15 @@ class LibrarySnapshot:
             self.index_key=key
         return self.index
 
+    def active_project(self, identifier):
+        if not identifier:
+            return None
+        with self.lock:
+            for item in self._index().get('projects', []):
+                if item.get('id') == identifier and not item.get('archived'):
+                    return {'id': identifier, 'name': item.get('name') or identifier}
+        return None
+
     @staticmethod
     def modality(asset):
         return asset.get('type') if asset.get('type') in {'IMAGE','VIDEO','AUDIO'} else 'CHAT'

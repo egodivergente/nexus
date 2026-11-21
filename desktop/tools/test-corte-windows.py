@@ -1,6 +1,8 @@
 """Real JVM/domain, Windows media and export acceptance; isolated data, no account calls."""
 from pathlib import Path
+from base64 import b64decode
 import hashlib
+from io import BytesIO
 import json
 import shutil
 import subprocess
@@ -13,6 +15,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from corte_host import CorteHost
 from corte_render import render_project
 from native_operations import NativeOperations
+from PIL import Image
 
 
 class CorteAcceptance(unittest.TestCase):
@@ -92,6 +95,17 @@ class CorteAcceptance(unittest.TestCase):
             return self.native.process([self.native.ffmpeg(),'-v','error','-ss',str(t),'-i',str(path),'-frames:v','1','-f','rawvideo','-pix_fmt','rgb24','pipe:1'],30)
         for t in [1,4.5,5.5,6.5]:self.assertEqual(frame(target,t),frame(preview,t))
         type(self).rendered=target
+    def test_03a_preview_frame_reads_source_at_playhead(self):
+        def frame(at):
+            result = self.mutate('preview_frame', at_us=at)
+            with Image.open(BytesIO(b64decode(result['image'].split(',', 1)[1]))) as preview:
+                self.assertEqual(preview.size, (320, 240))
+                return preview.tobytes()
+        self.assertNotEqual(frame(1_000_000), frame(2_500_000))
+        self.assertEqual(self.host.run({'method':'preview_frame','project_id':'qa',
+                                      'expected_revision':0,'at_us':1_000_000}), {'stale':True})
+        self.assertFalse(self.host.run({'method':'jobs'})['jobs'])
+
     def test_04_missing_media_and_cancellation(self):
         renamed=self.source.with_suffix('.unavailable');self.source.rename(renamed)
         try:

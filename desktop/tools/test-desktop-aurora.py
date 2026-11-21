@@ -118,6 +118,14 @@ def verify(page, out, baseline):
                            timeout=60_000)
     page.evaluate("async id => { await ensureAssistantReady(); await agentCall('project', {id}); }", PROJECT)
     open_view(page, 'canvas', '#creative-command')
+    aurora2 = page.evaluate("initial.version.endsWith('aurora.2')")
+    if aurora2:
+        expect(page.locator('#nexus-project-context')).to_have_text('Costa de prueba')
+        page.locator('#gallery-activity').click()
+        expect(page.locator('#nexus-activity-panel')).to_be_visible()
+        expect(page.locator('#creative-command')).to_be_visible()
+        page.locator('#gallery-activity').click()
+        expect(page.locator('#nexus-activity-panel')).to_be_hidden()
     if baseline and page.locator('#creative-dock-toggle').get_attribute('aria-expanded') == 'false':
         page.locator('#creative-dock-toggle').click()
     if not baseline:
@@ -163,6 +171,11 @@ def verify(page, out, baseline):
         page.evaluate("initial.qa = true")
 
     open_view(page, 'library', '.gallery-grid')
+    if aurora2:
+        expect(page.locator('#library-source')).to_be_hidden()
+        page.locator('.gallery-filters summary').click()
+        expect(page.locator('#library-source')).to_be_visible()
+        page.locator('.gallery-filters summary').click()
     page.locator('#pc-search').fill('Costa al amanecer')
     asset = page.locator('.gallery-piece').filter(has_text='Costa al amanecer')
     expect(asset).to_have_count(1)
@@ -180,6 +193,10 @@ def verify(page, out, baseline):
         open_view(page, 'editor', '#corte-timeline')
         page.wait_for_function('() => Boolean(Corte.snapshot)&&!Corte.busy', timeout=45_000)
         page.locator('.corte-asset').filter(has_text='Costa al amanecer').locator('[data-corte-place]').click()
+    elif aurora2:
+        expect(page.get_by_role('button', name='Usar como referencia')).to_be_visible()
+        expect(page.get_by_role('button', name='Mover a proyecto…')).to_be_hidden()
+        page.get_by_role('button', name='Añadir a Costa de prueba').click()
     else:
         page.get_by_role('button', name='Añadir a Montaje…').click()
         expect(page.locator('#library-montage-project')).to_have_value(PROJECT)
@@ -188,6 +205,10 @@ def verify(page, out, baseline):
     clip = page.locator('.corte-clip').first
     expect(clip).to_contain_text('Costa al amanecer', timeout=45_000)
     expect(page.locator('#corte-project')).to_have_value(PROJECT)
+    if aurora2:
+        page.wait_for_function("() => document.querySelector('#corte-image')?.naturalWidth > 0")
+        assert page.locator('#corte-video').get_attribute('src') is None
+        assert not page.evaluate("async () => (await corteRpc('jobs')).jobs.length")
     screenshot(page, out, '04-montaje')
     if not baseline:
         page.wait_for_function('() => Corte.selected.size === 1 && !Corte.busy')
@@ -203,8 +224,11 @@ def verify(page, out, baseline):
         page.locator('#pc-search').fill(PROMPT)
         expect(page.locator('.gallery-piece')).to_have_count(1)
         page.locator('.gallery-piece .gallery-media').click()
-        page.get_by_role('button', name='Añadir a Montaje…').click()
-        page.get_by_role('button', name='Añadir al cabezal', exact=True).click()
+        if aurora2:
+            page.get_by_role('button', name='Añadir a Costa de prueba · 5.00 s').click()
+        else:
+            page.get_by_role('button', name='Añadir a Montaje…').click()
+            page.get_by_role('button', name='Añadir al cabezal', exact=True).click()
         page.wait_for_function('() => view === "editor" && corteClips().length === 2 && !Corte.busy')
         assert page.evaluate('uri => Object.values(Corte.snapshot.links).some(link => link.original_uri === uri)', RESULT)
         first = page.locator('.corte-clip').filter(has_text='Costa al amanecer')
@@ -220,8 +244,89 @@ def verify(page, out, baseline):
         timeline.dispatch_event('drop', {'dataTransfer': drag, 'clientX': x + delta})
         expect(page.locator('#corte-snap-guide')).to_have_count(0)
         page.wait_for_function('id => corteClips().find(clip => clip.id === id)?.timelineStartUs === 5000000 && !Corte.busy', arg=first_id)
+        if aurora2:
+            page.locator('[data-corte-time="5000000"]').click()
+            page.wait_for_function("() => document.querySelector('#corte-image')?.naturalWidth > 0")
+            assert not page.evaluate("async () => (await corteRpc('jobs')).jobs.length")
+            page.locator('[data-corte="preview"]').click()
+            page.wait_for_function("() => document.querySelector('#corte-video')?.readyState >= 2", timeout=45_000)
+            assert page.evaluate("async () => (await corteRpc('jobs')).jobs.some(j => j.kind === 'preview' && j.state === 'COMPLETED')")
+            print('PASS fotograma inmediato sin trabajo de render y reproducción explícita', flush=True)
         print('PASS ArtBox, variante, generación simulada, biblioteca, visor, montaje e inspector', flush=True)
     return metrics
+
+
+def verify_message_queue(page, held):
+    """Keep using the real workspace, but hold the assistant transport at the localhost boundary."""
+    open_view(page, 'assistant', '#agent-compose')
+    page.evaluate("() => {Agent.snapshot.offline=false;renderAssistant();}")
+    composer = page.locator('#agent-input')
+    respond = lambda route, payload: route.fulfill(json={
+        'id': route.request.post_data_json['id'], **payload
+    })
+
+    def next_turn(text):
+        assert held and held[0].request.post_data_json['args']['args']['text'] == text
+        return held.pop(0)
+
+    def success(text):
+        route = next_turn(text)
+        respond(route, {'ok': True, 'value': {'result': {'text': 'Respuesta ' + text}, 'settings': {}}})
+        return route.request.post_data_json['args']['args']['attachments']
+
+    def enter(text):
+        composer.fill(text)
+        composer.press('Enter')
+        expect(composer).to_have_value('')
+
+    enter('Inicio')
+    expect(page.locator('.agent-thinking')).to_be_visible()
+    expect(page.locator('[data-agent="attach"]')).to_be_enabled()
+    page.locator('[data-agent="attach"]').click()
+    expect(page.locator('.agent-attachments')).to_contain_text('Referencia de prueba.png')
+    enter('Segundo')
+    enter('Tercero')
+    expect(page.locator('.agent-queue summary')).to_have_text('2 en cola')
+    assert len(held) == 1
+    success('Inicio')
+    page.wait_for_function("() => Agent.busy && Agent.items.at(-1).text === 'Segundo'")
+    attachments = success('Segundo')
+    assert len(attachments) == 1 and attachments[0]['uri'] == RESULT
+    page.wait_for_function("() => Agent.busy && Agent.items.at(-1).text === 'Tercero'")
+    enter('Después de parar')
+    page.get_by_role('button', name='Detener agente', exact=True).click()
+    expect(page.locator('.agent-queue')).to_contain_text('Cola pausada')
+    respond(next_turn('Tercero'), {'ok': False, 'error': 'Turno detenido por el usuario.'})
+    expect(page.locator('.agent-queue summary')).to_have_text('1 en cola')
+    assert not held
+    page.locator('.agent-queue summary').click()
+    page.locator('.agent-queue li').filter(has_text='Después de parar').get_by_role('button', name='Quitar').click()
+    expect(page.locator('.agent-queue')).to_be_hidden()
+    enter('Fallo')
+    enter('Pendiente')
+    enter('Eliminar')
+    respond(next_turn('Fallo'), {'ok': False, 'error': 'Fallo de prueba'})
+    expect(page.locator('.agent-queue')).to_contain_text('Cola pausada')
+    assert not held
+    page.locator('.agent-queue summary').click()
+    pending = page.locator('.agent-queue li').filter(has_text='Pendiente')
+    pending.get_by_role('button', name='Editar').click()
+    page.locator('#agent-queue-edit textarea').fill('Pendiente editado')
+    page.get_by_role('button', name='Guardar cambios', exact=True).click()
+    page.locator('.agent-queue li').filter(has_text='Eliminar').get_by_role('button', name='Quitar').click()
+    expect(page.locator('.agent-queue summary')).to_have_text('1 en cola')
+    page.evaluate('flush()')
+    page.reload()
+    page.wait_for_function("() => initial?.version.endsWith('aurora.2')")
+    open_view(page, 'assistant', '#agent-compose')
+    page.evaluate("async () => {await ensureAssistantReady(); Agent.snapshot.offline=false;renderAssistant();}")
+    expect(page.locator('.agent-queue summary')).to_have_text('1 en cola')
+    assert not held
+    page.get_by_role('button', name='Reanudar', exact=True).click()
+    page.wait_for_function("() => Agent.busy && Agent.items.at(-1).text === 'Pendiente editado'")
+    success('Pendiente editado')
+    expect(page.locator('.agent-queue')).to_be_hidden()
+    print('PASS cola FIFO con adjuntos, detención, edición, retirada, fallo, reapertura y reanudación', flush=True)
 
 
 def main():
@@ -232,7 +337,7 @@ def main():
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    errors, simulated = [], []
+    errors, simulated, held = [], [], []
     with tempfile.TemporaryDirectory(prefix='nexus-aurora-') as temp:
         data = Path(temp)
         make_fixture(data)
@@ -247,6 +352,15 @@ def main():
                 if urlsplit(route.request.url).path == '/rpc':
                     message = route.request.post_data_json
                     operation = message.get('op')
+                    if operation == 'agent' and message['args'].get('op') == 'send':
+                        held.append(route)
+                        return
+                    if operation == 'agentCancel':
+                        return route.fulfill(json={'id': message['id'], 'ok': True, 'value': True})
+                    if operation == 'pick':
+                        return route.fulfill(json={'id': message['id'], 'ok': True, 'value': [
+                            {'id': 'aurora-attachment', 'url': RESULT, 'mime': 'image/png', 'name': 'Referencia de prueba.png'}
+                        ]})
                     if operation == 'generate':
                         simulated.append(message['args']['provider'])
                         return route.fulfill(json={'id': message['id'], 'ok': True, 'value': {
@@ -296,6 +410,8 @@ def main():
                     page.emulate_media(reduced_motion='reduce')
                     assert page.evaluate("getComputedStyle(document.querySelector('#studio-settings')).transitionDuration === '0s'")
                     print('PASS 9 pantallas a 1440, 1024 y 760 px, comandos y movimiento reducido', flush=True)
+                    if page.evaluate("initial.version.endsWith('aurora.2')"):
+                        verify_message_queue(page, held)
                 assert simulated == ['runway'], simulated
                 assert not errors, errors
                 (output / 'resultado.json').write_text(json.dumps({

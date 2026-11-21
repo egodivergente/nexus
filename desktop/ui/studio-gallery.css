@@ -140,3 +140,17 @@ body.nx-ten .library-files .gallery-filters>div{top:calc(100% + var(--space-2));
 #library-move-status[data-state=success]{color:var(--text);}
 #library-move-dialog form[hidden]{display:none!important;}
 @media(max-width:600px){.library-move-fields>button{justify-self:stretch;}}
+
+/* Library controls and activity stay close to the workspace that opened them. */
+.gallery-filters .gallery-chips{grid-column:1/-1;flex-wrap:wrap}
+.gallery-viewer-more,.gallery-viewer-metadata{width:100%;margin:0}
+.gallery-viewer-more summary,.gallery-viewer-metadata summary{padding:6px 0;cursor:pointer;color:var(--muted)}
+.gallery-viewer-more>div{display:flex;flex-wrap:wrap;gap:6px}
+#nexus-project-context{max-width:15rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--t-meta);color:var(--muted)}
+#nexus-activity-panel{inset:70px 16px auto auto;margin:0;width:min(360px,calc(100vw - 32px));max-height:65dvh;overflow:auto;padding:12px;border:1px solid var(--line);border-radius:var(--radius-md);background:var(--panel);color:var(--text);box-shadow:var(--shadow-pop)}
+.activity-panel-title,#nexus-activity-panel li{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#nexus-activity-panel ul{margin:8px 0 0;padding:0;list-style:none}
+#nexus-activity-panel li{padding:8px 0;border-top:1px solid var(--line)}
+#nexus-activity-panel li div{min-width:0;overflow-wrap:anywhere}
+#nexus-activity-panel small{display:block;margin-top:2px;color:var(--muted)}
+#nexus-activity-panel button{flex-shrink:0}

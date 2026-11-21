@@ -55,7 +55,7 @@
   if(hint)text(hint,view==='assistant'?'Enter para enviar · Mayús+Enter otra línea':view==='canvas'?'Enter o Ctrl+Enter para generar · Mayús+Enter otra línea':'Ctrl+K comandos rápidos');
   const panel=$('.creative-control-panel'),actions=$('#creative-control-actions');
   const balances=$('#account-balances');if(balances&&panel&&balances.parentElement!==panel)panel.insertBefore(balances,actions);
-  ['telemetry-button','flow-control-button','order-latest','gallery-activity'].forEach(id=>{const b=$('#'+id);if(b&&actions&&b.parentElement!==actions)actions.append(b);});
+  ['telemetry-button','flow-control-button','order-latest'].forEach(id=>{const b=$('#'+id);if(b&&actions&&b.parentElement!==actions)actions.append(b);});
   const count=initial?.configured?.length||0;
   text($('#creative-status-label'),initial?.qa?'Laboratorio local':`${count} proveedor${count===1?'':'es'} configurado${count===1?'':'s'}`);
   text($('#creative-local-status'),$('#connection')?.textContent||'Estado local pendiente');

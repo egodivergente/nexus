@@ -5,6 +5,7 @@ it does not attempt to approximate Corte effects with CSS or a single source cli
 """
 from collections import OrderedDict
 from contextlib import ExitStack
+from io import BytesIO
 import math
 from pathlib import Path
 import subprocess
@@ -111,6 +112,65 @@ def draw_titles(canvas,titles):
         canvas.alpha_composite(overlay)
 
 
+def preview_size(settings):
+    width, height = settings['width'], settings['height']
+    ratio = min(1, 640 / max(width, height))
+    return max(16, int(width * ratio) // 2 * 2), max(16, int(height * ratio) // 2 * 2)
+
+
+def compose_frame(sample, size, read_frame):
+    canvas = Image.new('RGBA', size, (0, 0, 0, 255))
+    for layer in sample['layers']:
+        if layer['alpha'] > 0:
+            image = read_frame(layer['media_id'], layer['source_us'])
+            image, position = layer_image(image, layer, size)
+            canvas.alpha_composite(image, position)
+    draw_titles(canvas, sample['titles'])
+    return canvas.convert('RGB')
+
+
+def render_preview_frame(host, snapshot, at_us):
+    project = snapshot['project']
+    if not snapshot['duration_us']:
+        return None
+    at_us = max(0, min(at_us, snapshot['duration_us'] - 1))
+    size = preview_size(project['settings'])
+    samples = host.exchange('render_samples', {
+        'project_id': project['id'], 'expected_revision': snapshot['revision'],
+        'render_project': project, 'times': [at_us]
+    })['samples']
+    sample = samples[0]
+    if not sample['titles'] and not any(layer['alpha'] > 0 for layer in sample['layers']):
+        return None
+    media = {item['id']: item for item in project['media']}
+
+    def read_frame(media_id, source_us):
+        item = media[media_id]
+        path = local_path(item['uri'])
+        if not path.is_file():
+            raise ValueError('Medio ausente: ' + item['displayName'])
+        if item['kind'] == 'IMAGE':
+            with Image.open(path) as image:
+                image.draft('RGB', tuple(dimension * 2 for dimension in size))
+                return ImageOps.exif_transpose(image).convert('RGB')
+        width, height = size
+        result = subprocess.run(
+            [host.native.ffmpeg(), '-v', 'error', '-nostdin', '-threads', '1',
+             '-ss', str(source_us / 1_000_000), '-i', str(path), '-an', '-frames:v', '1',
+             '-vf', f'scale={width}:{height}:force_original_aspect_ratio=decrease',
+             '-threads', '1', '-c:v', 'png', '-f', 'image2pipe', 'pipe:1'],
+            capture_output=True, creationflags=FLAGS, timeout=12
+        )
+        if result.returncode or not result.stdout:
+            raise ValueError('No se pudo leer el fotograma de ' + item['displayName'])
+        with Image.open(BytesIO(result.stdout)) as image:
+            return image.convert('RGB')
+
+    output = BytesIO()
+    compose_frame(sample, size, read_frame).save(output, format='JPEG', quality=84)
+    return output.getvalue()
+
+
 def render_project(host,snapshot,output,progress,preview=False):
     project=snapshot['project'];duration=snapshot['duration_us']
     if duration<=0:raise ValueError('El montaje está vacío.')
@@ -119,7 +179,7 @@ def render_project(host,snapshot,output,progress,preview=False):
     if missing:raise ValueError('Revincula los medios ausentes: '+', '.join(missing))
     width,height=project['settings']['width'],project['settings']['height']
     if preview:
-        ratio=min(1,640/max(width,height));width=max(16,int(width*ratio)//2*2);height=max(16,int(height*ratio)//2*2)
+        width,height=preview_size(project['settings'])
     rate=project['settings']['frameRate'];fps=rate['num']/rate['den']
     count=math.ceil(duration*rate['num']/(rate['den']*1_000_000))
     ffmpeg=host.native.ffmpeg();decoders=OrderedDict();encoder=None
@@ -145,21 +205,20 @@ def render_project(host,snapshot,output,progress,preview=False):
                     try:encoder.wait(timeout=5)
                     except subprocess.TimeoutExpired:encoder.kill();encoder.wait()
             resources.callback(release_encoder)
+            def read_frame(mid, source_us):
+                if mid not in decoders:
+                    decoders[mid] = Decoder(ffmpeg, media[mid], (width, height), fps)
+                decoders.move_to_end(mid)
+                while len(decoders) > 8:
+                    decoders.popitem(last=False)[1].close()
+                return decoders[mid].get(source_us)
             try:
                 for start in range(0,count,50):
                     times=[round(i*rate['den']*1_000_000/rate['num']) for i in range(start,min(count,start+50))]
                     samples=host.exchange('render_samples',{'project_id':project['id'],'expected_revision':snapshot['revision'],'render_project':project,'times':times})['samples']
                     for offset,sample in enumerate(samples):
                         i=start+offset;progress(i,count)
-                        canvas=Image.new('RGBA',(width,height),(0,0,0,255))
-                        for layer in sample['layers']:
-                            if layer['alpha']<=0:continue
-                            mid=layer['media_id']
-                            if mid not in decoders:decoders[mid]=Decoder(ffmpeg,media[mid],(width,height),fps)
-                            decoders.move_to_end(mid)
-                            while len(decoders)>8:decoders.popitem(last=False)[1].close()
-                            im,xy=layer_image(decoders[mid].get(layer['source_us']),layer,(width,height));canvas.alpha_composite(im,xy)
-                        draw_titles(canvas,sample['titles']);encoder.stdin.write(canvas.convert('RGB').tobytes())
+                        encoder.stdin.write(compose_frame(sample,(width,height),read_frame).tobytes())
                         a=round(i*48000/fps);b=min(round((i+1)*48000/fps),round(duration*48000/1_000_000))
                         chunk=np.zeros((max(0,b-a),2),np.float32)
                         for layer in sample['audio']:

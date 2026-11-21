@@ -16,14 +16,14 @@ renderAssistant=function(){
   const button=document.createElement('button');button.type='button';button.dataset.stopTurn=Agent.activeTurn.id;button.textContent='Detener agente';
   button.addEventListener('click',async()=>{
    button.disabled=true;button.textContent='Deteniendo…';
-   try{await rpc('agentCancel',{owner:Agent.owner,turn_id:button.dataset.stopTurn});Agent.cancelDraining=Agent.callbacks.size>0;}
+   try{await AgentQueue.pause();await rpc('agentCancel',{owner:Agent.owner,turn_id:button.dataset.stopTurn});Agent.cancelDraining=Agent.callbacks.size>0;}
    catch(error){toast(error.message);button.disabled=false;}
   });
   compose.querySelector('.agent-compose-actions')?.append(button);
  }
  if(Agent.cancelDraining){
   const notice=document.createElement('p');notice.textContent='Finalizando una operación ya enviada…';compose.prepend(notice);
-  compose.querySelector('[data-agent=send]')?.setAttribute('disabled','');
+  if(!AgentQueue.has())compose.querySelector('[data-agent=send]')?.setAttribute('disabled','');
  }
 };
 const agentCallBeforeTurnControl=agentCall;

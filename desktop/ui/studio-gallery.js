@@ -104,14 +104,28 @@
  const montageMime={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',
   mp4:'video/mp4',mov:'video/quicktime',webm:'video/webm',mp3:'audio/mpeg',wav:'audio/wav',
   m4a:'audio/mp4',ogg:'audio/ogg',flac:'audio/flac'};
+ const activeProjectId=()=>Agent.snapshot?Agent.snapshot.projectId:initial?.activeProject?.id;
+ function montageProjects(item){
+  const memberships=item._libraryEntry?.projectIds||[];
+  return (G.librarySnapshot?.projects||[]).filter(project=>!project.archived&&
+   (!memberships.length||memberships.includes(project.id)));
+ }
+ function preferredMontage(item){
+  return montageProjects(item).find(project=>project.id===activeProjectId());
+ }
+ function montageActions(item){
+  if(!canMontage(item))return '';
+  const target=preferredMontage(item);
+  if(!target)return button('to-montage','Añadir a Montaje…','class="primary"');
+  const time=Corte.projectId===target.id?' · '+corteSeconds(Corte.playhead):'';
+  return button('to-active-montage','Añadir a '+escape(target.name||target.id)+time,'class="primary" data-montage-project="'+escape(target.id)+'"');
+ }
  function openMontage(item){
   if(!canMontage(item))throw Error('Elige un archivo original disponible en este PC.');
-  const memberships=item._libraryEntry?.projectIds||[];
-  const projects=(G.librarySnapshot?.projects||[]).filter(project=>!project.archived&&
-   (!memberships.length||memberships.includes(project.id)));
+  const projects=montageProjects(item);
   if(!projects.length)throw Error('Elige primero una carpeta de proyecto activa para este archivo.');
   const choices=projects.map(project=>[project.id,project.name||project.id]);
-  const preferred=[G.project,Corte.projectId].find(id=>projects.some(project=>project.id===id))||
+  const preferred=[activeProjectId(),G.project,Corte.projectId].find(id=>projects.some(project=>project.id===id))||
    (projects.length===1?projects[0].id:'');
   modal(`<section><h2>Añadir a Montaje</h2><p>${escape(name(item))}</p>
    <p class="hint">El clip se añade en la posición del cabezal.</p>
@@ -132,6 +146,16 @@
   form.querySelector('button').disabled=true;close.disabled=true;
   status.dataset.state='working';status.textContent='Preparando el montaje…';
   try{
+   await placeInMontage(item,projectId);
+   dialog.close();closeViewer();navigate('editor');
+  }catch(error){
+   status.dataset.state='error';status.textContent=error.message;
+  }finally{
+   form.removeAttribute('aria-busy');select.disabled=false;
+   form.querySelector('button').disabled=false;close.disabled=false;
+  }
+ }
+ async function placeInMontage(item,projectId){
    await corteOpen(projectId);
    const uri=media(item),mime=item._libraryEntry?.mimeType||montageMime[uri.split('.').pop()];
    const available=record=>record.uri===uri&&!record.libraryDeleted&&(!record.projectId||record.projectId===projectId);
@@ -142,13 +166,20 @@
    }
    if(!asset)throw Error('Este original no está disponible en el proyecto elegido.');
    await cortePlaceAsset(asset.id);
-   dialog.close();closeViewer();navigate('editor');
+ }
+ async function quickMontage(control){
+  const item=findItem(G.viewer?.id);
+  const target=item&&preferredMontage(item);
+  if(target?.id!==control.dataset.montageProject){openMontage(item);return;}
+  if(G.placing)return;
+  G.placing=true;control.disabled=true;control.textContent='Añadiendo…';
+  try{
+   await placeInMontage(item,target.id);
+   closeViewer();navigate('editor');
   }catch(error){
-   status.dataset.state='error';status.textContent=error.message;
-  }finally{
-   form.removeAttribute('aria-busy');select.disabled=false;
-   form.querySelector('button').disabled=false;close.disabled=false;
-  }
+   if(G.viewer?.id===item.id){control.disabled=false;control.textContent='Añadir a '+target.name;}
+   throw error;
+  }finally{G.placing=false;}
  }
  const scopedProject=()=>!['__all__','__unassigned__'].includes(G.project);
  const projectName=()=>G.project==='__all__'?'Todas las carpetas':G.project==='__unassigned__'?'Sin proyecto':G.librarySnapshot?.projects?.find(project=>project.id===G.project)?.name||'Proyecto no disponible';
@@ -164,7 +195,10 @@
   const options=(rows,selected,unavailable)=>{const values=rows.map(row=>[row.id,[row.code,row.title||row.description].filter(Boolean).join(' · ')||row.id]);if(selected&&!values.some(([id])=>id===selected))values.push([selected,unavailable]);return pcOptions([['','Todas'],...values],selected);};
   return `<label>Origen<select id="library-source">${pcOptions([['','Todos'],['GENERATED','Generado'],['IMPORTED','Importado'],['EDITED','Editado'],['SHARED','Compartido']],G.source)}</select></label><label>Función<select id="library-role">${pcOptions([['','Todas'],['KEYFRAME','Fotograma clave'],['REFERENCE','Referencia'],['OUTPUT','Resultado'],['FINAL','Final'],['SOURCE','Fuente'],['OTHER','Otro']],G.role)}</select></label><label>Escena<select id="library-scene">${options(scenes,G.sceneId,'Escena no disponible')}</select></label><label>Plano<select id="library-shot">${options(shots,G.shotId,'Plano no disponible')}</select></label>`;
  }
- function toolbar(jobs){return `<div class="gallery-tools"><button type="button" data-gallery="folders" aria-controls="library-projects" aria-expanded="false">Carpetas</button><div class="tabs studio-tabs"><button data-studio-tab="results" class="active">Archivos</button><button data-studio-tab="activity">Actividad</button></div><label class="gallery-search"><span aria-hidden="true">⌕</span><input id="pc-search" type="search" aria-label="Buscar archivos" placeholder="Buscar por nombre, prompt o modelo…" value="${escape(PC.search)}"></label><div class="gallery-chips">${[['','Todos'],['IMAGE','Imagen'],['VIDEO','Vídeo'],['AUDIO','Audio'],['CHAT','Documentos']].map(([k,l])=>`<button data-gallery-kind="${k}" aria-pressed="${PC.kind===k}">${l}</button>`).join('')}<button data-gallery="favorites" aria-pressed="${G.favorites}">☆ Favoritos</button></div><details class="gallery-filters"><summary>Filtros y orden</summary><div>${classificationControls()}<label>Proveedor<select id="pc-provider">${pcOptions([['','Todos'],...Object.entries(galleryProviders)],PC.provider)}</select></label><label>Estado<select id="pc-status">${pcOptions([['','Todos'],['COMPLETED','Completado'],['PROCESSING','Procesando'],['QUEUED','En cola'],['FAILED','Revisar envío']],PC.status)}</select></label><label>Orden<select id="gallery-sort">${pcOptions([['recent','Recientes'],['name','Por nombre']],G.sort)}</select></label><label>Tamaño de miniaturas<input id="gallery-size" type="range" min="160" max="360" step="20" value="${prefs().size}"></label>${button('save-view','Guardar vista')}</div></details></div><div class="library-scope"><div><h2>${escape(projectName())}</h2><span class="pc-results-count">${countLabel(jobs)}${G.collection?' · '+escape(prefs().collections.find(c=>c.id===G.collection)?.name||'Colección')+' · en este PC':''}</span></div><div class="library-scope-actions">${G.collection?button('all','Salir de colección')+`<button data-project-reference-collection="${escape(prefs().collections.find(c=>c.id===G.collection)?.name||'Colección')}">Archivos de referencia</button>`:''}${G.group?button('group-all','Salir de creación'):''}${PC.search||PC.provider||PC.status||PC.kind||G.favorites||G.source||G.role||G.sceneId||G.shotId?button('reset','Quitar filtros'):''}</div></div>`;}
+ function toolbar(jobs){
+  const filters=[PC.kind,PC.provider,PC.status,G.source,G.role,G.sceneId,G.shotId,G.favorites].filter(Boolean).length;
+  const open=$('.gallery-filters')?.open?' open':'';
+  return `<div class="gallery-tools"><button type="button" data-gallery="folders" aria-controls="library-projects" aria-expanded="false">Carpetas</button><label class="gallery-search"><span aria-hidden="true">⌕</span><input id="pc-search" type="search" aria-label="Buscar archivos" placeholder="Buscar por nombre, prompt o modelo…" value="${escape(PC.search)}"></label><details class="gallery-filters"${open}><summary>Filtros${filters?' · '+filters:''}</summary><div><div class="gallery-chips">${[['','Todos'],['IMAGE','Imagen'],['VIDEO','Vídeo'],['AUDIO','Audio'],['CHAT','Documentos']].map(([k,l])=>`<button data-gallery-kind="${k}" aria-pressed="${PC.kind===k}">${l}</button>`).join('')}<button data-gallery="favorites" aria-pressed="${G.favorites}">☆ Favoritos</button></div>${classificationControls()}<label>Proveedor<select id="pc-provider">${pcOptions([['','Todos'],...Object.entries(galleryProviders)],PC.provider)}</select></label><label>Estado<select id="pc-status">${pcOptions([['','Todos'],['COMPLETED','Completado'],['PROCESSING','Procesando'],['QUEUED','En cola'],['FAILED','Revisar envío']],PC.status)}</select></label><label>Orden<select id="gallery-sort">${pcOptions([['recent','Recientes'],['name','Por nombre']],G.sort)}</select></label><label>Tamaño de miniaturas<input id="gallery-size" type="range" min="160" max="360" step="20" value="${prefs().size}"></label>${button('save-view','Guardar vista')}</div></details></div><div class="library-scope"><div><h2>${escape(projectName())}</h2><span class="pc-results-count">${countLabel(jobs)}${G.collection?' · '+escape(prefs().collections.find(c=>c.id===G.collection)?.name||'Colección')+' · en este PC':''}</span></div><div class="library-scope-actions">${G.collection?button('all','Salir de colección')+`<button data-project-reference-collection="${escape(prefs().collections.find(c=>c.id===G.collection)?.name||'Colección')}">Archivos de referencia</button>`:''}${G.group?button('group-all','Salir de creación'):''}${PC.search||PC.provider||PC.status||PC.kind||G.favorites||G.source||G.role||G.sceneId||G.shotId?button('reset','Quitar filtros'):''}</div></div>`;}
  function selectionBar(){
   document.querySelector('.gallery-selection')?.remove();if(!G.selected.size)return;
   const bar=document.createElement('section');bar.className='gallery-selection';bar.setAttribute('aria-label','Acciones de selección');
@@ -318,6 +352,8 @@
  function renderGallery(){
   if(!['library','history'].includes(view))return;
   if(Studio.tab==='activity'){oldRenderPC();return;}
+  const project=activeProjectId()||null;
+  if(G.activeScope!==project){G.activeScope=project;if(project){G.project=project;G.sceneId='';G.shotId='';G.limit=36;}}
   G.projection=null;ensureLibrary();G.observer?.disconnect();const jobs=entries();PC.limit=G.limit;
   $('#content').classList.add('studio-library','gallery-library');
   $('#content').innerHTML=`<div class="library-browser">${projectSidebar()}<section class="library-files" aria-label="Archivos de la carpeta">${toolbar(jobs)}${G.libraryError?`<div class="library-index-notice" role="status"><span>${escape(G.libraryError)} Se muestran los resultados locales disponibles.</span>${button('refresh-library','Reintentar')}</div>`:!G.librarySnapshot?'<p class="hint library-index-loading" role="status">Reuniendo tus archivos y resultados…</p>':''}<div class="gallery-grid results" style="--gallery-size:${prefs().size}px">${jobs.slice(0,G.limit).map(card).join('')}</div>${jobs.length>G.limit?'<div class="gallery-sentinel" role="status">Más creaciones al continuar</div>':''}${jobs.length?'':`<div class="empty"><h2>${state.jobs.length?'No hay coincidencias':'Tu galería empieza aquí'}</h2><p>${state.jobs.length?'Prueba otra búsqueda o quita los filtros.':'Elige un modelo y crea tu primera imagen o vídeo.'}</p>${state.jobs.length?button('reset','Quitar filtros'):'<button data-nav="canvas">Crear</button>'}</div>`}</section></div>`;
@@ -348,7 +384,7 @@
   index=outputIndex(j,index);if(j.sourceJobId&&Number.isInteger(j._libraryEntry?.outputIndex))outputSelection.set(j.sourceJobId,j._libraryEntry.outputIndex);removeViewer();G.viewer={id,index};Studio.detail=id;outputSelection.set(id,index);
   const u=media(j,index),valid=isMediaUrl(u),variants=variant(j),textDocument=j.modality==='CHAT'&&(/^text\//.test(j._libraryEntry?.mimeType||'')||/\.(txt|md|csv|srt)(?:$|\?)/i.test(u||'')),dlg=document.createElement('dialog');dlg.className='gallery-lightbox';dlg.setAttribute('aria-label',name(j));
   const asset=active(j)?pendingMedia(j):j.modality==='CHAT'?`<pre id="gallery-document">${escape(textDocument?'Cargando documento…':j._libraryEntry?.mimeType==='application/pdf'||/\.pdf(?:$|\?)/i.test(u||'')?'Documento PDF. Descarga el original para abrirlo.':valid||j._libraryEntry?.assetId?'Documento disponible para descargar.':j.prompt||'Documento sin original disponible.')}</pre>`:previewable(j)?j.modality==='VIDEO'?`<video data-gallery-preview="original" src="${escape(previewUrl(j,index,true))}" poster="${escape(previewUrl(j,index))}" playsinline preload="metadata"></video><div class="gallery-player">${button('play','Reproducir / pausar')}<input id="gallery-seek" type="range" min="0" max="100" value="0" aria-label="Posición del vídeo">${button('mute','Activar sonido')}${button('fullscreen','Pantalla completa')}</div>`:`<img data-gallery-preview="original" src="${escape(previewUrl(j,index,true))}" alt="${escape(name(j))}">`:(valid||j._libraryEntry?.assetId)&&j.modality==='AUDIO'?`<audio src="${escape(j._libraryEntry?.assetId?previewUrl(j,0,true):u)}" controls preload="metadata"></audio>`:`<p>${escape(status(j))}</p>`;
-  dlg.innerHTML=`<div class="gallery-viewer-media"><div class="gallery-viewer-top">${button('prev','←','aria-label="Creación anterior"')}${button('next','→','aria-label="Creación siguiente"')}<span>${Math.max(0,viewerEntries().findIndex(x=>x.id===id&&x.index===index))+1} / ${Math.max(1,viewerEntries().length)}</span>${button('close-viewer','✕','aria-label="Cerrar visor"')}</div><div class="gallery-stage">${asset}</div>${variants.count>1?`<div class="gallery-output-nav">${button('prev-output','← Resultado')}<span>${variants.index+1} de ${variants.count}</span>${button('next-output','Resultado →')}</div>`:''}</div><aside class="gallery-viewer-details"><h2>${escape(name(j))}</h2><p class="hint">${escape(galleryProviders[j.providerId]||j.providerId)} · ${escape(status(j))}</p>${j.providerId==='google_flow'?`<p class="hint flow-model-evidence">Modelo ${j.modelConfirmed===true?'confirmado':'solicitado · atribución no confirmada por Google'}: ${escape(j.requestedModel||j.name||j.modelId)}</p>`:''}${j.prompt?`<h3>Prompt</h3><p class="gallery-prompt">${escape(j.prompt)}</p>`:'<p class="hint">Archivo disponible en tu biblioteca.</p>'}<div class="gallery-viewer-actions">${canMontage(j)?button('to-montage','Añadir a Montaje…','class="primary"'):''}${button('move-file','Mover a proyecto…')}${j.prompt?button('copy-prompt','Copiar prompt'):''}${models.some(model=>model.id===j.modelId)?button('reuse-library','Reutilizar ajustes'):''}${previewable(j)||j._libraryEntry?.assetId?button('download-original','Descargar'):valid?`<button ${u.startsWith('/media/')?'data-flow-save':'data-download'}="${escape(u)}">Descargar</button>`:''}${j.modality==='IMAGE'&&valid?`${button('use-reference','Usar como referencia')}${button('to-video','Preparar vídeo')}`:''}${j.providerId==='google_flow'&&j.status==='COMPLETED'&&(!j._libraryEntry||state.jobs.some(job=>job.id===j.sourceJobId))?`<button data-flow-improve="${escape(j.sourceJobId||id)}">Mejorar / exportar</button>`:''}<button data-gallery-favorite="${escape(id)}">${favorite(j)?'★ Favorito':'☆ Favorito'}</button></div>${j.error?`<div class="inline-notice" role="alert">No se pudo completar el encargo.<details><summary>Detalles</summary><pre>${escape(j.error)}</pre></details></div>`:''}${j.uncertain||j.pollError?'<p class="ux-notice">Estado pendiente de comprobar. Consulta el trabajo antes de repetir el envío.</p>':''}<h3>Parámetros</h3><dl>${Object.entries(j.parameters||{}).map(([k,v])=>`<dt>${escape(E.label(k))}</dt><dd>${escape(typeof v==='object'?JSON.stringify(v):v)}</dd>`).join('')}</dl><h3>Coste</h3><p>${j.estimated&&Number.isFinite(j.estimated.amount)?escape(amount(j.estimated))+' · estimación, cargo no verificado':'No registrado'}</p></aside>`;
+  dlg.innerHTML=`<div class="gallery-viewer-media"><div class="gallery-viewer-top">${button('prev','←','aria-label="Creación anterior"')}${button('next','→','aria-label="Creación siguiente"')}<span>${Math.max(0,viewerEntries().findIndex(x=>x.id===id&&x.index===index))+1} / ${Math.max(1,viewerEntries().length)}</span>${button('close-viewer','✕','aria-label="Cerrar visor"')}</div><div class="gallery-stage">${asset}</div>${variants.count>1?`<div class="gallery-output-nav">${button('prev-output','← Resultado')}<span>${variants.index+1} de ${variants.count}</span>${button('next-output','Resultado →')}</div>`:''}</div><aside class="gallery-viewer-details"><h2>${escape(name(j))}</h2><p class="hint">${escape(galleryProviders[j.providerId]||j.providerId)} · ${escape(status(j))}</p>${j.providerId==='google_flow'?`<p class="hint flow-model-evidence">Modelo ${j.modelConfirmed===true?'confirmado':'solicitado · atribución no confirmada por Google'}: ${escape(j.requestedModel||j.name||j.modelId)}</p>`:''}${j.prompt?`<h3>Prompt</h3><p class="gallery-prompt">${escape(j.prompt)}</p>`:'<p class="hint">Archivo disponible en tu biblioteca.</p>'}<div class="gallery-viewer-actions">${montageActions(j)}${j.modality==='IMAGE'&&valid?button('use-reference','Usar como referencia'):''}<details class="gallery-viewer-more"><summary>Más acciones</summary><div>${preferredMontage(j)&&canMontage(j)?button('to-montage','Cambiar destino…'):''}${button('move-file','Mover a proyecto…')}${j.prompt?button('copy-prompt','Copiar prompt'):''}${models.some(model=>model.id===j.modelId)?button('reuse-library','Reutilizar ajustes'):''}${previewable(j)||j._libraryEntry?.assetId?button('download-original','Descargar'):valid?`<button ${u.startsWith('/media/')?'data-flow-save':'data-download'}="${escape(u)}">Descargar</button>`:''}${j.modality==='IMAGE'&&valid?`${button('to-video','Preparar vídeo')}`:''}${j.providerId==='google_flow'&&j.status==='COMPLETED'&&(!j._libraryEntry||state.jobs.some(job=>job.id===j.sourceJobId))?`<button data-flow-improve="${escape(j.sourceJobId||id)}">Mejorar / exportar</button>`:''}<button data-gallery-favorite="${escape(id)}">${favorite(j)?'★ Favorito':'☆ Favorito'}</button></div></details></div>${j.error?`<div class="inline-notice" role="alert">No se pudo completar el encargo.<details><summary>Detalles</summary><pre>${escape(j.error)}</pre></details></div>`:''}${j.uncertain||j.pollError?'<p class="ux-notice">Estado pendiente de comprobar. Consulta el trabajo antes de repetir el envío.</p>':''}<details class="gallery-viewer-metadata"><summary>Detalles</summary><h3>Parámetros</h3><dl>${Object.entries(j.parameters||{}).map(([k,v])=>`<dt>${escape(E.label(k))}</dt><dd>${escape(typeof v==='object'?JSON.stringify(v):v)}</dd>`).join('')}</dl><h3>Coste</h3><p>${j.estimated&&Number.isFinite(j.estimated.amount)?escape(amount(j.estimated))+' · estimación, cargo no verificado':'No registrado'}</p></details></aside>`;
   document.body.append(dlg);wireViewerPreview(dlg,j,index);dlg.showModal();dlg.querySelector('[data-gallery="close-viewer"]').focus();dlg.addEventListener('cancel',e=>{e.preventDefault();closeViewer();});
   if(textDocument&&(valid||j._libraryEntry?.assetId))fetch(j._libraryEntry?.assetId?previewUrl(j,0,true):u).then(r=>{if(!r.ok)throw Error('No se pudo cargar el texto.');return r.text();}).then(text=>{if(dlg.isConnected)dlg.querySelector('#gallery-document').textContent=text.slice(0,100000);}).catch(e=>{if(dlg.isConnected)dlg.querySelector('#gallery-document').textContent=e.message;});
   const image=dlg.querySelector('.gallery-stage img');if(image){
@@ -385,11 +421,71 @@
   $('#nx-sidebar-note')?.remove();let area=$('#gallery-collections');if(!area){area=document.createElement('section');area.id='gallery-collections';$('#studio-settings')?.before(area);}
   area.innerHTML=`<div class="gallery-collection-heading">Colecciones en este PC${button('new-collection','+','aria-label="Nueva colección"')}</div>${prefs().collections.map(c=>`<button data-gallery-collection="${escape(c.id)}" aria-pressed="${G.collection===c.id}">${escape(c.name)}</button>`).join('')||'<small>Solo en este equipo</small>'}`;
  }
+ function paintProjectContext(){
+  if(view!=='canvas'){ $('#nexus-project-context')?.remove();return;}
+  const projectId=activeProjectId();
+  const project=(Agent.snapshot?.index.projects||[]).find(p=>p.id===projectId&&!p.archived)||
+   (initial?.activeProject?.id===projectId?initial.activeProject:null);
+  if(!project){$('#nexus-project-context')?.remove();return;}
+  let context=$('#nexus-project-context');
+  if(!context){context=document.createElement('span');context.id='nexus-project-context';$('#header-actions')?.prepend(context);}
+  if(context.textContent!==project.name)context.textContent=project.name;
+  context.title='Proyecto activo · '+project.name;
+ }
+ window.addEventListener('nexus:project-changed',()=>{
+  paintProjectContext();
+  if(view==='library'&&Studio.tab==='results')renderGallery();
+ });
+ function paintActivity(){
+  const toggle=$('#gallery-activity'),panel=$('#nexus-activity-panel');
+  const current=state.jobs.filter(active);
+  if(toggle){
+   toggle.textContent=current.length?'Actividad · '+current.length:'Actividad';
+   toggle.setAttribute('aria-expanded',String(Boolean(panel?.matches(':popover-open'))));
+  }
+  if(!panel?.matches(':popover-open'))return;
+  const recent=state.jobs.filter(job=>!active(job)&&job.status!=='CANCELLED').slice(0,5);
+  const rows=[...current,...recent];
+  const markup=rows.map(job=>{
+   const label=active(job)?status(job):job.status==='COMPLETED'?'Listo':'Requiere revisión';
+   const action=job.status==='COMPLETED'&&job.outputs?.length?
+    button('activity-result','Ver resultado','data-activity-job="'+escape(job.id)+'"'):
+    job.status==='FAILED'?button('activity-history','Revisar'):'';
+   return '<li><div><strong>'+escape(name(job))+'</strong><small>'+escape(label)+'</small></div>'+action+'</li>';
+  }).join('');
+  const list=panel.querySelector('ul'),content=markup||'<li>Sin actividad reciente.</li>';
+  if(list.innerHTML!==content)list.innerHTML=content;
+ }
+ function activityPanel(){
+  let panel=$('#nexus-activity-panel');
+  if(!panel){
+   panel=document.createElement('section');panel.id='nexus-activity-panel';panel.setAttribute('popover','auto');
+   panel.setAttribute('aria-label','Actividad');
+   panel.innerHTML='<div class="activity-panel-title"><strong>Actividad</strong>'+button('activity-history','Ver historial')+'</div><ul></ul>';
+   panel.addEventListener('beforetoggle',event=>{
+    const toggle=$('#gallery-activity');
+    if(event.newState==='open'&&toggle)panel.style.top=(toggle.getBoundingClientRect().bottom+8)+'px';
+   });
+   panel.addEventListener('toggle',paintActivity);document.body.append(panel);
+  }
+  return panel;
+ }
+ function openActivity(){
+  const panel=activityPanel();
+  if(panel.matches(':popover-open')){panel.hidePopover();return;}
+  panel.showPopover();paintActivity();
+ }
  function shell(){
   document.body.classList.add('gallery-studio');collectionSidebar();
   if(!['library','history'].includes(view)||Studio.tab==='activity'){document.querySelector('.gallery-selection')?.remove();$('#content')?.classList.remove('gallery-library');G.previewObserver?.disconnect();G.previewQueue=G.previewQueue.filter(image=>image.isConnected);stopVideo();}
-  let activity=$('#gallery-activity');if(!activity){activity=document.createElement('button');activity.id='gallery-activity';activity.dataset.gallery='activity';$('#header-actions')?.append(activity);}
-  if(activity){const count=state.jobs.filter(j=>['SENDING','QUEUED','PROCESSING','GENERATING'].includes(j.status)).length;activity.textContent=count?`Actividad · ${count}`:'Actividad';activity.setAttribute('aria-label','Abrir cola de actividad');}
+  let activity=$('#gallery-activity');
+  if(!activity){
+   activity=document.createElement('button');activity.id='gallery-activity';activity.type='button';
+   activityPanel();activity.setAttribute('popovertarget','nexus-activity-panel');activity.setAttribute('aria-controls','nexus-activity-panel');
+   $('#header-actions')?.append(activity);
+  }
+  paintActivity();
+  paintProjectContext();
   balances();scheduleLibrary();
  }
  const oldRender=render;render=function(){oldRender();shell();};
@@ -421,13 +517,14 @@
    if(b.dataset.galleryGroup!==undefined){G.group=b.dataset.galleryGroup;G.collection='';G.favorites=false;PC.search='';PC.provider='';PC.kind='';PC.status='';G.limit=36;renderGallery();return;}
    if(b.dataset.galleryKind!==undefined){PC.kind=b.dataset.galleryKind;G.limit=36;renderGallery();return;}
    if(b.dataset.galleryCollection){G.collection=b.dataset.galleryCollection;G.limit=36;Studio.tab='results';navigate('library');return;}
-   if(b.dataset.galleryCommand){$('#dialog').close();if(b.dataset.galleryCommand==='activity'){Studio.tab='activity';navigate('library');}else navigate(b.dataset.galleryCommand);return;}
+   if(b.dataset.galleryCommand){$('#dialog').close();if(b.dataset.galleryCommand==='activity')openActivity();else navigate(b.dataset.galleryCommand);return;}
    if(b.dataset.galleryModel){$('#dialog').close();await openModel(b.dataset.galleryModel);return;}
    if(G.viewer&&(b.dataset.reuse||b.dataset.studioReference||b.dataset.flowImprove))closeViewer();
    switch(b.dataset.gallery){
     case 'move-files':await openMove([...G.selected.values()]);break;
     case 'move-file':await openMove([findItem(G.viewer?.id)]);break;
-    case 'to-montage':openMontage(findItem(G.viewer?.id));break;
+ case 'to-montage':openMontage(findItem(G.viewer?.id));break;
+    case 'to-active-montage':await quickMontage(b);break;
     case 'folders':foldersPreference=!(foldersPreference??folderWidth.matches);syncFolders();break;
     case 'retry-preview':if(G.viewer)showViewer(G.viewer.id,G.viewer.index);break;
     case 'download-original':if(G.viewer){const job=findItem(G.viewer.id);if(job)await download(job,G.viewer.index);}break;
@@ -453,7 +550,11 @@
     case 'new-collection':modal('<h2>Nueva colección</h2><form id="gallery-new-collection"><label>Nombre<input name="name" required maxlength="80" autocomplete="off"></label><button class="primary">Crear colección</button></form>');$('#gallery-new-collection input').focus();break;
     case 'assign':modal('<h2>Añadir a colección</h2>'+prefs().collections.map(c=>`<button data-gallery-assign="${escape(c.id)}">${escape(c.name)}</button>`).join('')+button('new-collection','Nueva colección'));break;
     case 'commands':commands();break;
-    case 'activity':Studio.tab='activity';navigate('library');break;
+    case 'activity-history':$('#nexus-activity-panel')?.hidePopover();navigate('history');break;
+    case 'activity-result':{
+     const item=findItem(b.dataset.activityJob);
+     $('#nexus-activity-panel')?.hidePopover();if(item)showViewer(item.id);break;
+    }
     case 'save-view':prefs().savedView={search:PC.search,provider:PC.provider,kind:PC.kind,status:PC.status,favorites:G.favorites,sort:G.sort,...classificationFilters(),folder:scopedProject()?G.project:''};persist();toast('Vista guardada. Disponible en Comandos.');break;
    }
    if(b.dataset.galleryAssign){for(const id of G.selected.keys())prefs().members[id]=b.dataset.galleryAssign;persist();$('#dialog').close();toast('Colección actualizada.');}
@@ -487,9 +588,9 @@
  // Additional commands remain reversible and local.
  const baseCommands=commandList;commandList=function(){baseCommands();const q=$('#gallery-command-search').value.toLocaleLowerCase();if(!q||'recuperar ocultos'.includes(q))$('#gallery-command-list').insertAdjacentHTML('beforeend',button('restore-hidden','Recuperar creaciones ocultas'));if(prefs().savedView&&(!q||'vista guardada'.includes(q)))$('#gallery-command-list').insertAdjacentHTML('beforeend',button('saved-view','Abrir vista guardada'));};
  document.addEventListener('click',e=>{const a=e.target.closest('[data-gallery]')?.dataset.gallery;if(a==='restore-hidden'){prefs().hidden=[];persist();$('#dialog').close();Studio.tab='results';navigate('library');}if(a==='saved-view'){const v=prefs().savedView;Object.assign(PC,{search:v.search,provider:v.provider,kind:v.kind,status:v.status});G.favorites=v.favorites;G.sort=v.sort;restoreClassification(v);$('#dialog').close();Studio.tab='results';navigate('library');}});
- setInterval(()=>{if(document.hidden)return;document.querySelectorAll('[data-job-progress]').forEach(node=>{const j=state.jobs.find(x=>x.id===node.dataset.jobProgress);if(j&&active(j))node.innerHTML=progress(j);});},1000);
+ setInterval(()=>{if(document.hidden)return;if($('#nexus-activity-panel')?.matches(':popover-open'))paintActivity();document.querySelectorAll('[data-job-progress]').forEach(node=>{const j=state.jobs.find(x=>x.id===node.dataset.jobProgress);if(j&&active(j))node.innerHTML=progress(j);});},1000);
  window.addEventListener('nexus:library-changed',()=>{G.libraryFetchedAt=0;if(view==='library')refreshLibrary();});
  window.addEventListener('nexus:continuity-status',event=>{const stamp=JSON.stringify([event.detail.drive?.lastCompletedAt,event.detail.device?.lastSuccessAt]);if(G.syncStamp!==stamp){G.syncStamp=stamp;G.libraryFetchedAt=0;if(view==='library')refreshLibrary();}});
- function restoreClassification(value){G.project=typeof value.project==='string'&&value.project?value.project:typeof value.folder==='string'&&value.folder?value.folder:'__all__';G.source=['GENERATED','IMPORTED','EDITED','SHARED'].includes(value.source)?value.source:'';G.role=['KEYFRAME','REFERENCE','OUTPUT','FINAL','SOURCE','OTHER'].includes(value.role)?value.role:'';G.sceneId=typeof value.sceneId==='string'?value.sceneId:'';G.shotId=typeof value.shotId==='string'?value.shotId:'';}
+ function restoreClassification(value){G.activeScope=activeProjectId()||null;G.project=typeof value.project==='string'&&value.project?value.project:typeof value.folder==='string'&&value.folder?value.folder:'__all__';G.source=['GENERATED','IMPORTED','EDITED','SHARED'].includes(value.source)?value.source:'';G.role=['KEYFRAME','REFERENCE','OUTPUT','FINAL','SOURCE','OTHER'].includes(value.role)?value.role:'';G.sceneId=typeof value.sceneId==='string'?value.sceneId:'';G.shotId=typeof value.shotId==='string'?value.shotId:'';}
  if(initial){render();}window.NexusGallery={version:3,render:renderGallery,close:closeViewer,refresh:refreshLibrary,previewForJob(job){const candidates=allItems().filter(item=>item._libraryEntry?.sourceJobIds.includes(job.id)&&!NexusLibraryModel.isHidden(item._libraryEntry,prefs()));if(candidates.length)return previewUrl(candidates.find(item=>item._libraryEntry.outputIndex===outputIndex(job))||candidates[0]);return G.librarySnapshot?null:previewUrl(job);},loadPreview(image,url){if(!image.isConnected||image.dataset.previewQueued)return;image.dataset.galleryPreview='thumbnail';image.dataset.gallerySrc=url;image.dataset.previewQueued='1';G.previewQueue.push(image);pumpPreviews();},get items(){return allItems().map(item=>item._libraryEntry);},get importContext(){return G.project==='__all__'?undefined:{projectId:G.project==='__unassigned__'?null:G.project,...(G.librarySnapshot?.projects?.some(project=>project.id===G.project&&project.archived)?{allowArchivedProject:true}:{})};},get workspace(){return {...classificationFilters(),folder:scopedProject()?G.project:'',collection:G.collection,favorites:G.favorites,sort:G.sort,group:G.group,limit:G.limit,viewer:G.viewer?{id:G.viewer.id,index:G.viewer.index}:null};},async restoreWorkspace(value={}){restoreClassification(value);G.collection=typeof value.collection==='string'?value.collection:'';G.favorites=value.favorites===true;G.sort=value.sort==='name'?'name':'recent';G.group=typeof value.group==='string'?value.group:'';G.limit=Number.isInteger(value.limit)?Math.max(36,Math.min(5000,value.limit)):36;await refreshLibrary();renderGallery();if(typeof value.viewer?.id==='string'&&findItem(value.viewer.id))showViewer(value.viewer.id,0);},get preview(){return {active:G.previewActive,queued:G.previewQueue.filter(image=>image.isConnected).length,limit:2};}};
 })();
