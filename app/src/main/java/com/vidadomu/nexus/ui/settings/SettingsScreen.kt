@@ -482,19 +482,25 @@ internal fun SettingsCard(content:@Composable ColumnScope.()->Unit) {
     }
 }
 
-/** Tamaño de letra de toda la app; se aplica al soltar el control. */
+/** Tamaño de letra de Nexus: una sola escala, la tuya o la de Android; se aplica al soltar el control. */
 @Composable
 private fun FontScaleRow(appearance:AppearancePreferences) {
-    val saved by appearance.fontScaleState()
-    var draft by remember(saved) {mutableStateOf(saved)}
+    val chosen by appearance.textScaleState()
+    // Android's own scale: LocalDensity inside Nexus already carries the chosen one.
+    val system=androidx.compose.ui.platform.LocalConfiguration.current.fontScale
+    val shown=chosen ?: system.coerceIn(com.vidadomu.nexus.ui.theme.NexusTextScale.MIN,com.vidadomu.nexus.ui.theme.NexusTextScale.MAX)
+    var draft by remember(shown) {mutableStateOf(shown)}
+    fun percent(scale:Float)="${kotlin.math.round(scale*100).toInt()} %"
     Column(Modifier.fillMaxWidth().padding(vertical=NexusTokens.space4)) {
         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
             Text("Tamaño de letra",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
-            Text("${(draft*100).toInt()} %",style=MaterialTheme.typography.labelLarge.tabularMoney(),color=TextSecondary)
+            Text(if(chosen==null && draft==shown) "Android · ${percent(system)}" else percent(draft),
+                style=MaterialTheme.typography.labelLarge.tabularMoney(),color=TextSecondary)
         }
-        Slider(draft,{draft=it},valueRange=.8f..1.4f,steps=11,onValueChangeFinished={appearance.setFontScale(draft)},
+        Slider(draft,{draft=it},valueRange=com.vidadomu.nexus.ui.theme.NexusTextScale.MIN..com.vidadomu.nexus.ui.theme.NexusTextScale.MAX,
+            steps=11,onValueChangeFinished={appearance.setTextScale(draft)},
             modifier=Modifier.semantics {contentDescription="Tamaño de letra de Nexus"})
-        TextButton(onClick={draft=1f;appearance.setFontScale(1f)},enabled=saved!=1f||draft!=1f) {Text("Restablecer tamaño de letra")}
+        TextButton(onClick={appearance.setTextScale(null)},enabled=chosen!=null) {Text("Usar el tamaño de Android")}
         Text("Así se verá el texto de Nexus.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
         // Más espacio para el chat: la barra de pestañas se esconde al bajar y vuelve al subir.
         val context=LocalContext.current

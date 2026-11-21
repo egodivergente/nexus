@@ -33,6 +33,17 @@ internal fun sanitizedAppearance(value: AppearanceSelection) = value.copy(
 /** Preferences scoped to the local Android user. Never reads billing or credentials. */
 class AppearancePreferences(context: Context) {
     private val prefs = context.getSharedPreferences("nexus_appearance_user_v1", Context.MODE_PRIVATE)
+    init { migrateTextScale(context.resources.configuration.fontScale) }
+
+    /**
+     * «font_scale» multiplied Android's scale; «text_scale» is the one scale (0 = Android's). The old key stays
+     * untouched so an older Nexus still reads it; the new one is written once.
+     */
+    private fun migrateTextScale(system: Float) {
+        if (prefs.contains("text_scale")) return
+        val old = prefs.getFloat("font_scale", 1f)
+        prefs.edit().putFloat("text_scale", if (old == 1f) 0f else NexusTextScale.migrate(old, system)).apply()
+    }
     fun theme() = NexusAppearance.entries.firstOrNull { it.name == prefs.getString("theme", null) } ?: NexusAppearance.AURORA
     fun setTheme(theme: NexusAppearance) { applyAppearance(selection().copy(theme=theme)) }
     fun selection() = sanitizedAppearance(AppearanceSelection(theme(),
@@ -53,9 +64,11 @@ class AppearancePreferences(context: Context) {
     fun reduceMotion()=selection().reduceMotion
     fun setReduceMotion(value:Boolean) {applyAppearance(selection().copy(reduceMotion=value))}
     companion object { internal val preview=mutableStateOf<AppearanceSelection?>(null) }
-    /** Tamaño de letra de toda la app (0,8–1,4), encima del ajuste del sistema. */
-    fun fontScale() = prefs.getFloat("font_scale", 1f).coerceIn(.8f, 1.4f)
-    fun setFontScale(scale: Float) { prefs.edit().putFloat("font_scale", scale.coerceIn(.8f, 1.4f)).apply() }
+    /** Tamaño de letra de Nexus (0,8–1,4), la única escala; null = el de Android. */
+    fun textScale(): Float? = prefs.getFloat("text_scale", 0f).takeIf { it > 0f }?.coerceIn(NexusTextScale.MIN, NexusTextScale.MAX)
+    fun setTextScale(scale: Float?) {
+        prefs.edit().putFloat("text_scale", scale?.coerceIn(NexusTextScale.MIN, NexusTextScale.MAX) ?: 0f).apply()
+    }
     /** Ocultar la barra de navegación al bajar por el chat y mostrarla al subir. */
     fun autoHideBars() = prefs.getBoolean("auto_hide_bars", true)
     fun setAutoHideBars(on: Boolean) { prefs.edit().putBoolean("auto_hide_bars", on).apply() }
@@ -91,10 +104,10 @@ fun AppearancePreferences.themeState(): State<NexusAppearance> {
 }
 
 @Composable
-fun AppearancePreferences.fontScaleState(): State<Float> {
-    val state = remember(this) { mutableStateOf(fontScale()) }
+fun AppearancePreferences.textScaleState(): State<Float?> {
+    val state = remember(this) { mutableStateOf(textScale()) }
     DisposableEffect(this) {
-        val unregister = observe { state.value = fontScale() }
+        val unregister = observe { state.value = textScale() }
         onDispose(unregister)
     }
     return state

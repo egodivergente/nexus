@@ -35,3 +35,40 @@ fun nexusTypography(heading: FontFamily, body: FontFamily): Typography {
 }
 
 fun TextStyle.tabularMoney(): TextStyle = copy(fontFeatureSettings = "tnum")
+
+/**
+ * One scale for Nexus text: the size chosen in Personalización, or Android's when there is none. Before, both were
+ * multiplied (0,8 × 0,8 on the S25), so 12 sp ended at 7,7 sp. The floor keeps the smallest styles readable at any scale.
+ */
+object NexusTextScale {
+    const val MIN = .8f
+    const val MAX = 1.4f
+    /** No text style is drawn smaller than this, in sp at scale 1. */
+    const val FLOOR_SP = 11f
+
+    /** The old saved value was relative to Android's scale; the new one is the scale itself. */
+    fun migrate(oldRelative: Float, system: Float): Float = (oldRelative * system).coerceIn(MIN, MAX)
+
+    /** Size to declare so that, at [scale], the text is never below [FLOOR_SP]. */
+    fun flooredSp(sp: Float, scale: Float): Float = if (scale <= 0f || sp * scale >= FLOOR_SP) sp else FLOOR_SP / scale
+}
+
+/** Raises the size (and the line height with it) only when [scale] would draw this style below the floor. */
+fun TextStyle.withReadableFloor(scale: Float): TextStyle {
+    if (!fontSize.isSp) return this
+    val size = NexusTextScale.flooredSp(fontSize.value, scale)
+    if (size == fontSize.value) return this
+    val ratio = size / fontSize.value
+    return copy(fontSize = size.sp, lineHeight = if (lineHeight.isSp) (lineHeight.value * ratio).sp else lineHeight)
+}
+
+fun Typography.withReadableFloor(scale: Float): Typography = copy(
+    displayLarge = displayLarge.withReadableFloor(scale), displayMedium = displayMedium.withReadableFloor(scale),
+    displaySmall = displaySmall.withReadableFloor(scale), headlineLarge = headlineLarge.withReadableFloor(scale),
+    headlineMedium = headlineMedium.withReadableFloor(scale), headlineSmall = headlineSmall.withReadableFloor(scale),
+    titleLarge = titleLarge.withReadableFloor(scale), titleMedium = titleMedium.withReadableFloor(scale),
+    titleSmall = titleSmall.withReadableFloor(scale), bodyLarge = bodyLarge.withReadableFloor(scale),
+    bodyMedium = bodyMedium.withReadableFloor(scale), bodySmall = bodySmall.withReadableFloor(scale),
+    labelLarge = labelLarge.withReadableFloor(scale), labelMedium = labelMedium.withReadableFloor(scale),
+    labelSmall = labelSmall.withReadableFloor(scale),
+)

@@ -68,14 +68,16 @@ fun NexusTheme(content: @Composable () -> Unit) {
     }
     val platformHaptics=androidx.compose.ui.platform.LocalHapticFeedback.current
     val filteredHaptics=rememberNexusPlatformHaptics(platformHaptics)
-    val fontScale by preferences.fontScaleState()
+    val chosenScale by preferences.textScaleState()
     val base = LocalDensity.current
-    val density = remember(base, fontScale) { Density(base.density, base.fontScale * fontScale) }
+    // One scale, never both multiplied: the size chosen in Personalización, or Android's own (with its converter).
+    val density = remember(base, chosenScale) { chosenScale?.let { Density(base.density, it) } ?: base }
+    val readableTypography = remember(typography, density.fontScale) { typography.withReadableFloor(density.fontScale) }
     val decorativeMotion = rememberNexusMotionAllowed()
     CompositionLocalProvider(LocalNexusAppearance provides theme, LocalNexusVisuals provides NexusThemeSpecs.visuals(theme),
         LocalChromeColor provides chromeFor(theme), LocalDensity provides density,
         LocalNexusDecorativeMotion provides decorativeMotion, androidx.compose.ui.platform.LocalHapticFeedback provides filteredHaptics) {
-        MaterialTheme(colorScheme=scheme, typography=typography, shapes=NexusThemeSpecs.treatment(theme).shapes) {
+        MaterialTheme(colorScheme=scheme, typography=readableTypography, shapes=NexusThemeSpecs.treatment(theme).shapes) {
             Surface(modifier=Modifier.fillMaxSize(),color=scheme.background,contentColor=scheme.onBackground) {
                 NexusBackdrop {content()}
             }
