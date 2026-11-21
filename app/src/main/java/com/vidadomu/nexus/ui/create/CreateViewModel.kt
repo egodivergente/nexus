@@ -1097,6 +1097,8 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun launchGeneration(state: CreateUiState, onSuccess: (String) -> Unit, acceptedUsd:Double? = null) {
         _uiState.update { it.copy(isSubmitting = true, isUploading = false, errorMessage = null, submitFailure = null) }
+        // Primera generación: el momento de pedir el permiso para avisar cuando termine.
+        com.vidadomu.nexus.assistant.TurnNotifications.askPermissionOnce(app)
 
         viewModelScope.launch {
             try {
@@ -1130,6 +1132,7 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
         val batchSettings = com.vidadomu.nexus.assistant.AssistantRuntime.get(app).settings
         val batchLimit = batchSettings.effectiveLimits(batchSettings.load()).maxGenerationsPerBatch
         if (batchLimit > 0 && prompts.size > batchLimit) { onDone(0, "El lote supera tu límite de $batchLimit trabajos."); return }
+        com.vidadomu.nexus.assistant.TurnNotifications.askPermissionOnce(app)
         val base = _uiState.value
         _uiState.update { it.copy(isSubmitting = true, errorMessage = null) }
         viewModelScope.launch {

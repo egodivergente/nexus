@@ -560,7 +560,9 @@ private fun AssistantScreenContent(
                                 onChangeModel = { showSettings = true },
                                 onNewChat = if (canRetry && (item.text.contains("conversación nueva", true) || item.text.contains("razonamiento", true)))
                                     ({ vm.continueFailedTurnInNewChat() }) else null,
-                                compact = item.id != currentFailure, closesTurn = closingRow?.id == item.id)
+                                compact = item.id != currentFailure, closesTurn = closingRow?.id == item.id,
+                                // Turno cortado por Android: mientras ofrece Reintentar, también se puede descartar.
+                                onDismiss = if (canRetry && InterruptedTurns.isNotice(item.id)) ({ vm.dismissInterruptedTurn(item.id) }) else null)
                         }
                         is ChatItem.ModeSwitch -> Card(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(NexusTokens.space12)) {
@@ -1435,6 +1437,7 @@ private fun NoticeRow(
     compact: Boolean = false,
     /** This notice has just closed the turn that was on show (stopped or failed): its steps stay where they were. */
     closesTurn: Boolean = false,
+    onDismiss: (() -> Unit)? = null,
 ) {
     val history = com.vidadomu.nexus.ui.navigation.HistoryLinks.mentionsHistoryScreen(item.text)
     // The steps were on screen; the notice itself is what is new.
@@ -1453,6 +1456,7 @@ private fun NoticeRow(
         onOpenHistory = if (history) onOpenHistory else null,
         modifier = settle.entering,
         compact = compact,
+        onDismiss = onDismiss,
     )
     else Column(settle.entering) {
         Text(item.text,style=MaterialTheme.typography.bodyMedium,color=TextSecondary)

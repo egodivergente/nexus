@@ -17,6 +17,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -92,6 +93,10 @@ class MainActivity : ComponentActivity() {
     private var shareError by mutableStateOf<String?>(null)
     private var projectChooser by mutableStateOf(false)
     private var startupPreviewEpoch by mutableIntStateOf(0)
+    // Conversación que pide abrir el aviso de un turno terminado: (id, proyecto).
+    private var notifiedConversation by mutableStateOf<Pair<String, String?>?>(null)
+    // Sin respuesta que atender: aceptado o denegado, Nexus sigue igual y no vuelve a pedirlo.
+    private val notificationPermission = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.vidadomu.nexus.sync.DeviceSyncService.resume(this)
@@ -110,6 +115,16 @@ class MainActivity : ComponentActivity() {
         // Keep a pending result across recreation while startup is still warming up.
         initialDeepLinkJobId = savedInstanceState?.getString(STATE_PENDING_JOB)
         if(savedInstanceState==null || intent?.action !in setOf(Intent.ACTION_SEND,Intent.ACTION_SEND_MULTIPLE)) handleIntent(intent)
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                com.vidadomu.nexus.assistant.TurnNotifications.permissionRequests.collect {
+                    if (com.vidadomu.nexus.assistant.TurnNotifications.shouldAsk(this@MainActivity)) {
+                        com.vidadomu.nexus.assistant.TurnNotifications.markAsked(this@MainActivity)
+                        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
+            }
+        }
 
         setContent {
             NexusTheme {
@@ -355,6 +370,16 @@ class MainActivity : ComponentActivity() {
                         navController.navigate("output/${Uri.encode(jobId)}") { launchSingleTop = true }
                         initialDeepLinkJobId = null
                     }
+                }
+                // Aviso de turno terminado: a su conversación, en la pestaña del Agente.
+                LaunchedEffect(notifiedConversation) {
+                    val (conversationId, projectId) = notifiedConversation ?: return@LaunchedEffect
+                    assistantViewModel.awaitChatsReady()
+                    assistantViewModel.openConversation(conversationId, projectId)
+                    focusManager.clearFocus(force = true)
+                    navController.popBackStack("workspace", false)
+                    tabRequest = tabs.indexOf(Screen.Assistant)
+                    notifiedConversation = null
                 }
 
                 com.vidadomu.nexus.ui.components.NexusChrome(
@@ -680,6 +705,12 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        com.vidadomu.nexus.assistant.TurnNotifications.takeConversation(intent)?.let {
+            projectChooser = false
+            notifiedConversation = it
+            return
+        }
+
         // 1. Notification deep link
         val deepLinkJobId = NotificationNavigation.takeJobId(intent)
         if (deepLinkJobId != null) {
@@ -705,8 +736,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        com.vidadomu.nexus.assistant.TurnNotifications.activityStarted()
+    }
+
     override fun onStop() {
         getSharedPreferences("nexus_workspace",0).edit().putLong("leftAt",System.currentTimeMillis()).apply()
+        com.vidadomu.nexus.assistant.TurnNotifications.activityStopped()
         super.onStop()
     }
 
