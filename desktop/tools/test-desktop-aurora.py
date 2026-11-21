@@ -118,7 +118,7 @@ def verify(page, out, baseline):
                            timeout=60_000)
     page.evaluate("async id => { await ensureAssistantReady(); await agentCall('project', {id}); }", PROJECT)
     open_view(page, 'canvas', '#creative-command')
-    aurora2 = page.evaluate("initial.version.endsWith('aurora.2')")
+    aurora2 = page.evaluate("typeof AgentQueue !== 'undefined'")
     if aurora2:
         expect(page.locator('#nexus-project-context')).to_have_text('Costa de prueba')
         page.locator('#gallery-activity').click()
@@ -205,6 +205,11 @@ def verify(page, out, baseline):
     clip = page.locator('.corte-clip').first
     expect(clip).to_contain_text('Costa al amanecer', timeout=45_000)
     expect(page.locator('#corte-project')).to_have_value(PROJECT)
+    if page.evaluate("initial.version.endsWith('aurora.3')"):
+        control=page.get_by_role('button', name='Continuar en otro dispositivo')
+        expect(control).to_be_visible()
+        control.click()
+        expect(page.locator('#toast')).to_contain_text('Montaje guardado en este PC')
     if aurora2:
         page.wait_for_function("() => document.querySelector('#corte-image')?.naturalWidth > 0")
         assert page.locator('#corte-video').get_attribute('src') is None
@@ -317,7 +322,7 @@ def verify_message_queue(page, held):
     expect(page.locator('.agent-queue summary')).to_have_text('1 en cola')
     page.evaluate('flush()')
     page.reload()
-    page.wait_for_function("() => initial?.version.endsWith('aurora.2')")
+    page.wait_for_function("() => !!initial && typeof AgentQueue !== 'undefined'")
     open_view(page, 'assistant', '#agent-compose')
     page.evaluate("async () => {await ensureAssistantReady(); Agent.snapshot.offline=false;renderAssistant();}")
     expect(page.locator('.agent-queue summary')).to_have_text('1 en cola')
@@ -410,7 +415,7 @@ def main():
                     page.emulate_media(reduced_motion='reduce')
                     assert page.evaluate("getComputedStyle(document.querySelector('#studio-settings')).transitionDuration === '0s'")
                     print('PASS 9 pantallas a 1440, 1024 y 760 px, comandos y movimiento reducido', flush=True)
-                    if page.evaluate("initial.version.endsWith('aurora.2')"):
+                    if page.evaluate("typeof AgentQueue !== 'undefined'"):
                         verify_message_queue(page, held)
                 assert simulated == ['runway'], simulated
                 assert not errors, errors
