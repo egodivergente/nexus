@@ -46,12 +46,20 @@ internal data class AgentErrorNoticeContent(val cause: String, val status: Strin
  * la app sabe (conserva el mensaje y puede repetirlo); nunca afirma si el mensaje llegó o no al proveedor. Sin
  * reintento no hay línea: anunciar lo que no se puede hacer solo añade ruido al aviso.
  */
-internal fun agentErrorNoticeContent(raw: String, canRetry: Boolean): AgentErrorNoticeContent =
-    AgentErrorNoticeContent(
+internal fun agentErrorNoticeContent(raw: String, canRetry: Boolean): AgentErrorNoticeContent {
+    val retryStatus = "Reintentar usa el mismo texto y los mismos adjuntos."
+    // Un turno que Android cortó no trae error que traducir: se dice tal cual; los adjuntos que falten, en el estado.
+    if (raw.startsWith(InterruptedTurns.NOTICE_TEXT)) return AgentErrorNoticeContent(
+        cause = InterruptedTurns.NOTICE_TEXT,
+        status = if (canRetry) raw.removePrefix(InterruptedTurns.NOTICE_TEXT).trim().ifEmpty { retryStatus } else null,
+        technical = InterruptedTurns.TECHNICAL,
+    )
+    return AgentErrorNoticeContent(
         cause = noticeMessage(raw, "El agente no ha podido completar esta respuesta."),
-        status = if (canRetry) "Reintentar usa el mismo texto y los mismos adjuntos." else null,
+        status = if (canRetry) retryStatus else null,
         technical = raw,
     )
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -64,6 +72,7 @@ internal fun AgentErrorNotice(
     onOpenHistory: (() -> Unit)?,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
+    onDismiss: (() -> Unit)? = null,
 ) {
     val content = remember(raw, onRetry != null) { agentErrorNoticeContent(raw, onRetry != null) }
     var expanded by rememberSaveable(id) { mutableStateOf(false) }
@@ -163,6 +172,9 @@ internal fun AgentErrorNotice(
                     modifier = touch,
                 ) {
                     Icon(Icons.Default.Refresh, null, Modifier.size(NexusTokens.iconSmall)); Spacer(Modifier.width(NexusTokens.space4)); Text("Reintentar")
+                }
+                if (onDismiss != null) TextButton(onClick = { haptic.perform(NexusHapticEvent.SELECTION); onDismiss() }, modifier = touch) {
+                    Text("Descartar")
                 }
                 if (onNewChat != null) FilledTonalButton(
                     onClick = { haptic.perform(NexusHapticEvent.SELECTION); onNewChat() },

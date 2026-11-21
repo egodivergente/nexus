@@ -193,6 +193,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private var parkedOrders: com.vidadomu.nexus.agent.core.orders.OrderBookState? = null
     private var archivedProjectDetach: Pair<String, Job>? = null
     private val chatStore = AssistantChatStore(app)
+    private val interruptedTurns = InterruptedTurnStore(java.io.File(app.filesDir, "assistant/interrupted-turns"))
     private val chatsReady=kotlinx.coroutines.CompletableDeferred<Unit>()
     private val submitSlots = com.vidadomu.nexus.agent.core.config.AdjustableConcurrencyGate(runtime.settings.limits().maxConcurrentGenerations)
     // StateFlow can emit synchronously in init; callbacks need initialized state.
@@ -372,11 +373,18 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         // Everything this answer produces goes to its own conversation, even if the user has moved to another one.
         val chatId = _ui.value.conversationId
         turnChat = chatId
+        // Marca en disco mientras dure el turno: si Android mata el proceso, al volver se dice y se ofrece Reintentar.
+        val turnId = newId()
+        runCatching { interruptedTurns.begin(InterruptedTurn(chatId, turnId, clean, atts, System.currentTimeMillis())) }
+        TurnNotifications.askPermissionOnce(app)
         turnJob = viewModelScope.launch {
             var lastBreakdown: String? = null
             // Only an answer that ended on its own sends what was queued; stopping it or an error keep the draft.
             var completed = false
             var stopped = false
+            // Acabó de forma normal (respuesta, error mostrado o parado): la marca sobra. Un Error sin capturar no lo es.
+            var ended = false
+            var failed = false
             try {
                 val run: suspend () -> com.vidadomu.nexus.agent.core.agent.TurnResult = {
                     turnOrchestrator.send(conv, listOf(carriedNote, clean.ifEmpty { "Te adjunto estos archivos." }, note).filter { it.isNotBlank() }.joinToString("\n\n"), atts) { ev -> onEvent(ev, chatId) }
@@ -400,23 +408,31 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                 // Lo que el agente no corrigió por sí mismo se muestra con el estado verificado.
                 r.verifiedNotes.forEach { notice(it, error = false, chatId = chatId) }
                 if (r.stop == "MAX_ROUNDS") notice("He parado: demasiados pasos seguidos en un solo mensaje. Dime cómo seguir.", error = false, chatId = chatId)
-                completed = true
+                completed = true; ended = true
             } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 failedNotice(chatId, clean, atts, "La petición ha superado el tiempo de espera. Tus archivos se conservan; puedes reintentar.",
                     reason = "Tiempo de espera superado.")
+                ended = true; failed = true
             } catch (e: CancellationException) {
                 stopped = true
                 notice("Cancelado.", chatId = chatId, closing = AgentStepStatus.CANCELLED to null)
+                ended = true
                 throw e
             } catch (e: LlmException) {
                 failedNotice(chatId, clean, atts, Redactor.redact(e.message ?: "El asistente no respondió."))
+                ended = true; failed = true
             } catch (e: Exception) {
                 failedNotice(chatId, clean, atts, "Error del asistente (${e.javaClass.simpleName}): ${Redactor.redact(e.message?.take(200).orEmpty())}")
+                ended = true; failed = true
             } finally {
                 turnChat = null
+                if (ended) runCatching { interruptedTurns.clear(chatId, turnId) }
                 var queued = false
+                var title = "Nueva conversación"
+                var project: String? = null
                 updateChat(chatId) { state ->
                     queued = state.queuedSend
+                    title = chatTitle(state); project = state.activeProjectId
                     // Solo las tarjetas NUEVAS de este turno van tras la respuesta; las existentes
                     // se actualizan en su sitio y no saltan de posición.
                     val cards = state.items.filterIsInstance<ChatItem.PlanCard>().filter { card ->
@@ -426,6 +442,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
                         lastLatencyMs = android.os.SystemClock.elapsedRealtime() - started,
                         lastTurnBreakdown = lastBreakdown, items = state.items.filterNot { it in cards } + cards)
                 }
+                // Parar lo decide el usuario: no hace falta avisarle de lo que acaba de hacer.
+                if (ended && !stopped) TurnNotifications.turnEnded(app, chatId, project, title, failed)
                 refreshProjects()
                 if (background?.conversationId == chatId) finishBackground()
                 else if (_ui.value.conversationId == chatId) {
@@ -556,11 +574,12 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     internal fun conversations(): List<AssistantChatEntry> = conversationsIn(_ui.value.activeProjectId)
     internal fun conversationsIn(projectId: String?): List<AssistantChatEntry> =
         _conversationIndex.value.filter { projectId == null || it.projectId == projectId }
-    internal fun openConversation(id: String) {
+    /** [projectId]: lo conoce quien abre desde fuera (un aviso), cuando el índice de conversaciones aún no ha cargado. */
+    internal fun openConversation(id: String, projectId: String? = null) {
         ConversationTabs(app).open(id)
         if(id!=_ui.value.conversationId) {
             val entry=_conversationIndex.value.firstOrNull {it.id==id}
-            switchConversation(id,targetProject=entry?.projectId ?: _ui.value.activeProjectId)
+            switchConversation(id,targetProject=projectId ?: entry?.projectId ?: _ui.value.activeProjectId)
         }
     }
 
@@ -1013,6 +1032,44 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
             is ChatItem.Context -> if (item.sent) "user" to "Contexto traído de la conversación «${item.from}» (resumen):\n${item.summary}" else null
             else -> null
         } }))
+        offerInterruptedTurn(_ui.value.conversationId)
+    }
+
+    /**
+     * Turno cortado (Android mató el proceso a mitad): aviso al final del chat con Reintentar y Descartar. Nunca se
+     * reenvía solo; lo que sus herramientas ya enviaron queda como estaba. Un turno vivo, aquí o en segundo plano, no
+     * se cortó: sigue trabajando y no se avisa.
+     */
+    private fun offerInterruptedTurn(chatId: String) {
+        if ((turnChat == chatId && turnJob?.isActive == true) || background?.conversationId == chatId) return
+        viewModelScope.launch {
+            val turn = withContext(Dispatchers.IO) { runCatching { interruptedTurns.get(chatId) }.getOrNull() } ?: return@launch
+            val kept = withContext(Dispatchers.IO) { turn.attachments.filter(::readable) }
+            if (_ui.value.conversationId != chatId || _ui.value.thinking || turnChat == chatId) return@launch
+            val retry = turn.text.isNotBlank() || kept.isNotEmpty()
+            val text = if (retry) InterruptedTurns.noticeText(turn.attachments.size - kept.size, kept.size) else InterruptedTurns.NOTICE_TEXT
+            _ui.update { it.copy(items = InterruptedTurns.withNotice(it.items, turn, text, System.currentTimeMillis()),
+                retryNoticeId = if (retry) turn.noticeId else it.retryNoticeId, scrollRequest = it.scrollRequest + 1) }
+            if (retry) failedTurns[chatId] = FailedTurn(turn.noticeId, turn.text, kept)
+            // Sin nada que repetir el aviso queda como constancia y la marca ya no sirve.
+            else withContext(Dispatchers.IO) { runCatching { interruptedTurns.clear(chatId, turn.turnId) } }
+        }
+    }
+
+    private fun readable(attachment: Attachment) = runCatching {
+        app.contentResolver.openInputStream(Uri.parse(attachment.uri))?.use { true } ?: false
+    }.getOrDefault(false)
+
+    /** «Descartar» en el aviso de un turno cortado: se quita el aviso y la marca, sin enviar nada. */
+    fun dismissInterruptedTurn(noticeId: String) {
+        val chatId = _ui.value.conversationId
+        if (!InterruptedTurns.isNotice(noticeId)) return
+        failedTurns[chatId]?.takeIf { it.noticeId == noticeId }?.let { failedTurns.remove(chatId) }
+        _ui.update { state -> state.copy(items = state.items.filterNot { it.id == noticeId },
+            retryNoticeId = state.retryNoticeId.takeIf { it != noticeId }) }
+        viewModelScope.launch { withContext(Dispatchers.IO) { runCatching {
+            interruptedTurns.get(chatId)?.takeIf { it.noticeId == noticeId }?.let { interruptedTurns.clear(chatId, it.turnId) }
+        } } }
     }
 
     // ---- propuestas (Copiloto) ----------------------------------------------------------------
@@ -1302,6 +1359,7 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
         val order = orderOf(planId)
         if (order != null && order.status !in setOf(com.vidadomu.nexus.agent.core.orders.OrderStatus.AWAITING_CONFIRMATION, com.vidadomu.nexus.agent.core.orders.OrderStatus.FAILED)) return
         if (p.busy || !p.executable || p.state !in setOf(PlanState.PREPARED, PlanState.AWAITING_CONFIRMATION, PlanState.CONFIRMED)) return
+        TurnNotifications.askPermissionOnce(app)
         setPlan(planId) { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
