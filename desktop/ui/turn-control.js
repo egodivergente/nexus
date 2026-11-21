@@ -12,19 +12,26 @@ const renderBeforeTurnControl=renderAssistant;
 renderAssistant=function(){
  renderBeforeTurnControl();
  const compose=$('#agent-compose');if(!compose)return;
- if(Agent.busy&&Agent.activeTurn){
-  const button=document.createElement('button');button.type='button';button.dataset.stopTurn=Agent.activeTurn.id;button.textContent='Detener agente';
+ const turn=Agent.busy?Agent.activeTurn?.id:null;
+ const previousButton=compose.querySelector('[data-stop-turn]');
+ if(previousButton&&previousButton.dataset.stopTurn!==turn)previousButton.remove();
+ if(turn&&previousButton?.dataset.stopTurn!==turn){
+  const button=document.createElement('button');button.type='button';button.dataset.stopTurn=turn;button.textContent='Detener agente';
   button.addEventListener('click',async()=>{
    button.disabled=true;button.textContent='Deteniendo…';
-   try{await AgentQueue.pause();await rpc('agentCancel',{owner:Agent.owner,turn_id:button.dataset.stopTurn});Agent.cancelDraining=Agent.callbacks.size>0;}
+   try{await AgentQueue.pause();}catch(error){toast(error.message);}
+   try{await rpc('agentCancel',{owner:Agent.owner,turn_id:turn});Agent.cancelDraining=Agent.callbacks.size>0;}
    catch(error){toast(error.message);button.disabled=false;}
   });
   compose.querySelector('.agent-compose-actions')?.append(button);
  }
+ const notice=compose.querySelector('.agent-stopping-notice');
  if(Agent.cancelDraining){
-  const notice=document.createElement('p');notice.textContent='Finalizando una operación ya enviada…';compose.prepend(notice);
+  if(!notice){
+   const message=document.createElement('p');message.className='agent-stopping-notice';message.textContent='Finalizando una operación ya enviada…';compose.prepend(message);
+  }
   if(!AgentQueue.has())compose.querySelector('[data-agent=send]')?.setAttribute('disabled','');
- }
+ }else notice?.remove();
 };
 const agentCallBeforeTurnControl=agentCall;
 agentCall=function(op,args={}){
