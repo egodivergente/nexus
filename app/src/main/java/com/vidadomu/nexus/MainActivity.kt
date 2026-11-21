@@ -744,6 +744,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         getSharedPreferences("nexus_workspace",0).edit().putLong("leftAt",System.currentTimeMillis()).apply()
         com.vidadomu.nexus.assistant.TurnNotifications.activityStopped()
+        (application as NexusApplication).flushAssistantChat()
         super.onStop()
     }
 
