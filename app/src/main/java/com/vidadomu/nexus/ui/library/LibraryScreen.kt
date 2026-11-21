@@ -587,11 +587,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     onOpenHistory?.let { go ->
-                        IconButton(onClick = go, modifier = Modifier.size(40.dp)) {
+                        IconButton(onClick = go, modifier = Modifier.size(NexusTokens.minimumTouch)) {
                             Icon(Icons.Default.History, "Historial de trabajos", modifier = Modifier.size(20.dp), tint = TextSecondary)
                         }
                     }
-                    IconButton(onClick = { searchVisible = !searchVisible }, modifier = Modifier.size(40.dp)) {
+                    IconButton(onClick = { searchVisible = !searchVisible }, modifier = Modifier.size(NexusTokens.minimumTouch)) {
                         Icon(
                             Icons.Default.Search,
                             if (searchVisible) "Ocultar búsqueda" else "Buscar en Biblioteca",
@@ -600,7 +600,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                         )
                     }
                     Box {
-                        IconButton(onClick = { moreVisible = true }, modifier = Modifier.size(40.dp)) {
+                        IconButton(onClick = { moreVisible = true }, modifier = Modifier.size(NexusTokens.minimumTouch)) {
                             Icon(Icons.Default.MoreVert, "Más opciones de biblioteca", modifier = Modifier.size(20.dp), tint = TextSecondary)
                         }
                         DropdownMenu(expanded = moreVisible, onDismissRequest = { moreVisible = false }) {
