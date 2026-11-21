@@ -1,31 +1,29 @@
-# NEXUS — Android y Windows
+# NEXUS: Android y Windows
 
-Fuente unificada de **Nexus Agent 1.9.6** para Android y **Nexus Studio 1.9.5**
-para Windows. La rama principal es `main`.
+Código de **Nexus Agent** para Android (paquete `com.vidadomu.nexus.agent`) y de
+**Nexus Desktop** para Windows.
 
-## Descargar
+## Qué rama es cuál
 
-[Android 1.9.6: corrección del bloqueo diario](https://github.com/egodivergente/nexus/releases/tag/v1.9.6-agent)
-· [Último paquete Windows publicado: 1.9.3](https://github.com/egodivergente/nexus/releases/tag/v1.9.3-agent)
-
-- **Android:** `Nexus-Agent-1.9.6-preview.apk`, paquete
-  `com.vidadomu.nexus.agent`, versionCode 40, sin las cuotas fijas locales de tokens,
-  compilada y firmada con el certificado de la app existente.
-- **Windows:** el código actual corresponde a 1.9.5; el ZIP publicado en la
-  Release anterior es `Nexus-Studio-Agent-1.9.3-Windows.zip`.
-- **SHA256SUMS.txt:** hashes para comprobar las dos descargas.
-- El código completo se obtiene con **Code → Download ZIP** o clonando `main`.
-
-La corrección y sus comprobaciones están documentadas en
-[AGENT-TOKEN-QUOTA-FIX-20261015.md](docs/AGENT-TOKEN-QUOTA-FIX-20261015.md).
-Publicar una Release no actualiza por sí solo las aplicaciones instaladas.
+- `main` está en la vc63 y no comparte historia con las ramas vivas: no describe
+  lo instalado.
+- Lo instalado sale de ramas `aki/…`. Cada entrega instalada lleva una etiqueta
+  `v<versión>-agent` en el commit del que se compiló su APK; no todas tienen
+  Release con APK publicada.
+- Esta rama, `aki/mejoras-auditoria-20261121`, es la vc228 (1.9.192-agent): parte
+  de la vc227 (`aki/agent-polish-20261120`) y añade las mejoras de la auditoría
+  del 20-11-2026 (lista en el [CHANGELOG](CHANGELOG.md)).
+- El escritorio se desarrolla en sus propias ramas: la carpeta `desktop/` de una
+  rama de Android puede ir por detrás.
 
 ## Código
 
 | Carpeta | Contenido |
 |---|---|
-| `app/` | Android: interfaz, proveedores, seguimiento, biblioteca y edición local |
-| `agent-core/` | Núcleo Kotlin del asistente y sus pruebas |
+| `app/` | Android: Agente, Crear, Biblioteca, Guion, Nexus Cut, ajustes y proveedores |
+| `agent-core/` | Núcleo Kotlin del agente (sin Android) y sus pruebas |
+| `cut-core/` | Núcleo Kotlin de Nexus Cut y sus pruebas |
+| `axel-link/` | Cliente de AXEL Link |
 | `agent-skills/` | Skills de Android |
 | `agent-proxy/` | Puente AKI y botón de Termux para arrancarlo |
 | `desktop/` | Host Windows, interfaz, agente JVM, edición y herramientas de entrega |
@@ -34,16 +32,32 @@ Publicar una Release no actualiza por sí solo las aplicaciones instaladas.
 
 ## Compilar Android
 
-Requiere JDK 17, SDK Android 35, NDK `27.2.12479018` y CMake `3.22.1`.
-Con el SDK configurado mediante `ANDROID_HOME` o `local.properties`:
+Requiere JDK 17 y el SDK de Android con la plataforma 36. Whisper necesita
+además el NDK `27.2.12479018` y CMake `3.22.1`; para no compilarlo, se puede
+pasar `-PnexusAgentPrebuiltJniDir=<carpeta>` con `libnexus_whisper.so` ya
+compilada por ABI (`arm64-v8a/`, `x86_64/`).
 
 ```bash
-./gradlew :app:testAgentPreviewUnitTest :app:assembleAgentPreview --max-workers=1 --no-parallel
+./gradlew :cut-core:test :agent-core:test :app:testAgentPreviewUnitTest :app:assembleAgentPreview --max-workers=1 --no-parallel
 ```
 
-En Windows, usar `gradlew.bat`. La firma compatible de la APK entregada se aplica
-fuera de Git; una compilación local no incluye esa clave de firma.
-También están documentadas las rutas de [ASUS/Pixel](docs/COMPILAR-PIXEL.md).
+En Windows, `gradlew.bat`. La firma de la APK entregada se aplica fuera de Git:
+una compilación propia no lleva esa clave y no se instala encima de la entregada.
+
+## Integración continua
+
+`.github/workflows/build-apk.yml` tiene tres trabajos:
+
+- **Android:** APK debug y Agent, pruebas JVM de todos los módulos y las APK de
+  pruebas sin red. Bloquea.
+- **Pruebas de interfaz:** en emulador, con las APK del trabajo anterior.
+  `AssistantPresentationUiTest` bloquea; `ChatRichContentDeviceTest`, que es
+  intermitente, se ejecuta y se guarda, pero su fallo solo deja un aviso.
+- **Windows:** pruebas y runtime del agente JVM de `desktop/agent`, y que todo el
+  Python y el JavaScript de `desktop/` se pueda leer. Bloquea.
+
+Un push nuevo a la misma rama cancela la ejecución anterior, y los cambios que
+solo tocan documentos no lanzan nada.
 
 ## Compilar y abrir Windows
 
@@ -55,19 +69,17 @@ python -m pip install -r desktop/requirements-media.txt
 ```
 
 Copiar los JAR de `desktop/agent/build/runtime/` a `desktop/agent/runtime/`.
-El ZIP de la Release ya incluye estos JAR. Para crear el acceso directo, ejecutar
-`desktop/install-local.ps1`. Datos y configuración permanecen en
-`%LOCALAPPDATA%/NexusDesktop`.
+Para crear el acceso directo, ejecutar `desktop/install-local.ps1`. Datos y
+configuración quedan en `%LOCALAPPDATA%/NexusDesktop`.
 
-Sol usa el puente autenticado del S25: [botón de Termux](docs/NEXUS-AKI-WIDGET-20261012.md).
-Whisper necesita su runtime y modelo locales; no se incluyen pesos en el ZIP.
+Sol usa el puente autenticado del móvil: [botón de Termux](docs/NEXUS-AKI-WIDGET-20261012.md).
+Whisper necesita su runtime y modelo locales; no se incluyen pesos.
 
-## Estado y pruebas
+## Más
 
-- [Changelog del proyecto](CHANGELOG.md).
-- [Mejoras implementadas tras la auditoría del 14 de octubre de 2026](docs/MEJORAS-AUDITORIA-20261014.md).
-- [Consolidación y procedencia de la Release 1.9.3](docs/RELEASE-193-CONSOLIDADA-20261013.md).
+- [Changelog](CHANGELOG.md).
+- [Rediseño de la pantalla del Agente, desde la vc224](docs/NEXUS-AGENT-REDESIGN-20261118.md).
+- [AXEL Link](docs/AXEL_LINK_20261118.md).
 
-Se conservaron todos los commits de ambas ramas, sin reescribir su historial.
-Los antiguos `SOURCE-MANIFEST.json` y `REPOSITORY-MANIFEST.json` corresponden a la
-recuperación inicial de 2026; no describen esta Release.
+Los antiguos `SOURCE-MANIFEST.json` y `REPOSITORY-MANIFEST.json` corresponden a
+la recuperación inicial de 2026; no describen el código actual.

@@ -1,5 +1,20 @@
 # Changelog — NEXUS
 
+## 1.9.192-agent (vc228) - 2026-11-21
+
+Mejoras tras la auditoría del 20-11, sobre 1.9.191-agent/vc227 (de la vc113 a la vc227, ver `docs/` y el historial de Git):
+- Agente: Enter escribe un salto de línea y Ctrl+Enter envía; «Editar» en tu último mensaje y «Otra respuesta» en la última respuesta, mientras ese intercambio no haya enviado ni cambiado nada.
+- Agente: si Android corta un turno, al volver aparece «El turno se cortó» con Reintentar y Descartar (nunca se reenvía solo); aviso «Respuesta lista» con Nexus en segundo plano. El permiso de notificaciones se pide una vez.
+- Agente: la revisión automática de resultados queda apagada salvo que se elija; un solo acceso a Ajustes en el menú del chat.
+- Chat: el progreso de un trabajo ya no reescribe el chat en cada tick y el índice de conversaciones solo se reescribe cuando cambia su lista.
+- Biblioteca: «Eliminar» borra de verdad del móvil los archivos de Nexus, tras comprobar si los usa el guion, un personaje, Nexus Cut u otro elemento; Drive y los otros dispositivos conservan su copia y la sincronización no los vuelve a traer.
+- Letra: una sola escala de texto con suelo de 11 sp, ajustable en Personalización (o la de Android).
+- Dianas de 48 dp: acciones del mensaje, Generar de la tarjeta, desvincular guion, cabecera de la Biblioteca y asas de recorte de Nexus Cut.
+- Háptica: cancelar y borrar con su propio toque, Generar y Parar se sienten, límite de frecuencia compartido.
+- Tema solo en Personalización > Apariencia; el selector se cierra sin botón Cancelar.
+- Crear: la hoja Avanzado agrupa sus salidas y explica una sola vez cuándo un modelo no admite el valor anterior.
+- Código: `AssistantScreen.kt` partido en seis archivos, el estado del chat fuera del modelo de vista y fuera el código muerto. CI en tres trabajos.
+
 ## 1.9.78-agent (vc112) - 2026-10-27
 
 Auditoría visual (10 mejoras), sobre 1.9.77/vc111:
