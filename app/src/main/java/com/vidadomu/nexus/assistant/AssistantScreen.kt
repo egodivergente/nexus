@@ -1903,7 +1903,7 @@ private fun AssistantSettingsDialog(ui: AssistantUiState, vm: AssistantViewModel
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexusTokens.space12)) {
                         Column(Modifier.weight(1f)) {
                             Text("Revisar los resultados al terminar", style = MaterialTheme.typography.bodyLarge)
-                            Text("Cuando acaban tus imágenes, el agente las mira y comprueba que cumplen lo que pediste. Solo informa; no genera ni gasta nada por su cuenta. Usa una consulta al modelo por lote.",
+                            Text("Cuando acaban tus imágenes, el agente las mira y te dice si cumplen lo que pediste. Cada revisión es un turno más del modelo; nunca genera por su cuenta.",
                                 style = MaterialTheme.typography.bodySmall, color = TextMuted)
                         }
                         Switch(autoReview, { autoReview = it; vm.setAutoReview(it) })

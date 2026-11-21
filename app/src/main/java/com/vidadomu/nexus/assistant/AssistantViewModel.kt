@@ -1427,7 +1427,8 @@ class AssistantViewModel(application: Application) : AndroidViewModel(applicatio
     private val reviewQueue = linkedMapOf<String, String>()
     private var reviewJob: kotlinx.coroutines.Job? = null
 
-    fun autoReviewEnabled(): Boolean = reviewPrefs.getBoolean("auto_review", true)
+    /** Off unless chosen: each review is one more turn of the model that nobody asked for. */
+    fun autoReviewEnabled(): Boolean = reviewPrefs.getBoolean("auto_review", false)
     fun setAutoReview(on: Boolean) { reviewPrefs.edit().putBoolean("auto_review", on).apply(); if (!on) { reviewQueue.clear(); reviewJob?.cancel() } }
 
     /** Un encargo de imagen acaba de recibir su resultado: se anota para revisarlo junto con el resto de su lote. */
