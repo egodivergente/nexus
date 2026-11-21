@@ -223,7 +223,7 @@ private fun drawerTitle(titles: ConversationTitles, chat: AssistantChatEntry): S
 
 /** Long press on an empty spot of the chat: the actions one reaches for most, as a small floating menu. */
 @Composable internal fun ChatContextMenu(ui: AssistantUiState, vm: AssistantViewModel, expanded: Boolean, offset: DpOffset,
-    onDismiss: () -> Unit, onProjects: () -> Unit, onAppearance: () -> Unit, onSettings: () -> Unit, barPinned: Boolean, onPinBar: (Boolean) -> Unit,
+    onDismiss: () -> Unit, onProjects: () -> Unit, onAppearance: () -> Unit, barPinned: Boolean, onPinBar: (Boolean) -> Unit,
     onCopyChat: () -> Unit, onShareChat: () -> Unit, onImportImages: () -> Unit,
     onOrders: (() -> Unit)? = null, onAssistantSettings: (() -> Unit)? = null) {
     DropdownMenu(expanded=expanded,onDismissRequest=onDismiss,offset=offset) {
@@ -241,7 +241,7 @@ private fun drawerTitle(titles: ConversationTitles, chat: AssistantChatEntry): S
         DropdownMenuItem(text={Text(if(barPinned) "Esconder la barra de pestañas" else "Dejar la barra de pestañas siempre visible")},
             leadingIcon={Icon(Icons.Default.ViewDay,null)},onClick={onDismiss();onPinBar(!barPinned)})
         onAssistantSettings?.let { open -> DropdownMenuItem(text={Text("Cerebro y modelo del agente")},leadingIcon={Icon(Icons.Default.Tune,null)},onClick={onDismiss();open()}) }
-        DropdownMenuItem(text={Text("Todos los ajustes")},leadingIcon={Icon(Icons.Default.Settings,null)},onClick={onDismiss();onSettings()})
+        // Ajustes has one door in the Agent: the gear in the header.
     }
 }
 

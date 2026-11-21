@@ -54,7 +54,7 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
     val scope = rememberCoroutineScope()
     val appearance = rememberAppearancePreferences()
     val haptics = rememberNexusHaptics()
-    val selectedTheme by appearance.themeState()
+    val selectedAppearance by appearance.selectionState()
     val currencyState by currencyManager.state.collectAsState()
 
     var accountBalance by remember { mutableStateOf<AccountBalance?>(app.secureStorage.getCachedBalance()) }
@@ -160,7 +160,7 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
                 SettingsPage.APPEARANCE -> {
                     item {HubRow(SettingsPage.VISUAL,"Fondo, foto propia, movimiento y háptica") {pageName=SettingsPage.VISUAL.name}}
             item {SettingsCard {
-                SettingRow("Apariencia",selectedTheme.label,{appearanceOpen=true})
+                SettingRow("Apariencia","${selectedAppearance.theme.label} · ${selectedAppearance.ambientMode.label}",{appearanceOpen=true})
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
                 FontScaleRow(appearance)
                 HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)

@@ -23,9 +23,6 @@ import com.vidadomu.nexus.settings.RuntimePreferences
     val store=remember {RuntimePreferences.get(context)}
     val haptics=rememberNexusHaptics()
     val configuration by store.state.collectAsState()
-    val appearance=rememberAppearancePreferences()
-    val selected by appearance.selectionState()
-    var pickerOpen by remember {mutableStateOf(false)}
     var message by remember {mutableStateOf<String?>(null)}
     val photo=rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) {uri ->
         if(uri!=null) runCatching {
@@ -33,14 +30,8 @@ import com.vidadomu.nexus.settings.RuntimePreferences
             store.set("ui.photo",uri.toString())
         }.onFailure {message="No se pudo conservar esta foto. El fondo anterior se mantiene."}
     }
-    if(pickerOpen) PremiumAppearancePicker(appearance,onDismiss={pickerOpen=false})
+    // The theme and its ambient are chosen in Personalización > Apariencia; this page keeps the background, motion and touch.
     Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space12)) {
-        FilledTonalButton(onClick={pickerOpen=true},modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.field) {
-            Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.Start) {
-                Text("Temas y ambiente",style=MaterialTheme.typography.labelLarge)
-                Text("${selected.theme.label} · ${selected.ambientMode.label}",style=MaterialTheme.typography.bodySmall)
-            }
-        }
         val checked=configuration.value("ui.haptics").toBoolean()
         Row(Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)
             .toggleable(checked,role=Role.Switch,onValueChange={store.set("ui.haptics",it.toString());haptics.perform(NexusHapticEvent.TOGGLE_DECISIVE,changed=it!=checked)}),

@@ -412,7 +412,7 @@ private fun AssistantScreenContent(
             }
             val openChatMenu: @Composable (Boolean, androidx.compose.ui.unit.DpOffset, () -> Unit) -> Unit = { expanded, at, dismiss ->
                 ChatContextMenu(ui, vm, expanded, at, dismiss, onProjects = { showProject = true }, onAppearance = { showAppearance = true },
-                    onSettings = onOpenSettings, barPinned = barPinned, onPinBar = { com.vidadomu.nexus.ui.theme.ChromeVisibility.setPinned(chatContext, it) },
+                    barPinned = barPinned, onPinBar = { com.vidadomu.nexus.ui.theme.ChromeVisibility.setPinned(chatContext, it) },
                     onCopyChat = {
                         copyMessageIds = null; showChatCopy = true
                     },

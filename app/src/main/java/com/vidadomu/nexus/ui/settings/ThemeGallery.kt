@@ -51,12 +51,10 @@ internal fun PremiumAppearancePicker(appearance:AppearancePreferences,onDismiss:
     NexusSheet("Apariencia",cancel,subtitle="Explora el ambiente. Se guarda al aplicar.",icon=Icons.Default.Palette,
         primaryAction={
             Column(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
-                    TextButton(onClick=cancel,modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch)) {Text("Cancelar")}
-                    Button(onClick={appearance.applyAppearance(selection);haptics.perform(NexusHapticEvent.CONFIRMATION);onDismiss()},
-                        enabled=selection!=initial,modifier=Modifier.weight(1f).heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.action) {
-                        Text("Aplicar")
-                    }
+                // Closing without applying (the X, a swipe down or Back) is the one way to leave it as it was.
+                Button(onClick={appearance.applyAppearance(selection);haptics.perform(NexusHapticEvent.CONFIRMATION);onDismiss()},
+                    enabled=selection!=initial,modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch),shape=NexusTokens.action) {
+                    Text("Aplicar")
                 }
                 onMoreSettings?.let {more -> TextButton(onClick={cancel();more()},modifier=Modifier.fillMaxWidth().heightIn(min=NexusTokens.minimumTouch)) {
                     Text("Tamaño de letra y más ajustes")
