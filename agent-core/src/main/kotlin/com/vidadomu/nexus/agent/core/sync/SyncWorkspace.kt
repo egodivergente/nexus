@@ -18,7 +18,7 @@ class SyncWorkspace(
     private val journal=SyncJournal(File(directory,"journal.json"),remote,deviceLabel)
     private val storyJournal=storyRemote?.let {SyncJournal(File(directory,"story-journal-v1.json"),it,deviceLabel,setOf("story"))}
     private val collections=listOf("projects","scenes","shots","characters","assets","generations")
-    suspend fun cycle(downloadProjects:Set<String>?,extras:Map<String,JsonObject> = emptyMap(),applyExtras:(Map<String,JsonObject>)->Unit = {}):JsonObject {
+    suspend fun cycle(downloadProjects:Set<String>?,extras:Map<String,JsonObject> = emptyMap(),applyExtras:suspend (Map<String,JsonObject>)->Unit = {}):JsonObject {
         val expected=index.snapshot()
         val useStory=storyJournal!=null && storyEnabled()
         // Device-local transfer receipts are never part of a portable snapshot or sync journal.
@@ -54,7 +54,18 @@ class SyncWorkspace(
             if(kind=="generations")row=JsonObject(row+mapOf("referenceUris" to JsonArray(row["referenceUris"]?.jsonArray.orEmpty().map {JsonPrimitive(portable(it.jsonPrimitive.content))})))
             rows[kind+":"+row["id"]!!.jsonPrimitive.content]=row
         }
-        rows.putAll(extras.mapValues {(_,value)->SyncBlobs.rewrite(value){uri->if(uri.startsWith("file:")||uri.startsWith("content:")||uri.startsWith("/media/"))portable(uri)else replacements[uri]?:uri}.jsonObject})
+        for ((key, value) in extras) {
+            val row = SyncBlobs.rewrite(value) { uri ->
+                if (uri.startsWith("file:") || uri.startsWith("content:") || uri.startsWith("/media/")) portable(uri)
+                else replacements[uri] ?: uri
+            }.jsonObject
+            val unavailable = key.startsWith("montages:") && row["document"]?.jsonObject
+                ?.get("project")?.jsonObject?.get("media")?.jsonArray.orEmpty().any {
+                    it.jsonObject["uri"]?.jsonPrimitive?.contentOrNull?.startsWith(SyncBlobs.PREFIX) != true
+                }
+            if (unavailable) journal.published(key)?.let { rows[key] = it }
+            else rows[key] = row
+        }
         val capturedStory=StorySyncCodec.capture(expected)
         val storyRows=if(!useStory)capturedStory else capturedStory.mapValues {(_,value)->SyncBlobs.rewrite(value){uri->
             if(uri.startsWith("file:")||uri.startsWith("content:")||uri.startsWith("/media/"))portable(uri)else replacements[uri]?:uri
@@ -63,8 +74,10 @@ class SyncWorkspace(
         val storyResult=if(useStory)storyJournal!!.exchange(storyRows)else null
         val retained=result.rows.toMutableMap()
         val retainedStory=(storyResult?.rows?:storyRows).toMutableMap()
-        // The editor keeps its local text while every competing version remains in the journal.
-        if(useStory)for(conflict in result.conflicts)rows[conflict.key]?.let {retained[conflict.key]=it}?:retained.remove(conflict.key)
+        // A conflicting montage remains local until a version is explicitly selected.
+        val heldMontages = result.conflicts.map { it.key }.filter { it.startsWith("montages:") }.toSet()
+        val retainedKeys = if (useStory) result.conflicts.map { it.key }.toSet() else heldMontages
+        for(key in retainedKeys)rows[key]?.let { retained[key]=it }?:retained.remove(key)
         for(conflict in storyResult?.conflicts.orEmpty())storyRows[conflict.key]?.let {retainedStory[conflict.key]=it}?:retainedStory.remove(conflict.key)
         val downloaded=mutableMapOf<String,String>()
         val selectedStoryAssets=if(downloadProjects==null)mutableSetOf()else StorySyncCodec.referencedAssetIds(
@@ -84,7 +97,14 @@ class SyncWorkspace(
             val linked=key.startsWith("assets:") && row["id"]?.jsonPrimitive?.contentOrNull in selectedStoryAssets
             // Removed from the Library: an existing copy is reused, a missing one is not fetched again.
             val removed=key.startsWith("assets:") && row["libraryDeleted"]?.jsonPrimitive?.booleanOrNull==true
-            return SyncBlobs.rewrite(row){deviceUri(it,!removed && (linked || downloadProjects==null || project==null || project in downloadProjects))}.jsonObject
+            val originals = if (key.startsWith("montages:")) {
+                extras[key]?.get("document")?.jsonObject?.get("project")?.jsonObject
+                    ?.get("media")?.jsonArray.orEmpty().mapNotNull { media ->
+                        val uri = media.jsonObject["uri"]?.jsonPrimitive?.contentOrNull
+                        uri?.let { local -> replacements[local]?.let { it to local } }
+                    }.toMap()
+            } else emptyMap()
+            return SyncBlobs.rewrite(row) { originals[it] ?: deviceUri(it, !removed && (linked || downloadProjects==null || project==null || project in downloadProjects)) }.jsonObject
         }
         val localized=retained.mapValues {(key,row)->localize(key,row)}.toMutableMap()
         val localizedStory=retainedStory.mapValues {(key,row)->localize(key,row)}
@@ -125,8 +145,8 @@ class SyncWorkspace(
             index.applySyncedSnapshot(expected,restored.snapshot)
         }
         if(pending.isEmpty()) {
-            applyExtras(localized.filterKeys {it.substringBefore(':') !in collections})
-            journal.acknowledge(result.rows,if(useStory)result.conflicts.map {it.key}.toSet()else emptySet())
+            applyExtras(localized.filterKeys {it.substringBefore(':') !in collections && it !in heldMontages})
+            journal.acknowledge(result.rows,retainedKeys)
             if(useStory)storyJournal!!.acknowledge(storyResult!!.rows,storyResult.conflicts.map {it.key}.toSet())
         }
         // No acknowledgement on an incomplete graph: next cycle must not upload retained local data

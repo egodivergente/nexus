@@ -9,6 +9,8 @@ class SyncDocuments(private val directory:File) {
     private val cache=File(directory,"documents.json")
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
     private fun cached():Map<String,JsonObject> = if(cache.exists())cache.inputStream().buffered(1 shl 16).use {Json.decodeFromStream(JsonObject.serializer(),it)}.mapValues {it.value.jsonObject}else emptyMap()
+    fun montages(): Map<String, JsonObject> = cached().filterKeys { it.startsWith("montages:") }
+        .mapKeys { it.key.substringAfter(':') }.mapValues { it.value.getValue("document").jsonObject }
     fun capture(chats:List<JsonObject>,montages:Map<String,JsonObject>):Map<String,JsonObject> {
         val rows=cached().toMutableMap()
         for(chat in chats) {

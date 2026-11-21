@@ -172,6 +172,23 @@ class CutSession(
 
     /** El cabezal se mueve muchas veces por segundo al reproducir: no pasa por la transacción ni por el historial. */
     fun setPlayhead(timeUs: Long) = _state.update { s -> s.copy(view = s.view.copy(playheadUs = timeUs.coerceIn(0, maxOf(0, s.project.timeline.durationUs)))) }
+
+    internal suspend fun applySynced(expected: Project?, replacement: Project, atUs: Long) = mutex.withLock {
+        val current = _state.value
+        check(current.project == expected && current.project.id == replacement.id) {
+            "El montaje cambió durante la sincronización."
+        }
+        val incoming = replacement.copy(revision = current.revision, modifiedAtMs = current.project.modifiedAtMs)
+        if (incoming != current.project) {
+            check(!current.view.playing) { "Pausa el montaje para recibir los cambios." }
+            val saved = incoming.copy(revision = current.revision + 1, modifiedAtMs = clock())
+            persist(saved)?.let { error(it) }
+            undoStack.clear()
+            redoStack.clear()
+            _state.update { snapshot(saved, tidy(it.view.copy(playheadUs = atUs), saved)) }
+        } else if (!current.view.playing) setPlayhead(atUs)
+    }
+
     fun setPlaying(playing: Boolean) = _state.update { s -> if (s.view.playing == playing) s else s.copy(view = s.view.copy(playing = playing)) }
 
     // ------------------------------------------------------------------ consultas

@@ -48,6 +48,8 @@ fun CutHomeScreen(
     val app = LocalContext.current.applicationContext as NexusApplication
     val runtime = remember(app) { AssistantRuntime.get(app) }
     val workspace = remember(app) { NexusCut.workspace(app) }
+    val drive = remember(app) { com.vidadomu.nexus.sync.NexusDriveSync.get(app) }
+    val syncStatus by drive.status.collectAsState()
     val hub = remember(runtime, workspace) { CutProjectHub(runtime.assets, workspace) }
     val index by runtime.assets.changes.collectAsState()
     val scope = rememberCoroutineScope()
@@ -74,7 +76,7 @@ fun CutHomeScreen(
     BackHandler(enabled = isActive && selectedId != null) { if (!busy) selectedId = null }
     BackHandler(enabled = isActive && busy) { /* Finish the current metadata transaction before leaving. */ }
 
-    LaunchedEffect(isActive, index, refresh) {
+    LaunchedEffect(isActive, index, refresh, syncStatus["completedAt"]) {
         if (!isActive) return@LaunchedEffect
         loading = true
         failure = null
@@ -156,6 +158,11 @@ fun CutHomeScreen(
                             }
                         }
                     } else selected?.let { project ->
+                        if (!project.archived) IconButton(onClick = {
+                            val queued = drive.syncMontage(project.id)
+                            scope.launch { snackbar.showSnackbar(if (queued) "Buscando cambios del montaje…"
+                            else "Conecta Google Drive desde Ajustes.") }
+                        }, enabled = !busy) { Icon(Icons.Default.Refresh, "Sincronizar montaje") }
                         CutProjectMenu(project, !busy, onRename = { openName("rename", project.id, project.name) }, onArchive = { archive(project) })
                     }
                 },

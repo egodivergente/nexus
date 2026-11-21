@@ -858,6 +858,18 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
         onFrameRate = { haptics.perform(NexusHapticEvent.SELECTION); vm.setFrameRate(it) },
         onRename = { settingsOpen = false; dialog = CutDialog.Rename },
         onDismiss = { settingsOpen = false },
+        onContinueElsewhere = project.nexusProjectId?.takeIf { project.sceneId == null }?.let { id ->
+            {
+                vm.saveView(viewport.pxPerSecond.takeIf { zoomChosen })
+                val queued = com.vidadomu.nexus.sync.NexusDriveSync.get(app).syncMontage(id, project.id)
+                settingsOpen = false
+                scope.launch {
+                    snackbar.showSnackbar(if (queued) "Sincronización solicitada. Consulta su estado en Ajustes."
+                    else "Conecta Google Drive en Ajustes para continuar el montaje en Windows.")
+                }
+                Unit
+            }
+        },
     )
 
     when (val d = dialog) {

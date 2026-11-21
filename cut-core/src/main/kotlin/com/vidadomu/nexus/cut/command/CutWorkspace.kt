@@ -1,7 +1,9 @@
 package com.vidadomu.nexus.cut.command
 
 import com.vidadomu.nexus.cut.model.IdGenerator
+import com.vidadomu.nexus.cut.model.Project
 import com.vidadomu.nexus.cut.model.ProjectSettings
+import com.vidadomu.nexus.cut.storage.AtomicFile
 import com.vidadomu.nexus.cut.storage.ProjectStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,6 +57,20 @@ class CutWorkspace(
     fun current(): CutSession? = _active.value?.let { sessions[it] }
 
     suspend fun activeSession(): CutSession? = _active.value?.let { id -> runCatching { session(id) }.getOrNull() }
+
+    suspend fun applySynced(expected: Project?, incoming: Project, atUs: Long) = lock.withLock {
+        val id = incoming.id
+        val open = sessions[id]
+        if (open != null) {
+            open.applySynced(expected, incoming, atUs)
+        } else withContext(io) {
+            val file = store.fileOf(id)
+            val previous = if (file.exists() || AtomicFile.backupOf(file).exists()) store.load(id).project else null
+            check(previous == expected) { "El montaje cambió durante la sincronización." }
+            val candidate = incoming.copy(revision = previous?.revision ?: 0, modifiedAtMs = previous?.modifiedAtMs ?: 0)
+            if (previous != candidate) store.save(candidate.copy(revision = candidate.revision + 1, modifiedAtMs = clock()))
+        }
+    }
 
     /** Crea un montaje vacío, ya guardado y con su sesión abierta. */
     suspend fun create(name: String, nexusProjectId: String? = null, sceneId: String? = null, settings: ProjectSettings = ProjectSettings()): CutSession = lock.withLock {

@@ -21,6 +21,8 @@ import com.vidadomu.nexus.BuildConfig
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.R
 import com.vidadomu.nexus.assistant.AssistantRuntime
+import com.vidadomu.nexus.cut.NexusCut
+import com.vidadomu.nexus.ui.cut.CutViewPrefs
 import com.vidadomu.nexus.agent.core.sync.*
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -113,6 +115,15 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
         val ids=prefs.getStringSet("projects",emptySet())!!.toMutableSet();if(selected)ids+=id else ids-=id
         prefs.edit().putStringSet("projects",ids).apply();enqueue(manual=true)
     }
+    fun syncMontage(projectId: String, montageId: String? = null): Boolean {
+        if (BuildConfig.OFFLINE_QA || prefs.getString("account", null) == null) return false
+        val projects = prefs.getStringSet("projects", emptySet()).orEmpty().toSet() + projectId
+        prefs.edit().putStringSet("projects", projects).apply {
+            if (montageId != null) putString("cut_montage.$projectId", montageId)
+        }.apply()
+        enqueue(manual = true)
+        return true
+    }
     fun resolve(key:String,revision:String) {prefs.edit().putString("resolution",buildJsonObject {put("key",key);put("revision",revision)}.toString()).apply();enqueue(manual=true)}
     private fun readStatus():JsonObject=runCatching {Json.parseToJsonElement(File(app.filesDir,"assistant/sync/status.json").readText()).jsonObject}.getOrDefault(buildJsonObject {put("state","idle")})
     fun setStatus(value:JsonObject) {SyncJournal.atomic(File(app.filesDir,"assistant/sync/status.json"),value.toString());status.value=value}
@@ -159,8 +170,12 @@ class NexusDriveSync private constructor(val app:NexusApplication) {
                 prefs.edit().remove("resolution").apply()
             }
             val active=AssistantRuntime.get(app).settings.activeProjectId()
-            val selected=prefs.getStringSet("projects",emptySet())!!.toSet()+listOfNotNull(active)
-            val result=workspace.cycle(selected,documents.capture(chats,emptyMap())) {rows->
+            val cut = NexusCut.workspace(app)
+            val selected=prefs.getStringSet("projects",emptySet())!!.toSet()+
+                listOfNotNull(active, cut.current()?.state?.value?.project?.nexusProjectId)
+            val montageSync = CutMontageSync(cut, prefs, CutViewPrefs(app), File(directory, "blobs"))
+            val result=workspace.cycle(selected,documents.capture(chats,montageSync.capture(selected, documents.montages()))) {rows->
+                montageSync.apply(rows)
                 documents.apply(rows){id,row->
                     val messages=row["items"]!!.jsonArray.mapIndexed {position,element->
                         val item=element.jsonObject;val text=item["text"]!!.jsonPrimitive.content

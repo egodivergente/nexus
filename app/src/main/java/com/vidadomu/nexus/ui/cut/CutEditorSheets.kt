@@ -84,6 +84,7 @@ internal fun CutSettingsSheet(
     project: Project, ripple: Boolean, snapping: Boolean, previewLevel: PreviewLevel,
     onRipple: (Boolean) -> Unit, onSnapping: (Boolean) -> Unit, onPreviewLevel: (PreviewLevel) -> Unit,
     onAspect: (String) -> Unit, onFrameRate: (String) -> Unit, onRename: () -> Unit, onDismiss: () -> Unit,
+    onContinueElsewhere: (() -> Unit)? = null,
 ) {
     CutSheet(onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp),
@@ -96,6 +97,9 @@ internal fun CutSettingsSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 TextButton(onClick = onRename) { Text("Renombrar") }
+            }
+            if (onContinueElsewhere != null) {
+                TextButton(onClick = onContinueElsewhere) { Text("Continuar en otro dispositivo") }
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
             Text("Formato", style = MaterialTheme.typography.labelLarge)
