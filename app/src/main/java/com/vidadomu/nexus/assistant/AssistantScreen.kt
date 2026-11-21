@@ -681,7 +681,7 @@ private fun AssistantScreenContent(
                             Text(listOfNotNull(scene?.title ?: scene?.code,shot?.title ?: shot?.code).joinToString(" › ").ifBlank {ui.projects.firstOrNull {it.id==selection.projectId}?.name ?: "Proyecto"},style=MaterialTheme.typography.labelMedium,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             // (el detalle «Propuestas · proyecto» se ve al tocar la pastilla; aquí solo el nombre)
                         }
-                        IconButton(onClick={com.vidadomu.nexus.assistant.story.StorySelectionStore.clear()},modifier=Modifier.size(36.dp)) {Icon(Icons.Default.Close,"Desvincular el guion",Modifier.size(16.dp))}
+                        Box(Modifier.width(NexusTokens.minimumTouch).fillMaxHeight().clickable(interactionSource=null,indication=androidx.compose.material3.ripple(bounded=false,radius=18.dp),role=androidx.compose.ui.semantics.Role.Button) {com.vidadomu.nexus.assistant.story.StorySelectionStore.clear()},contentAlignment=Alignment.Center) {Icon(Icons.Default.Close,"Desvincular el guion",Modifier.size(16.dp))}
                     }
                 }
             }
@@ -1139,9 +1139,9 @@ internal fun UserBubble(item:ChatItem.User, onSelectMessages: () -> Unit = {}) {
         val bubbleHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
         Box(Modifier.padding(end = NexusTokens.space8, top = 2.dp)) {
             Row(
+                // The time line is short: it answers across 48 dp of height without pushing the next message away.
                 modifier = Modifier
-                    .clip(NexusTokens.pill)
-                    .clickable(onClickLabel = "Acciones del mensaje") {
+                    .tallClickable(onClickLabel = "Acciones del mensaje", shape = NexusTokens.pill) {
                         bubbleHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
                         actions = true
                     }
@@ -1291,8 +1291,7 @@ internal fun AssistantBubble(item:ChatItem.Assistant, onOpenHistory: () -> Unit 
             SettleIn(settle.arrived) { Box {
                 Row(
                     modifier = Modifier
-                        .clip(NexusTokens.pill)
-                        .clickable(onClickLabel = "Acciones de la respuesta") {
+                        .tallClickable(onClickLabel = "Acciones de la respuesta", shape = NexusTokens.pill) {
                             responseHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
                             actionsExpanded = true
                         }

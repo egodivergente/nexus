@@ -272,7 +272,7 @@ internal fun OrderCard(
                         })
                         CardAction.SENDING, CardAction.NONE -> ({})
                     }
-                    Button(onClick = click, enabled = shown.enabled, shape = NexusTokens.field, modifier = Modifier.fillMaxWidth().heightIn(min = 40.dp),
+                    Button(onClick = click, enabled = shown.enabled, shape = NexusTokens.field, modifier = Modifier.fillMaxWidth().heightIn(min = NexusTokens.minimumTouch),
                         contentPadding = PaddingValues(horizontal = NexusTokens.space16, vertical = NexusTokens.space8)) {
                         Text(shown.actionLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge)
                     }
@@ -376,7 +376,7 @@ private fun OrderDetails(order: Order, p: PlanUi, prompt: String, onPrompt: (Str
         if (params.isNotEmpty()) {
             Text("Configuración", style = MaterialTheme.typography.labelLarge)
             params.forEach { (k, v) ->
-                Row(Modifier.fillMaxWidth().heightIn(min = 40.dp).clip(NexusTokens.thumbnail).clickable(enabled = editable) { onEditParam(k, v) },
+                Row(Modifier.fillMaxWidth().heightIn(min = NexusTokens.minimumTouch).clip(NexusTokens.thumbnail).clickable(enabled = editable) { onEditParam(k, v) },
                     verticalAlignment = Alignment.CenterVertically) {
                     Text(k, style = MaterialTheme.typography.bodySmall, color = TextSecondary, modifier = Modifier.weight(1f))
                     Text(v, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)

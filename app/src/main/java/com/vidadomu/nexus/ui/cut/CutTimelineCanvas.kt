@@ -147,6 +147,7 @@ internal fun TimelineCanvas(
     val rulerPx = RULER_DP * dp
     val collapsedPx = Math.round(COLLAPSED_ROW_DP * dp).toFloat()
     val handlePx = 16 * dp
+    val handleTouchPx = com.vidadomu.nexus.ui.theme.NexusTokens.minimumTouch.value / 2f * dp
     val snapPx = 10 * dp
     val edgeZonePx = 44 * dp
     val viewConfiguration = LocalViewConfiguration.current
@@ -199,6 +200,7 @@ internal fun TimelineCanvas(
     fun geometry(width: Float, t: Timeline, ph: Long) = TimelineGeometry(
         t, width, rulerPx, Math.round(VIDEO_ROW_DP * dp * latestRowScale).toFloat(), Math.round(AUDIO_ROW_DP * dp * latestRowScale).toFloat(), collapsedPx, ph,
         viewport.pxPerSecond * dp / 1_000_000.0, viewport.scrollY, handlePx, emptyRowPx = Math.round(EMPTY_ROW_DP * dp).toFloat(),
+        touchPx = handleTouchPx,
     )
 
     Canvas(

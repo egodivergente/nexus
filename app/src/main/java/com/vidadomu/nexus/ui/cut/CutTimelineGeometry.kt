@@ -36,6 +36,8 @@ internal class TimelineGeometry(
     val handlePx: Float,
     /** Alto de una pista vacía; null = el mismo que si tuviera clips. */
     val emptyRowPx: Float? = null,
+    /** How far each side of a clip edge the trim handle answers (it is drawn narrower): 24 dp makes a 48 dp target. */
+    val touchPx: Float = handlePx,
 ) {
     val centerX: Float get() = widthPx / 2f
 
@@ -84,19 +86,21 @@ internal class TimelineGeometry(
         // Selected clips get edge handles that may extend slightly outside the clip.
         val candidates = row.track.clips.filter { c ->
             val x0 = xOf(c.timelineStartUs); val x1 = xOf(c.endUs)
-            x >= x0 - (if (c.id in selection) handlePx else 0f) && x <= x1 + (if (c.id in selection) handlePx else 0f)
+            x >= x0 - (if (c.id in selection) touchPx else 0f) && x <= x1 + (if (c.id in selection) touchPx else 0f)
         }
         val clip = candidates.firstOrNull { it.id in selection } ?: candidates.firstOrNull { it.contains(t) } ?: return Hit(row, null, Zone.BODY)
         if (clip.id !in selection) return Hit(row, clip, Zone.BODY)
         val x0 = xOf(clip.timelineStartUs); val x1 = xOf(clip.endUs)
         val top = yOf(row)
         val w = x1 - x0
-        val edge = minOf(handlePx, w / 3f)
+        val edge = minOf(touchPx, w / 3f)
+        // The fade handles keep the room they had: the wider trim target only takes what was the clip's body.
+        val fadeGuard = minOf(handlePx, w / 3f) * 0.6f
         val inTopBand = y < top + row.height * 0.40f && !row.track.collapsed && w > handlePx * 4
         val (fx0, fx1) = fadeHandleXs(clip)
         return when {
-            inTopBand && Math.abs(x - fx0) < handlePx * 0.9f && x - x0 > edge * 0.6f -> Hit(row, clip, Zone.FADE_IN)
-            inTopBand && Math.abs(x - fx1) < handlePx * 0.9f && x1 - x > edge * 0.6f -> Hit(row, clip, Zone.FADE_OUT)
+            inTopBand && Math.abs(x - fx0) < handlePx * 0.9f && x - x0 > fadeGuard -> Hit(row, clip, Zone.FADE_IN)
+            inTopBand && Math.abs(x - fx1) < handlePx * 0.9f && x1 - x > fadeGuard -> Hit(row, clip, Zone.FADE_OUT)
             x < x0 + edge -> Hit(row, clip, Zone.HEAD)
             x > x1 - edge -> Hit(row, clip, Zone.TAIL)
             else -> Hit(row, clip, Zone.BODY)
