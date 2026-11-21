@@ -4,7 +4,7 @@
 
 Mejoras tras la auditoría del 20-11, sobre 1.9.191-agent/vc227 (de la vc113 a la vc227, ver `docs/` y el historial de Git):
 - Agente: Enter escribe un salto de línea y Ctrl+Enter envía; «Editar» en tu último mensaje y «Otra respuesta» en la última respuesta, mientras ese intercambio no haya enviado ni cambiado nada.
-- Agente: si Android corta un turno, al volver aparece «El turno se cortó» con Reintentar y Descartar (nunca se reenvía solo); aviso «Respuesta lista» con Nexus en segundo plano. El permiso de notificaciones se pide una vez.
+- Agente: si Android corta un turno, al volver aparece «El turno se cortó» con Reintentar y Descartar (nunca se reenvía solo); aviso «Respuesta lista» con Nexus en segundo plano, que se retira solo al ver la conversación. El permiso de notificaciones se pide una vez.
 - Agente: la revisión automática de resultados queda apagada salvo que se elija; un solo acceso a Ajustes en el menú del chat.
 - Chat: el progreso de un trabajo ya no reescribe el chat en cada tick y el índice de conversaciones solo se reescribe cuando cambia su lista.
 - Biblioteca: «Eliminar» borra de verdad del móvil los archivos de Nexus, tras comprobar si los usa el guion, un personaje, Nexus Cut u otro elemento; Drive y los otros dispositivos conservan su copia y la sincronización no los vuelve a traer.

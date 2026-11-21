@@ -99,7 +99,7 @@ fun SettingsScreen(assistantViewModel: com.vidadomu.nexus.assistant.AssistantVie
     var currencyOpen by remember {mutableStateOf(false)}
     var currencyDetails by remember {mutableStateOf(false)}
     var settingsSearch by rememberSaveable {mutableStateOf("")}
-    var pageName by rememberSaveable(initialPage) { mutableStateOf(initialPage) }
+    var pageName by rememberSaveable(initialPage) { mutableStateOf(initialPage ?: SettingsStart.take()) }
     val page = pageName?.let { n -> SettingsPage.entries.firstOrNull { it.name == n } }
     val closePage: () -> Unit = {
         if (page != null && initialPage == null) pageName = null else onCloseInitialPage?.invoke()
@@ -419,6 +419,15 @@ private fun ProviderCredentialCard(
         })
     }
 }
+/** Página con la que se abre Ajustes la próxima vez; se consume una vez y Atrás vuelve a la lista de Ajustes. */
+object SettingsStart {
+    /** Nombre de [SettingsPage.APPEARANCE]; si dejara de existir, Ajustes abre en su lista. */
+    const val APPEARANCE = "APPEARANCE"
+    @Volatile private var page: String? = null
+    fun open(name: String) { page = name }
+    internal fun take(): String? = page.also { page = null }
+}
+
 private enum class SettingsPage(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     CATALOG("Catálogo y workflows", Icons.Default.GridView),
     CONNECTIONS("Conexiones", Icons.Default.Cable),
@@ -502,6 +511,7 @@ private fun FontScaleRow(appearance:AppearancePreferences) {
             modifier=Modifier.semantics {contentDescription="Tamaño de letra de Nexus"})
         TextButton(onClick={appearance.setTextScale(null)},enabled=chosen!=null) {Text("Usar el tamaño de Android")}
         Text("Así se verá el texto de Nexus.",style=MaterialTheme.typography.bodyMedium,color=TextSecondary)
+        HorizontalDivider(Modifier.padding(top=NexusTokens.space8),color=MaterialTheme.colorScheme.outlineVariant)
         // Más espacio para el chat: la barra de pestañas se esconde al bajar y vuelve al subir.
         val context=LocalContext.current
         val pinned by com.vidadomu.nexus.ui.theme.ChromeVisibility.pinned

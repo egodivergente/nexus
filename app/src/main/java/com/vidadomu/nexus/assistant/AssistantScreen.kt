@@ -126,6 +126,17 @@ private fun AssistantScreenContent(
     vm: AssistantViewModel,
 ) {
     val ui by vm.ui.collectAsState()
+    // El aviso «Respuesta lista» de esta conversación sobra en cuanto se ve: se retira al abrirla y al volver a Nexus.
+    val seenContext = LocalContext.current.applicationContext
+    val seenOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(seenOwner, ui.conversationId) {
+        val conversation = ui.conversationId
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) TurnNotifications.seen(seenContext, conversation)
+        }
+        seenOwner.lifecycle.addObserver(observer)
+        onDispose { seenOwner.lifecycle.removeObserver(observer) }
+    }
     val storySelection by com.vidadomu.nexus.assistant.story.StorySelectionStore.selection.collectAsState()
     val storyIndex by vm.runtime.assets.changes.collectAsState()
     // Outputs can be downloaded after the order status changes: observe the repository too.
@@ -653,7 +664,11 @@ private fun AssistantScreenContent(
             projectPicker?.let { picker -> Surface(Modifier.matchParentSize(), color = MaterialTheme.colorScheme.background) { picker() } }
             // Long press on an empty spot of the chat: the same menu as the header's, where the finger is.
             openChatMenu(menuOpen, menuAt) { menuOpen = false }
-            if (showAppearance) QuickAppearanceSheet({ showAppearance = false }, onOpenSettings)
+            if (showAppearance) QuickAppearanceSheet({ showAppearance = false }) {
+                // «Tamaño de letra y más ajustes» abre Ajustes ya en Personalización, donde está el control.
+                com.vidadomu.nexus.ui.settings.SettingsStart.open(com.vidadomu.nexus.ui.settings.SettingsStart.APPEARANCE)
+                onOpenSettings()
+            }
             // Notices at the foot of the conversation, right above the composer: the field, its controls and the stop
             // button stay in sight and in reach while a notice is up.
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).onSizeChanged { noticeHeight = it.height }) { data ->

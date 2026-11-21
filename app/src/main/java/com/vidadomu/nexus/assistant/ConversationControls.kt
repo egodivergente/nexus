@@ -237,7 +237,7 @@ private fun drawerTitle(titles: ConversationTitles, chat: AssistantChatEntry): S
         DropdownMenuItem(text={Text("Compartir chat")},leadingIcon={Icon(Icons.Default.Share,null)},enabled=hasMessages,onClick={onDismiss();onShareChat()})
         DropdownMenuItem(text={Text("Copiar todo el chat")},leadingIcon={Icon(Icons.Default.ContentCopy,null)},enabled=hasMessages,onClick={onDismiss();onCopyChat()})
         HorizontalDivider()
-        DropdownMenuItem(text={Text("Apariencia: colores y tamaño de letra")},leadingIcon={Icon(Icons.Default.Palette,null)},onClick={onDismiss();onAppearance()})
+        DropdownMenuItem(text={Text("Apariencia y tamaño de letra")},leadingIcon={Icon(Icons.Default.Palette,null)},onClick={onDismiss();onAppearance()})
         DropdownMenuItem(text={Text(if(barPinned) "Esconder la barra de pestañas" else "Dejar la barra de pestañas siempre visible")},
             leadingIcon={Icon(Icons.Default.ViewDay,null)},onClick={onDismiss();onPinBar(!barPinned)})
         onAssistantSettings?.let { open -> DropdownMenuItem(text={Text("Cerebro y modelo del agente")},leadingIcon={Icon(Icons.Default.Tune,null)},onClick={onDismiss();open()}) }

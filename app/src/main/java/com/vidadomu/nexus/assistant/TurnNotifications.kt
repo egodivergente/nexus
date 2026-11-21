@@ -66,7 +66,7 @@ internal object TurnNotifications {
         val notification = NotificationCompat.Builder(app, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(if (failed) "El turno falló" else "Respuesta lista")
-            .setContentText(title)
+            .setContentText(oneLine(title))
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
@@ -77,6 +77,14 @@ internal object TurnNotifications {
     }
 
     private fun tag(conversationId: String) = "turn:$conversationId"
+
+    /** La conversación está a la vista: su aviso ya no dice nada nuevo y se retira. */
+    fun seen(context: Context, conversationId: String) {
+        runCatching { context.applicationContext.getSystemService(NotificationManager::class.java)?.cancel(tag(conversationId), 1) }
+    }
+
+    /** El título sale del primer mensaje, que puede traer saltos de línea: en el aviso va en una sola. */
+    fun oneLine(text: String): String = text.replace(Regex("\\s+"), " ").trim()
 
     private fun openIntent(context: Context, conversationId: String, projectId: String?) = Intent(context, MainActivity::class.java).apply {
         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
