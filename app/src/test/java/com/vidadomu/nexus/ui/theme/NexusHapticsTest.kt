@@ -42,10 +42,35 @@ class NexusHapticsTest {
 
     @Test
     fun confirmationsUseConfirmFromApi30AndKeyboardTapBefore() {
-        listOf(NexusHapticEvent.TOGGLE_DECISIVE, NexusHapticEvent.CANCEL_CONFIRMED, NexusHapticEvent.CONFIRMATION).forEach { event ->
+        listOf(NexusHapticEvent.TOGGLE_DECISIVE, NexusHapticEvent.CONFIRMATION).forEach { event ->
             assertEquals(HapticFeedbackConstants.KEYBOARD_TAP, NexusHapticPolicy.feedbackConstant(event, 29))
             assertEquals(HapticFeedbackConstants.CONFIRM, NexusHapticPolicy.feedbackConstant(event, 30))
         }
+    }
+
+    @Test
+    fun cancellingNeverFeelsLikeConfirming() {
+        listOf(26, 27, 29, 30, 33, 34, 35, 36).forEach { sdk ->
+            val cancel = NexusHapticPolicy.feedbackConstant(NexusHapticEvent.CANCEL_CONFIRMED, sdk)
+            assertNotEquals(NexusHapticPolicy.feedbackConstant(NexusHapticEvent.CONFIRMATION, sdk), cancel)
+            assertNotEquals(HapticFeedbackConstants.REJECT, cancel)
+        }
+        assertEquals(HapticFeedbackConstants.TOGGLE_OFF, NexusHapticPolicy.feedbackConstant(NexusHapticEvent.CANCEL_CONFIRMED, 34))
+        assertEquals(HapticFeedbackConstants.VIRTUAL_KEY_RELEASE, NexusHapticPolicy.feedbackConstant(NexusHapticEvent.CANCEL_CONFIRMED, 30))
+    }
+
+    @Test
+    fun throttlingIsSharedByEveryHapticsInstance() {
+        NexusHapticThrottle.reset()
+        // DragHaptics builds a new NexusHaptics for each frame: the spacing must hold across instances.
+        assertTrue(NexusHapticThrottle.allow(NexusHapticEvent.GESTURE_TICK, 1_000))
+        assertFalse(NexusHapticThrottle.allow(NexusHapticEvent.GESTURE_TICK, 1_030))
+        assertTrue(NexusHapticThrottle.allow(NexusHapticEvent.GESTURE_TICK, 1_080))
+        // Each event keeps its own clock, and discrete actions are never dropped.
+        assertTrue(NexusHapticThrottle.allow(NexusHapticEvent.SNAP, 1_081))
+        assertTrue(NexusHapticThrottle.allow(NexusHapticEvent.CONFIRMATION, 1_082))
+        assertTrue(NexusHapticThrottle.allow(NexusHapticEvent.CONFIRMATION, 1_083))
+        NexusHapticThrottle.reset()
     }
 
     @Test

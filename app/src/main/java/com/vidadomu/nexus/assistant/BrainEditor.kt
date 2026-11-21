@@ -339,9 +339,10 @@ internal fun BrainEditorDialog(initial: BrainProfile?, store: BrainStore, onClos
             }
         }
     }
+    val deleteHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false },
         title = { Text("¿Eliminar «${initial?.name.orEmpty()}»?") },
         text = { Text("Se borra el proveedor y su clave de este teléfono. Los demás no se tocan.") },
-        confirmButton = { TextButton(onClick = { confirmDelete = false; initial?.let { store.delete(it.id) }; onClose(null) }) { Text("Eliminar") } },
+        confirmButton = { TextButton(onClick = { confirmDelete = false; initial?.let { store.delete(it.id) }; deleteHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CANCEL_CONFIRMED); onClose(null) }) { Text("Eliminar") } },
         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } })
 }

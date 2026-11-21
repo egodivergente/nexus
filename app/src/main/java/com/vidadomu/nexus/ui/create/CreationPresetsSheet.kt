@@ -64,10 +64,11 @@ import androidx.compose.ui.unit.dp
             item {TextButton(onClick={vm.restoreModelDefaults();onDismiss()}) {Text("Restaurar valores del modelo")}}
         }
     }
+    val deleteHaptics=com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     deleting?.let {target->
         AlertDialog(onDismissRequest={deleting=null},title={Text("¿Eliminar «${target.name}»?")},
             text={Text("Solo se borra este ajuste guardado; el modelo y tus creaciones no cambian.")},
-            confirmButton={Button(onClick={prefs.removePreset(model,target.name,modality);entries=prefs.presets(model,modality);defaultName=prefs.defaultPresetName(model,modality);deleting=null}) {Text("Eliminar")}},
+            confirmButton={Button(onClick={deleteHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CANCEL_CONFIRMED);prefs.removePreset(model,target.name,modality);entries=prefs.presets(model,modality);defaultName=prefs.defaultPresetName(model,modality);deleting=null}) {Text("Eliminar")}},
             dismissButton={TextButton(onClick={deleting=null}) {Text("Cancelar")}})
     }
 }

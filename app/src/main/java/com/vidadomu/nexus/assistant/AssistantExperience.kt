@@ -245,6 +245,7 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
     val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val limits by AssistantRuntime.get(app).settings.limitsState.collectAsState()
     val currencyState by app.currencyManager.state.collectAsState()
+    val batchHaptics = rememberNexusHaptics()
     Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(Modifier.fillMaxWidth().padding(horizontal = NexusTokens.space12, vertical = NexusTokens.space4), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -255,7 +256,7 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
                     style = MaterialTheme.typography.labelSmall)
             }
             val enabled=!ui.thinking && ui.plans.values.none {it.busy} && !blockedByDraft
-            FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar los ${minOf(pending.size,limits.maximum(limits.maxGenerationsPerBatch))}")}
+            FilledTonalButton(onClick={batchHaptics.perform(NexusHapticEvent.CONFIRMATION);onGenerate()},enabled=enabled,shape=NexusTokens.field) {Text("Generar los ${minOf(pending.size,limits.maximum(limits.maxGenerationsPerBatch))}")}
         }
     }
 }
@@ -265,6 +266,7 @@ internal fun PendingGenerations(ui: AssistantUiState, blockedByDraft:Boolean=fal
 internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: () -> Unit,
     onAttach: (List<android.net.Uri>) -> Unit, onDiscard: () -> Unit, onToggleBatch: () -> Unit, assistantBusy: Boolean, details: @Composable () -> Unit) {
     val picker=rememberProjectMediaPicker(onAttach)
+    val cardHaptics = rememberNexusHaptics()
     var wall by remember { mutableStateOf(false) }
     var stageIndex by remember { mutableStateOf<Int?>(null) }
     val results = remember(outputs, p.jobId, p.plan.modality) { outputs.mapIndexed { index, uri ->
@@ -278,7 +280,7 @@ internal fun CompactGeneration(p: PlanUi, outputs: List<String>, onOpenOutput: (
                     Icon(Icons.Default.AttachFile, null, Modifier.size(16.dp))
                     Text(if(p.plan.media.isEmpty()) "Adjuntar referencias" else "Cambiar referencias · ${p.plan.media.size}")
                 }
-                TextButton(onClick = onDiscard, enabled = !p.busy && !assistantBusy) { Text("Descartar") }
+                TextButton(onClick = { cardHaptics.perform(NexusHapticEvent.CANCEL_CONFIRMED); onDiscard() }, enabled = !p.busy && !assistantBusy) { Text("Descartar") }
             }
         }
         if(p.busy || p.jobStatus in listOf("PENDING", "PROCESSING")) LinearProgressIndicator(Modifier.fillMaxWidth())

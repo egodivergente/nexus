@@ -39,8 +39,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -92,7 +90,6 @@ internal fun StudioPromptField(value: String, onValueChange: (String) -> Unit,
             bringPromptIntoView.bringIntoView()
         }
     }
-    val haptic = LocalHapticFeedback.current
     val feedback = rememberNexusHaptics()
     val clipboard = LocalClipboardManager.current
     var cleared by rememberSaveable { mutableStateOf<String?>(null) }
@@ -177,7 +174,6 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
     val interactions = remember { MutableInteractionSource() }
     val pressed by interactions.collectIsPressedAsState()
     val scale by animateFloatAsState(if(pressed) .98f else 1f, spring(dampingRatio = 0.72f, stiffness = 560f), label = "Generate press")
-    val haptic = rememberNexusHaptics()
     val scheme = MaterialTheme.colorScheme
     val visuals = LocalNexusVisuals.current
     val busyInk = visuals.onProcessing
@@ -190,7 +186,8 @@ internal fun StudioGenerateButton(cost: String, enabled: Boolean, busy: Boolean,
                 else Modifier
             )
     ) {
-        Button(onClick = { haptic.perform(NexusHapticEvent.SELECTION); onClick() },
+        // No haptic here: only the caller knows whether the press sent, asked about the cost or was refused.
+        Button(onClick = onClick,
             enabled = enabled && !busy, interactionSource = interactions,
             modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = NexusTokens.action,
             border = if (enabled && !busy) studioSpecularBorder(accentTint = scheme.onPrimary.copy(alpha = 0.30f)) else null,

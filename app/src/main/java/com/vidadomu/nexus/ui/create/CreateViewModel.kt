@@ -1055,34 +1055,34 @@ class CreateViewModel(application: Application) : AndroidViewModel(application) 
     private val _pendingCostAcceptance = MutableStateFlow<GenerationCostQuote?>(null)
     val pendingCostAcceptance: StateFlow<GenerationCostQuote?> = _pendingCostAcceptance.asStateFlow()
 
-    fun requestGeneration(quote: GenerationCostQuote, onSuccess: (String) -> Unit) { forgetModelSwitch();
+    fun requestGeneration(quote: GenerationCostQuote, onSuccess: (String) -> Unit): GenerationRequestOutcome { forgetModelSwitch();
         _pendingCostAcceptance.value = null
-        if(comparison.sending) return
+        if(comparison.sending) return GenerationRequestOutcome.IGNORED
         val state = _uiState.value
-        generationBlocker(state)?.let { message -> _uiState.update { it.copy(errorMessage = message) }; return }
+        generationBlocker(state)?.let { message -> _uiState.update { it.copy(errorMessage = message) }; return GenerationRequestOutcome.REFUSED }
         val model=state.selectedModel
         val rules=com.vidadomu.nexus.settings.RuntimePreferences.get(app)
         val threshold=rules.value("generation.costWarning",com.vidadomu.nexus.agent.core.config.RuleScope(provider=model?.providerId,model=model?.providerModelId ?: model?.id,workflow=model?.inputMode?.name)).toDouble()
         if(threshold>0 && quote.known && quote.usd?.let {it*app.currencyManager.state.value.rate>=threshold}==true) {
-            _pendingCostAcceptance.value=quote.copy(details="Tu umbral de gasto requiere confirmación. "+quote.details);return
+            _pendingCostAcceptance.value=quote.copy(details="Tu umbral de gasto requiere confirmación. "+quote.details);return GenerationRequestOutcome.ASKS_ACCEPTANCE
         }
-        when(val gate = GenerationCostGuard.onGenerate(quote, generationFingerprint(state), com.vidadomu.nexus.BuildConfig.OFFLINE_QA)) {
-            CostGate.Proceed -> launchGeneration(state, onSuccess, quote.usd.takeIf {quote.known})
-            is CostGate.AskAcceptance -> _pendingCostAcceptance.value = gate.quote
-            is CostGate.Reject -> _uiState.update { it.copy(errorMessage = gate.message) }
+        return when(val gate = GenerationCostGuard.onGenerate(quote, generationFingerprint(state), com.vidadomu.nexus.BuildConfig.OFFLINE_QA)) {
+            CostGate.Proceed -> { launchGeneration(state, onSuccess, quote.usd.takeIf {quote.known}); GenerationRequestOutcome.SENT }
+            is CostGate.AskAcceptance -> { _pendingCostAcceptance.value = gate.quote; GenerationRequestOutcome.ASKS_ACCEPTANCE }
+            is CostGate.Reject -> { _uiState.update { it.copy(errorMessage = gate.message) }; GenerationRequestOutcome.REFUSED }
         }
     }
 
-    fun acceptUnknownCost(onSuccess: (String) -> Unit) { forgetModelSwitch();
-        val pending = _pendingCostAcceptance.value ?: return
+    fun acceptUnknownCost(onSuccess: (String) -> Unit): GenerationRequestOutcome { forgetModelSwitch();
+        val pending = _pendingCostAcceptance.value ?: return GenerationRequestOutcome.IGNORED
         _pendingCostAcceptance.value = null
-        if(comparison.sending) return
+        if(comparison.sending) return GenerationRequestOutcome.IGNORED
         val state = _uiState.value
-        generationBlocker(state)?.let { message -> _uiState.update { it.copy(errorMessage = message) }; return }
-        when(val gate = GenerationCostGuard.onAccept(pending, generationFingerprint(state), com.vidadomu.nexus.BuildConfig.OFFLINE_QA)) {
-            CostGate.Proceed -> launchGeneration(state, onSuccess, pending.usd.takeIf {pending.known})
-            is CostGate.Reject -> _uiState.update { it.copy(errorMessage = gate.message) }
-            is CostGate.AskAcceptance -> Unit
+        generationBlocker(state)?.let { message -> _uiState.update { it.copy(errorMessage = message) }; return GenerationRequestOutcome.REFUSED }
+        return when(val gate = GenerationCostGuard.onAccept(pending, generationFingerprint(state), com.vidadomu.nexus.BuildConfig.OFFLINE_QA)) {
+            CostGate.Proceed -> { launchGeneration(state, onSuccess, pending.usd.takeIf {pending.known}); GenerationRequestOutcome.SENT }
+            is CostGate.Reject -> { _uiState.update { it.copy(errorMessage = gate.message) }; GenerationRequestOutcome.REFUSED }
+            is CostGate.AskAcceptance -> GenerationRequestOutcome.IGNORED
         }
     }
 

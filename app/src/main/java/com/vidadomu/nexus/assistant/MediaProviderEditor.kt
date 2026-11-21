@@ -199,9 +199,10 @@ internal fun MediaProviderEditorDialog(initial: MediaProviderConfig?, store: Cus
             models = if (old == null) models + saved else models.map { if (it.id == old.id) saved else it }
             editingModel = null; addingModel = false
         })
+    val deleteHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false },
         title = { Text("¿Eliminar «${initial?.name.orEmpty()}»?") }, text = { Text("Se borra el proveedor, sus modelos y su clave de este teléfono. Lo ya generado se conserva.") },
-        confirmButton = { TextButton(onClick = { confirmDelete = false; initial?.let { store.delete(it.id) }; onClose(null) }) { Text("Eliminar") } },
+        confirmButton = { TextButton(onClick = { confirmDelete = false; initial?.let { store.delete(it.id) }; deleteHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CANCEL_CONFIRMED); onClose(null) }) { Text("Eliminar") } },
         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } })
 }
 

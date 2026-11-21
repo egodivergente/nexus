@@ -33,8 +33,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -75,7 +73,7 @@ fun CreateScreen(
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
     val currencyManager = app.currencyManager
-    val haptic = LocalHapticFeedback.current
+    val haptic = rememberNexusHaptics()
     val configuration = LocalConfiguration.current
     val horizontalActions = configuration.screenWidthDp >= 600
     val compactTyping = WindowInsets.isImeVisible
@@ -117,9 +115,10 @@ fun CreateScreen(
     var pendingBatch by remember { mutableStateOf<Pair<Int, GenerationFingerprint>?>(null) }
     val quantity=canvasQuantity(countParam,state.parameters,batchCount)
     val repeatedBatch = quantity.repeated && state.selectedModality in setOf(Modality.IMAGE,Modality.VIDEO)
+    // The press is felt for what it did: sent, asked about the cost, or refused.
     val generateAction: () -> Unit = {
-        if(repeatedBatch) pendingBatch = batchCount to generationFingerprint(state)
-        else viewModel.requestGeneration(costQuote, onNavigateToOutput)
+        if(repeatedBatch) { haptic.perform(NexusHapticEvent.SELECTION); pendingBatch = batchCount to generationFingerprint(state) }
+        else viewModel.requestGeneration(costQuote, onNavigateToOutput).hapticEvent?.let { haptic.perform(it) }
     }
     val pendingCost by viewModel.pendingCostAcceptance.collectAsState()
 
@@ -404,7 +403,7 @@ fun CreateScreen(
         }
     }
     if(showInspiration) CanvasSheet("Inspiración",{showInspiration=false}) {
-        CreativePresetsRow(state.prompt) { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove);viewModel.updatePrompt(it) }
+        CreativePresetsRow(state.prompt) { haptic.perform(NexusHapticEvent.SELECTION);viewModel.updatePrompt(it) }
     }
     if(showPriceDetails) CanvasSheet("Coste estimado",{showPriceDetails=false}) {
         Text(estimate.amount,style=MaterialTheme.typography.titleMedium.tabularMoney())
@@ -438,8 +437,8 @@ fun CreateScreen(
         AlertDialog(onDismissRequest=viewModel::dismissCostAcceptance, title={Text(if(quote.known) "Confirmar gasto" else "Importe sin confirmar")},
             text={Text("Importe mostrado: ${quote.amount}.\n"+quote.details.ifBlank {"No hay una tarifa confirmada para esta configuración. No equivale a coste cero."}+
                 "\nSi generas, el proveedor puede cobrar según su tarifa real. Cualquier cambio en el modelo, el prompt, las opciones o los archivos anula esta aceptación.")},
-            confirmButton={TextButton(onClick={viewModel.acceptUnknownCost(onNavigateToOutput)}) {Text("Aceptar y generar")}},
-            dismissButton={TextButton(onClick=viewModel::dismissCostAcceptance) {Text("Cancelar")}})
+            confirmButton={TextButton(onClick={viewModel.acceptUnknownCost(onNavigateToOutput).hapticEvent?.let { haptic.perform(it) }}) {Text("Aceptar y generar")}},
+            dismissButton={TextButton(onClick={haptic.perform(NexusHapticEvent.CANCEL_CONFIRMED);viewModel.dismissCostAcceptance()}) {Text("Cancelar")}})
     }
 
     pendingBatch?.let { (count, fingerprint) ->
@@ -455,6 +454,8 @@ fun CreateScreen(
             })},
             confirmButton={TextButton(enabled=!offline, onClick={
                 pendingBatch=null
+                val sends=!com.vidadomu.nexus.BuildConfig.OFFLINE_QA && fingerprint == generationFingerprint(state)
+                haptic.perform(if(sends) NexusHapticEvent.CONFIRMATION else NexusHapticEvent.ERROR)
                 when {
                     com.vidadomu.nexus.BuildConfig.OFFLINE_QA -> batchScope.launch { batchSnackbar.showSnackbar(GenerationCostGuard.OFFLINE_MESSAGE) }
                     fingerprint != generationFingerprint(state) -> batchScope.launch { batchSnackbar.showSnackbar(GenerationCostGuard.CHANGED_AFTER_ACCEPTANCE_MESSAGE) }
@@ -463,7 +464,7 @@ fun CreateScreen(
                     }
                 }
             }) {Text("Generar $count")}},
-            dismissButton={TextButton(onClick={pendingBatch=null}) {Text("Cancelar")}})
+            dismissButton={TextButton(onClick={haptic.perform(NexusHapticEvent.CANCEL_CONFIRMED);pendingBatch=null}) {Text("Cancelar")}})
     }
 
     // Modal Bottom Sheet para Inspector de Solicitud (DEBUG)

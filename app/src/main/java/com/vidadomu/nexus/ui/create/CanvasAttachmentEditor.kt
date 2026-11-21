@@ -29,8 +29,6 @@ import com.vidadomu.nexus.core.model.AttachedMedia
 import com.vidadomu.nexus.ui.components.StudioRemoveMediaButton
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.stylusHover
-import com.vidadomu.nexus.ui.theme.rememberNexusHaptics
-import com.vidadomu.nexus.ui.theme.NexusHapticEvent
 
 /** One input surface per declared field; sources live in a sheet, never as duplicate rows of buttons. */
 @OptIn(ExperimentalMaterial3Api::class,ExperimentalLayoutApi::class)
@@ -68,7 +66,6 @@ internal fun CanvasAttachmentEditor(
         else if (remaining > 1) multiple.launch(PickVisualMediaRequest(type))
         else single.launch(PickVisualMediaRequest(type))
     }
-    val haptics = rememberNexusHaptics()
     val canImport = enabled && remaining > 0
     val colors = MaterialTheme.colorScheme
     val icon = when {
@@ -168,7 +165,7 @@ internal fun CanvasAttachmentEditor(
         } else if(frameColumn && selected.size==1) {
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 CanvasAttachmentTile(selected.single(),field.label,enabled,thumbnailSize=maxWidth.coerceAtMost(168.dp),showLabel=false) {
-                    onRemove(selected.single().id);haptics.perform(NexusHapticEvent.SELECTION)
+                    onRemove(selected.single().id)
                 }
             }
         } else if(selected.size>1) {
@@ -179,7 +176,7 @@ internal fun CanvasAttachmentEditor(
                     CanvasAttachmentTile(item,"${field.label} ${index+1}",enabled,thumbnailSize=88.dp,showLabel=false,position=index+1,
                         onMoveBefore=onReorder?.takeIf {index>0}?.let {move -> {move(item.id,-1)}},
                         onMoveAfter=onReorder?.takeIf {index<selected.lastIndex}?.let {move -> {move(item.id,1)}}) {
-                        onRemove(item.id);haptics.perform(NexusHapticEvent.SELECTION)
+                        onRemove(item.id)
                     }
                 }}
             }
@@ -188,7 +185,7 @@ internal fun CanvasAttachmentEditor(
             }
         } else selected.singleOrNull()?.let {item ->
             CanvasAttachmentTile(item,field.label,enabled,thumbnailSize=104.dp) {
-                onRemove(item.id);haptics.perform(NexusHapticEvent.SELECTION)
+                onRemove(item.id)
             }
         }
         }

@@ -357,7 +357,7 @@ internal fun ZoomableImageViewer(imageUrl: String, localUri: String? = null, onN
 internal fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)? = null) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val haptic = rememberNexusHaptics()
     var capturingFrame by remember(videoUrl) { mutableStateOf(false) }
     var playbackError by remember(videoUrl) {mutableStateOf<String?>(null)}
     val exoPlayer = remember(videoUrl) {
@@ -405,7 +405,7 @@ internal fun NativeVideoPlayer(videoUrl: String, onCaptureFrame: ((Uri) -> Unit)
                     val posMs = exoPlayer.currentPosition.coerceAtLeast(0L)
                     exoPlayer.pause()
                     capturingFrame = true
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    haptic.perform(NexusHapticEvent.CONFIRMATION)
                     scope.launch(kotlinx.coroutines.Dispatchers.Main.immediate) {
                         val captured = try { captureVideoFrameToLocalUri(context, videoUrl, posMs) }
                             finally { capturingFrame = false }

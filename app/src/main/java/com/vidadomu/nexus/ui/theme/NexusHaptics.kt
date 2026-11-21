@@ -61,9 +61,15 @@ object NexusHapticPolicy {
         NexusHapticEvent.SELECTION ->
             if (sdkInt >= 34) HapticFeedbackConstants.SEGMENT_TICK else HapticFeedbackConstants.CLOCK_TICK
         NexusHapticEvent.TOGGLE_DECISIVE,
-        NexusHapticEvent.CANCEL_CONFIRMED,
         NexusHapticEvent.CONFIRMATION ->
             if (sdkInt >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.KEYBOARD_TAP
+        // Cancelling, stopping or deleting must not feel like a confirmation (CONFIRM is a full click): from API 34
+        // a low, soft tick that reads as «off»; before, a plain tick.
+        NexusHapticEvent.CANCEL_CONFIRMED -> when {
+            sdkInt >= 34 -> HapticFeedbackConstants.TOGGLE_OFF
+            sdkInt >= 27 -> HapticFeedbackConstants.VIRTUAL_KEY_RELEASE
+            else -> HapticFeedbackConstants.CLOCK_TICK
+        }
         NexusHapticEvent.ERROR ->
             if (sdkInt >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
         NexusHapticEvent.GESTURE_START ->
@@ -82,17 +88,31 @@ object NexusHapticPolicy {
     internal fun allowsFeedback(appEnabled: Boolean, viewEnabled: Boolean) = appEnabled && viewEnabled
 }
 
-@Stable
-class NexusHaptics internal constructor(private val view: View) {
+/**
+ * One clock for the whole app. Drag helpers and gesture callbacks build a short-lived [NexusHaptics] per call, so a
+ * memory kept per instance never throttled them: a fast drag could buzz on every frame.
+ */
+internal object NexusHapticThrottle {
     private val last = java.util.EnumMap<NexusHapticEvent, Long>(NexusHapticEvent::class.java)
 
+    @Synchronized
+    fun allow(event: NexusHapticEvent, nowMs: Long): Boolean {
+        if (NexusHapticPolicy.throttled(event, nowMs, last[event])) return false
+        last[event] = nowMs
+        return true
+    }
+
+    @Synchronized
+    internal fun reset() = last.clear()
+}
+
+@Stable
+class NexusHaptics internal constructor(private val view: View) {
     /** Uses no flags, so the system "touch feedback" setting is honoured. Returns whether a tick was requested. */
     fun perform(event: NexusHapticEvent, changed: Boolean = true, accepted: Boolean = true): Boolean {
         if (!isEnabled()) return false
         if (!NexusHapticPolicy.shouldEmit(event, changed, accepted)) return false
-        val now = android.os.SystemClock.uptimeMillis()
-        if (NexusHapticPolicy.throttled(event, now, last[event])) return false
-        last[event] = now
+        if (!NexusHapticThrottle.allow(event, android.os.SystemClock.uptimeMillis())) return false
         return view.performHapticFeedback(NexusHapticPolicy.feedbackConstant(event, Build.VERSION.SDK_INT))
     }
 
@@ -101,6 +121,21 @@ class NexusHaptics internal constructor(private val view: View) {
         view.isHapticFeedbackEnabled
     )
 }
+
+/**
+ * Android's own «touch feedback» switch. When it is off, no app vibrates on touch, whatever Nexus says, so
+ * Settings must say so instead of showing a switch that seems to do nothing. Re-read on every resume.
+ */
+@Composable
+fun rememberSystemTouchFeedbackEnabled(): Boolean {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val resumed = rememberLifecycleResumed()
+    return remember(context, resumed) { readSystemTouchFeedback(context) }
+}
+
+internal fun readSystemTouchFeedback(context: android.content.Context): Boolean = runCatching {
+    android.provider.Settings.System.getInt(context.contentResolver, android.provider.Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0
+}.getOrDefault(true)
 
 @Composable
 fun rememberNexusHaptics(): NexusHaptics {

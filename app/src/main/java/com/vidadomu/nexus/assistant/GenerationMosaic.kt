@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -158,7 +157,7 @@ private fun MosaicCell(
 ) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
-    val haptic = LocalHapticFeedback.current
+    val haptic = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     val video = tile.modality == "VIDEO"
     val state = when {
         tile.uri != null -> "Completado"
@@ -172,7 +171,7 @@ private fun MosaicCell(
             .combinedClickable(
                 onClick = { if (tile.uri != null) onOpen(tile) else onExpand() },
                 onLongClick = {
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.GESTURE_START)
                     onExpand()
                 },
                 onLongClickLabel = "Ver detalles de ${tile.model}",

@@ -706,7 +706,7 @@ private fun CutEditor(vm: CutEditorViewModel, chat: CutChatViewModel, onBack: ()
                             DockTool(Icons.AutoMirrored.Filled.AlignHorizontalRight, "Final aquí", haptics, enabled = playheadInside, event = NexusHapticEvent.CONFIRMATION) { vm.trimToPlayhead(one.id, Edge.TAIL) }
                         }
                         // Eliminar va entre lo primero: se usa mucho y no debe quedar fuera de la pantalla.
-                        DockTool(Icons.Default.Delete, "Eliminar", haptics, event = NexusHapticEvent.CONFIRMATION, destructive = true) { vm.deleteSelection() }
+                        DockTool(Icons.Default.Delete, "Eliminar", haptics, event = NexusHapticEvent.CANCEL_CONFIRMED, destructive = true) { vm.deleteSelection() }
                         if (one != null) {
                             if (one.kind != ClipKind.TEXT) DockTool(Icons.Default.Speed, "Velocidad", haptics) { dialog = CutDialog.Speed(one) }
                             if (one.kind == ClipKind.TEXT) DockTool(Icons.Default.TextFields, "Editar", haptics) { dialog = CutDialog.Title(one) }

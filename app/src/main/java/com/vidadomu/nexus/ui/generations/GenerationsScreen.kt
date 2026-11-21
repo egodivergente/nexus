@@ -263,6 +263,7 @@ fun GenerationsScreen(onNavigateToOutput:(String)->Unit,onPrepareAgain:(Generati
                                 if(isTerminal && job.outputs.isEmpty()) DropdownMenuItem(text={Text("Eliminar del historial")},onClick={close();
                                     scope.launch {
                                         app.generationRepository.deleteJob(job.id)
+                                        haptics.perform(NexusHapticEvent.CANCEL_CONFIRMED)
                                         android.widget.Toast.makeText(context, "Trabajo eliminado del historial", android.widget.Toast.LENGTH_SHORT).show()
                                     }
                                 })

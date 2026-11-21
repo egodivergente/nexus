@@ -106,8 +106,9 @@ internal fun ProviderKeyRow(maskedKey: String?, onChange: () -> Unit, onClear: (
     // Solo se recuerda si el diálogo está abierto: la clave no se copia a memoria para un posible «deshacer».
     // Con clave por proveedor y clave enmascarada, una fila reutilizada para otro destino descarta la confirmación pendiente.
     var confirmClear by androidx.compose.runtime.saveable.rememberSaveable(providerName, maskedKey) { androidx.compose.runtime.mutableStateOf(false) }
+    val clearHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     if (confirmClear && maskedKey != null && onClear != null) {
-        ClearProviderKeyDialog(providerName, onConfirm = { confirmClear = false; onClear() }, onDismiss = { confirmClear = false })
+        ClearProviderKeyDialog(providerName, onConfirm = { confirmClear = false; clearHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CANCEL_CONFIRMED); onClear() }, onDismiss = { confirmClear = false })
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Default.Lock, null, Modifier.size(16.dp), tint = TextSecondary)

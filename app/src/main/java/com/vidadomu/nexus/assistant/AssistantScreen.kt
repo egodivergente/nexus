@@ -687,7 +687,7 @@ private fun AssistantScreenContent(
             }
             Box(Modifier.fillMaxWidth().onFocusChanged { composerFocused = it.hasFocus }) {
             InputBar(ui, input, onInput = { input = it; draftPrefs.edit().putString(draftKey, it.text).remove("text").apply() }, onAttach = { picker.launchDevice(arrayOf("image/*", "video/*", "audio/*") + AgentDocuments.types, maxSelection = com.vidadomu.nexus.settings.RuntimePreferences.get(context).int("chat.attachmentCount").takeIf {it>0} ?: Int.MAX_VALUE) },
-                onSend = { if(sent(vm.sendWithBoards(input.text))) {haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = vm::stop, onRemove = vm::removeAttachment, onReply = { sent(vm.send(it)) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
+                onSend = { if(sent(vm.sendWithBoards(input.text))) {haptic.perform(NexusHapticEvent.CONFIRMATION);draftPrefs.edit().remove(draftKey).remove("text").apply(); input = androidx.compose.ui.text.input.TextFieldValue("")} }, onStop = { vm.stop(); haptic.perform(NexusHapticEvent.CANCEL_CONFIRMED) }, onRemove = vm::removeAttachment, onReply = { sent(vm.send(it)) }, onCamera = takePhoto, onAudio=vm::attachAudio,onReorder=vm::reorderAttachment,
                 onShowLibrary = { openLibrary() }, onHideLibrary = { libraryExpanded = false }, libraryExpanded = libraryExpanded,
                 // Mode and model sit in the composer, wired to the same settings as before.
                 reasoningControl = { ReasoningPicker(ui, vm); BridgeModelPicker(ui, vm) { showSettings = true } },
@@ -1518,6 +1518,7 @@ internal fun PlanCardView(
     onDiagnoseFailure:()->Unit={},
     onOpenHistory:()->Unit={},
 ) {
+    val planHaptics=rememberNexusHaptics()
     val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
     val currency=app.currencyManager
     val currencyState by currency.state.collectAsState()
@@ -1551,8 +1552,8 @@ internal fun PlanCardView(
                 }
                 if(editable && !retired) {
                     val enabled=p.executable && !p.busy && !dirty && !assistantBusy
-                    if(primaryAction) Button(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar")}
-                    else FilledTonalButton(onClick=onGenerate,enabled=enabled,shape=NexusTokens.field) {Text("Generar")}
+                    if(primaryAction) Button(onClick={planHaptics.perform(NexusHapticEvent.CONFIRMATION);onGenerate()},enabled=enabled,shape=NexusTokens.field) {Text("Generar")}
+                    else FilledTonalButton(onClick={planHaptics.perform(NexusHapticEvent.CONFIRMATION);onGenerate()},enabled=enabled,shape=NexusTokens.field) {Text("Generar")}
                 }
             }
             if(p.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -1585,12 +1586,12 @@ internal fun PlanCardView(
                 if(p.jobStatus=="COMPLETED") FilledTonalButton(onClick=onOpenOutput) {Text("Ver resultado")}
                 if(p.jobStatus in setOf("FAILED","CANCELLED")) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                     if(p.jobStatus=="FAILED") TextButton(onClick=onDiagnoseFailure,enabled=!assistantBusy) {Text("Analizar fallo",color=TextSecondary)}
-                    TextButton(onClick=onDiscard) {Text("Quitar tarjeta",color=TextSecondary)}
+                    TextButton(onClick={planHaptics.perform(NexusHapticEvent.CANCEL_CONFIRMED);onDiscard()}) {Text("Quitar tarjeta",color=TextSecondary)}
                     TextButton(onClick=onOpenOutput) {Text("Ver detalle",color=TextSecondary)}
                 }
             } else if(p.state!=PlanState.DISCARDED) FlowRow(horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
                 if(!retired) TextButton(onClick=onOpenCanvas,enabled=!p.busy) {Text("Abrir en el Lienzo",color=TextSecondary)}
-                if(showDiscard) TextButton(onClick=onDiscard,enabled=!p.busy) {Text("Descartar",color=TextSecondary)}
+                if(showDiscard) TextButton(onClick={planHaptics.perform(NexusHapticEvent.CANCEL_CONFIRMED);onDiscard()},enabled=!p.busy) {Text("Descartar",color=TextSecondary)}
             }
             TextButton(onClick={expanded=!expanded},colors=ButtonDefaults.textButtonColors(contentColor=TextSecondary)) {
                 Text(if(expanded) "Ocultar detalles" else "Detalles");Icon(if(expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,null)

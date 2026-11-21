@@ -27,10 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -62,7 +60,7 @@ fun LiveRenderPill(
     val context = LocalContext.current
     val app = context.applicationContext as NexusApplication
     val jobs by app.generationRepository.allJobs.collectAsState()
-    val haptic = LocalHapticFeedback.current
+    val haptic = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     val nexusHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
     val conflicts = remember(jobs) { com.vidadomu.nexus.core.model.OutputFiles.conflictingLocalUris(jobs.flatMap { it.outputs }) }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -138,7 +136,7 @@ fun LiveRenderPill(
                 .fillMaxWidth()
                 .padding(horizontal = NexusTokens.screenMargin, vertical = 2.dp)
                 .clickable(role = Role.Button) {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION)
                     onOpenOutput(job.id)
                 }
                 .semantics {
@@ -212,7 +210,7 @@ fun LiveRenderPill(
                     if (onSendToAgent != null && firstOutputId != null) {
                         TextButton(
                             onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CONFIRMATION)
                                 dismissedIds = dismissedIds + job.id
                                 onSendToAgent(job.id, firstOutputId)
                             },

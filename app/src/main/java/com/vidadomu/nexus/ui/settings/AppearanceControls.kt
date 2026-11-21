@@ -48,6 +48,17 @@ import com.vidadomu.nexus.settings.RuntimePreferences
             Text("Respuesta háptica",Modifier.weight(1f),style=MaterialTheme.typography.bodyLarge)
             Switch(checked,onCheckedChange=null)
         }
+        if(checked && !rememberSystemTouchFeedbackEnabled()) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+            Text("La respuesta táctil de Android está desactivada: Nexus no puede vibrar.",Modifier.weight(1f),
+                style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick={
+                val sound=android.content.Intent(android.provider.Settings.ACTION_SOUND_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching {context.startActivity(sound)}.onFailure {
+                    runCatching {context.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))}
+                }
+            },modifier=Modifier.heightIn(min=NexusTokens.minimumTouch)) {Text("Ajustes")}
+        }
         if(!configuration.value("ui.background").toBoolean() || !configuration.value("ui.motion").toBoolean()) Text(
             "Una regla avanzada limita el fondo o sus animaciones.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(configuration.value("ui.photo").isNotBlank()) {

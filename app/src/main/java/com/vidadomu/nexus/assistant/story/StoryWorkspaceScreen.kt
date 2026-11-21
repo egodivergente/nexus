@@ -781,7 +781,8 @@ private fun StoryEditorDialog(
             }
         }
     }
-    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Eliminar ${if (isShot) "plano" else if (isScene) "escena" else "bloque"}") }, text = { Text("El material se conserva en la biblioteca. Puedes deshacer este cambio.") }, confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete?.invoke() }) { Text("Eliminar") } }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } })
+    val deleteHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
+    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Eliminar ${if (isShot) "plano" else if (isScene) "escena" else "bloque"}") }, text = { Text("El material se conserva en la biblioteca. Puedes deshacer este cambio.") }, confirmButton = { TextButton(onClick = { confirmDelete = false; deleteHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CANCEL_CONFIRMED); onDelete?.invoke() }) { Text("Eliminar") } }, dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancelar") } })
 }
 
 @Composable

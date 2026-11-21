@@ -336,7 +336,7 @@ fun StudioRemoveMediaButton(onClick: () -> Unit, modifier: Modifier = Modifier,
     Box(modifier.size(NexusTokens.minimumTouch)
         .semantics { contentDescription = description }
         .clickable(role = Role.Button) {
-            haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.SELECTION); onClick()
+            haptic.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CANCEL_CONFIRMED); onClick()
         }) {
         Box(Modifier.align(Alignment.TopEnd).padding(NexusTokens.space4).size(20.dp)
             .clip(CircleShape).background(Color.Black.copy(alpha = .50f)), contentAlignment = Alignment.Center) {

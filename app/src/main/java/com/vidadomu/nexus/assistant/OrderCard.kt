@@ -167,14 +167,15 @@ internal fun OrderCard(
             }
             val menuBox: @Composable () -> Unit = {
                 Box {
+                    val menuHaptics = com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
                     IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.MoreVert, "Más opciones", tint = TextSecondary) }
                     DropdownMenu(menu, { menu = false }) {
                         DropdownMenuItem({ Text(if (expanded) "Ocultar detalles" else "Detalles") }, { menu = false; expanded = !expanded })
                         if (order.status.editable && !retired) DropdownMenuItem({ Text("Abrir en el Lienzo") }, { menu = false; onOpenCanvas() }, enabled = !p.busy)
-                        if (order.status.editable) DropdownMenuItem({ Text("Descartar") }, { menu = false; onDiscard() }, enabled = !p.busy && !assistantBusy)
+                        if (order.status.editable) DropdownMenuItem({ Text("Descartar") }, { menu = false; menuHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CANCEL_CONFIRMED); onDiscard() }, enabled = !p.busy && !assistantBusy)
                         if (order.status == OrderStatus.FAILED) {
                             if (!retired) DropdownMenuItem({ Text("Revisar reintento") }, { menu = false; onPrepareRetry() }, enabled = !p.busy && !assistantBusy)
-                            DropdownMenuItem({ Text("Eliminar tarjeta · conservar medios") }, { menu = false; onRemove() }, enabled = !p.busy && !assistantBusy)
+                            DropdownMenuItem({ Text("Eliminar tarjeta · conservar medios") }, { menu = false; menuHaptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CANCEL_CONFIRMED); onRemove() }, enabled = !p.busy && !assistantBusy)
                         }
                         DropdownMenuItem({ Text("Abrir Historial") }, { menu = false; onOpenHistory() })
                     }
