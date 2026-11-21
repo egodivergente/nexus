@@ -11,7 +11,7 @@ Mejoras tras la auditoría del 20-11, sobre 1.9.191-agent/vc227 (de la vc113 a l
 - Letra: una sola escala de texto con suelo de 11 sp, ajustable en Personalización (o la de Android).
 - Dianas de 48 dp: acciones del mensaje, Generar de la tarjeta, desvincular guion, cabecera de la Biblioteca y asas de recorte de Nexus Cut.
 - Háptica: cancelar y borrar con su propio toque, Generar y Parar se sienten, límite de frecuencia compartido.
-- Tema solo en Personalización > Apariencia; el selector se cierra sin botón Cancelar.
+- Ajustes: el tema se elige en un solo sitio, Personalización > Apariencia (el menú del chat abre esa misma hoja), y la hoja se cierra sin botón Cancelar.
 - Crear: la hoja Avanzado agrupa sus salidas y explica una sola vez cuándo un modelo no admite el valor anterior.
 - Código: `AssistantScreen.kt` partido en seis archivos, el estado del chat fuera del modelo de vista y fuera el código muerto. CI en tres trabajos.
 
