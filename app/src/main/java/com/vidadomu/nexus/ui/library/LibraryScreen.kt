@@ -80,6 +80,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var mounting by remember {mutableStateOf(false)}
     val prefs=remember {context.getSharedPreferences("library_actions_v1",0)}
     var hidden by remember {mutableStateOf(prefs.getStringSet("hidden",emptySet())!!.toSet())}
+    var erased by remember {mutableStateOf(LibraryDeletions.tokens(context))}
     var favorites by remember {mutableStateOf(prefs.getStringSet("favorites",emptySet())!!.toSet())}
     var showHidden by rememberSaveable {mutableStateOf(false)}
     var favoriteOnly by rememberSaveable {mutableStateOf(false)}
@@ -164,9 +165,9 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
         val present=index.assets.filter {!it.libraryDeleted}.map(::libraryOrigin).toSet()
         LibraryOriginFilter.values().filter {it in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED,LibraryOriginFilter.IMPORTED) || it in present}
     }
-    val completed=remember(jobs,filter,query,removed,hidden,favorites,favoriteOnly,showHidden,originFilter,openFolder,folderIds,projectIndex,names) {
+    val completed=remember(jobs,filter,query,removed,hidden,erased,favorites,favoriteOnly,showHidden,originFilter,openFolder,folderIds,projectIndex,names) {
         if(originFilter !in setOf(LibraryOriginFilter.ALL,LibraryOriginFilter.GENERATED)) emptyList()
-        else jobs.map {job -> job.copy(outputs=job.outputs.filter {inScope(projectIndex.projects(job,it)) && it.localUri !in removed && it.url !in removed && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
+        else jobs.map {job -> job.copy(outputs=job.outputs.filter {inScope(projectIndex.projects(job,it)) && it.localUri !in removed && it.url !in removed && OutputFiles.token(it) !in erased && (OutputFiles.token(it) in hidden)==showHidden && (!favoriteOnly || OutputFiles.token(it) in favorites)})}.filter {it.status==GenerationStatus.COMPLETED && it.outputs.isNotEmpty()}
             .filter {filter==null || it.modality==filter}
             .filter {job -> matchesCreationSearch(job,query) || job.outputs.any {names[OutputFiles.token(it)]?.contains(query,true)==true}}.sortedByDescending {it.startedAt}
     }
@@ -184,11 +185,11 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     }
     val localAssetGroups=remember(localAssets) {localAssets.groupBy(::libraryOrigin)}
     // Archivos por carpeta (sin ocultos ni eliminados), para el recuento bajo cada carpeta.
-    val folderCounts=remember(jobs,index,removed,hidden,projectIndex) {
+    val folderCounts=remember(jobs,index,removed,hidden,erased,projectIndex) {
         val counts=mutableMapOf<String,Int>()
         val generatedUris=jobs.flatMap {it.outputs}.flatMap {listOfNotNull(it.url,it.localUri)}.toSet()
         jobs.filter {it.status==GenerationStatus.COMPLETED}.forEach {job -> job.outputs.forEach {o ->
-            if(o.localUri !in removed && o.url !in removed && OutputFiles.token(o) !in hidden)
+            if(o.localUri !in removed && o.url !in removed && OutputFiles.token(o) !in hidden && OutputFiles.token(o) !in erased)
                 projectIndex.projects(job,o).forEach {counts[it]=(counts[it] ?: 0)+1}
         }}
         index.assets.filter {!it.libraryDeleted && it.uri !in generatedUris && "asset:"+it.id !in hidden}
@@ -205,18 +206,19 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     var newFolderFor by remember {mutableStateOf<List<LibraryEntry>?>(null)}
     var creatingFolder by remember {mutableStateOf(false)}
     var deletingFolder by remember {mutableStateOf<String?>(null)}
+    var erasing by remember {mutableStateOf<List<com.vidadomu.nexus.agent.core.assets.DeletionTarget>?>(null)}
     var bulkRename by remember {mutableStateOf<List<LibraryEntry>?>(null)}
     var cropTarget by remember {mutableStateOf<LibraryEntry?>(null)}
     var cropping by remember {mutableStateOf(false)}
     val conflicts=remember(jobs) {OutputFiles.conflictingLocalUris(jobs.flatMap {it.outputs})}
     // Portada de cada carpeta: sus fotos y vídeos más recientes, generados o importados, con copia en el móvil.
     // Se guardan varios por si el primero ya no se puede abrir.
-    val folderPreviews=remember(jobs,index,removed,hidden,projectIndex,conflicts) {
+    val folderPreviews=remember(jobs,index,removed,hidden,erased,projectIndex,conflicts) {
         val candidates=mutableListOf<Triple<String,String,Pair<Long,Boolean>>>()
         val generatedUris=jobs.flatMap {it.outputs}.flatMap {listOfNotNull(it.url,it.localUri)}.toSet()
         jobs.filter {it.status==GenerationStatus.COMPLETED}.forEach {job -> job.outputs.forEach {o ->
             val local=OutputFiles.trustedLocalUri(o,conflicts)
-            if(local!=null && o.type in listOf(Modality.IMAGE,Modality.VIDEO) && o.localUri !in removed && o.url !in removed && OutputFiles.token(o) !in hidden)
+            if(local!=null && o.type in listOf(Modality.IMAGE,Modality.VIDEO) && o.localUri !in removed && o.url !in removed && OutputFiles.token(o) !in hidden && OutputFiles.token(o) !in erased)
                 projectIndex.projects(job,o).forEach {candidates+=Triple(it,local,(job.completedAt ?: job.startedAt) to (o.type==Modality.VIDEO))}
         }}
         index.assets.filter {!it.libraryDeleted && it.projectId!=null && it.uri !in generatedUris && !it.uri.startsWith("http") &&
@@ -309,6 +311,14 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             entry.job.prompt.lineSequence().firstOrNull()?.trim()?.take(80).orEmpty()).filter {it.isNotBlank()}.joinToString(" · ")
     }
     fun message(text:String) {scope.launch {snackbar.showSnackbar(text)}}
+    fun deletionTarget(entry:LibraryEntry)=when(entry) {
+        is LibraryEntry.Local -> com.vidadomu.nexus.agent.core.assets.DeletionTarget(tokenOf(entry),nameOf(entry),setOf(entry.asset.id),setOf(entry.asset.uri))
+        is LibraryEntry.Out -> entry.job.outputs[entry.index].let {o ->
+            com.vidadomu.nexus.agent.core.assets.DeletionTarget(tokenOf(entry),nameOf(entry),
+                index.assets.filter {!it.libraryDeleted && (it.uri==o.url || it.uri==o.localUri)}.map {it.id}.toSet(),
+                setOfNotNull(o.localUri?.takeIf {it.isNotBlank()},o.url.takeIf {it.isNotBlank()}))
+        }
+    }
     fun mountSelection() {
         if(mounting) return
         val entries=shownTimeline.values.flatten().filter {tokenOf(it) in markedVisible}
@@ -411,30 +421,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
                 scope.launch {if(snackbar.showSnackbar(if(wasHidden) "Archivo restaurado" else "Archivo ocultado","Deshacer",withDismissAction=true)==SnackbarResult.ActionPerformed) {
                     hidden=if(wasHidden) hidden+token else hidden-token;prefs.edit().putStringSet("hidden",hidden).apply()
                 }}
-            },onDelete={
-                // Close the viewer so the reversible action remains visible above the library.
-                viewerAt=null
-                val ids=when(entry) {
-                    is LibraryEntry.Local -> setOf(entry.asset.id).takeUnless {entry.asset.libraryDeleted}.orEmpty()
-                    is LibraryEntry.Out -> entry.job.outputs[entry.index].let {output ->
-                        index.assets.filter {!it.libraryDeleted && (it.uri==output.url || it.uri==output.localUri)}.map {it.id}.toSet()
-                    }
-                }
-                val wasHidden=token in hidden
-                scope.launch {
-                    try {
-                        runtime.assets.deleteLibraryAssets(ids)
-                        if(entry is LibraryEntry.Out) {hidden=hidden+token;prefs.edit().putStringSet("hidden",hidden).apply()}
-                        if(snackbar.showSnackbar("Eliminado de la biblioteca; los originales se conservan","Deshacer",withDismissAction=true)==SnackbarResult.ActionPerformed) {
-                            // Restore only the removed flag: names/project edits made meanwhile survive.
-                            runtime.assets.restoreLibraryAssets(ids)
-                            hidden=if(wasHidden) hidden+token else hidden-token
-                            prefs.edit().putStringSet("hidden",hidden).apply()
-                        }
-                    } catch(e:kotlinx.coroutines.CancellationException) {throw e}
-                    catch(e:Exception) {snackbar.showSnackbar("No se pudo completar la acción en la biblioteca")}
-                }
-            },onMessage=::message,
+            },onDelete={erasing=listOf(deletionTarget(entry))},onMessage=::message,
             onAddToChat=when(entry) {
                 is LibraryEntry.Local -> onSendToAgent?.let {send -> leaving {send(entry.asset)}}
                 is LibraryEntry.Out -> onSendResultToAgent?.let {send -> leaving {send(entry.job.id,entry.job.outputs[entry.index].id)}}
@@ -449,6 +436,9 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
     }
     @Composable fun FileDialogs() {
         optionsFor?.let {FileOptions(it)}
+        erasing?.let {targets -> LibraryEraseDialog(targets,scope,onDismiss={erasing=null}) {text ->
+            erased=LibraryDeletions.tokens(context);marked=emptySet();message(text)
+        }}
         renaming?.let {entry -> RenameFileDialog(nameOf(entry),{renaming=null}) {name -> rename(entry,name);renaming=null}}
         moving?.let {entries -> MoveToFolderSheet(entries.size,folders,openFolder,{moving=null},onNewFolder={newFolderFor=entries;moving=null}) {id ->
             moving=null;marked=emptySet();moveTo(entries,id)
@@ -531,6 +521,7 @@ fun LibraryScreen(onNavigateToOutput:(String)->Unit,onNavigateToResult:((String,
             optionsFor=flat.firstOrNull {tokenOf(it)==token}
             marked=emptySet()
         },onMove={moving=flat.filter {tokenOf(it) in markedVisible}},
+        onDelete={erasing=flat.filter {tokenOf(it) in markedVisible}.map(::deletionTarget)},
         onRename={bulkRename=flat.filter {tokenOf(it) in markedVisible}},
         onCrop=flat.singleOrNull {tokenOf(it) in markedVisible}?.takeIf {markedVisible.size==1 && isImage(it)}?.let {entry -> {cropTarget=entry;marked=emptySet()}},
         onArtBox=onOpenArtBox?.let {open -> flat.filter {tokenOf(it) in markedVisible && isImage(it)}.takeIf {it.isNotEmpty()}?.let {images -> {

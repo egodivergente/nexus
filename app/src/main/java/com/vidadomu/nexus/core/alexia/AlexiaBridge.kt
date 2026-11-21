@@ -93,12 +93,14 @@ object AlexiaBridge {
         }
 
         val conflicts = OutputFiles.conflictingLocalUris(job.outputs)
+        val erased = com.vidadomu.nexus.ui.library.LibraryDeletions.tokens(context)
         var anySuccess = false
         val updatedOutputs = mutableListOf<GenerationOutput>()
 
         for (output in job.outputs) {
             val url = output.url
-            if (url.isBlank()) {
+            // Erased from the Library on this device: never downloaded again.
+            if (url.isBlank() || OutputFiles.token(output) in erased) {
                 updatedOutputs.add(output)
                 continue
             }
@@ -179,10 +181,12 @@ object AlexiaBridge {
      */
     suspend fun classifyPendingGenerations(context: Context, repository: GenerationRepository) = withContext(Dispatchers.IO) {
         val jobs = repository.allJobs.value
+        val erased = com.vidadomu.nexus.ui.library.LibraryDeletions.tokens(context)
         val pendingJobs = jobs.filter { job ->
             job.status == GenerationStatus.COMPLETED &&
                 (OutputFiles.conflictingLocalUris(job.outputs).isNotEmpty() || job.outputs.any { out ->
-                    out.url.isNotBlank() && (out.localUri.isNullOrBlank() || !File(Uri.parse(out.localUri).path ?: "").exists())
+                    out.url.isNotBlank() && OutputFiles.token(out) !in erased &&
+                        (out.localUri.isNullOrBlank() || !File(Uri.parse(out.localUri).path ?: "").exists())
                 })
         }
 

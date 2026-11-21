@@ -73,7 +73,7 @@ fun OutputViewerScreen(jobId:String,onBack:()->Unit,onReuseAsInput:(String, Stri
     val assetIndex by com.vidadomu.nexus.assistant.AssistantRuntime.get(app).assets.changes.collectAsState()
     val removed=remember(assetIndex) {assetIndex.assets.filter {it.libraryDeleted}.map {it.uri}.toSet()}
     val gallery=remember(jobs,removed,collection,jobId) {
-        val hidden=libraryPrefs.getStringSet("hidden",emptySet()).orEmpty()
+        val hidden=libraryPrefs.getStringSet("hidden",emptySet()).orEmpty()+com.vidadomu.nexus.ui.library.LibraryDeletions.tokens(context)
         val candidates=if(collection.isEmpty()) jobs.firstOrNull {it.id==jobId}?.outputs?.indices?.map {jobId to it}.orEmpty()
             else collection.mapNotNull {key -> key.substringAfterLast('#').toIntOrNull()?.let {key.substringBeforeLast('#') to it}}
         candidates.filter {(id,index) -> jobs.firstOrNull {it.id==id}?.outputs?.getOrNull(index)?.let {o ->
