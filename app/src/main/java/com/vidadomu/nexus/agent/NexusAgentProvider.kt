@@ -113,6 +113,20 @@ class NexusAgentProvider:ContentProvider() {
             val result = tool.run(input["input"]?.jsonObject ?: buildJsonObject {}, session)
             return buildJsonObject { put("ok", !result.isError); put("result", result.result) }
         }
+        if (method == "remote_tool") {
+            // Solo consultas: comprueba por ADB que el agente llega a AXEL Commander con su emparejamiento.
+            require(input.keys.all { it in setOf("tool", "input") }) { "Campos de prueba desconocidos." }
+            require(text("tool") in setOf("remote_devices", "remote_apps_status")) { "El puente solo admite consultas remotas." }
+            val runtime = com.vidadomu.nexus.assistant.AssistantRuntime.get(app)
+            val remote = com.vidadomu.nexus.agent.core.tools.NexusToolkit.all(runtime.deps).filter { it.name.startsWith("remote_") }
+            val tool = remote.singleOrNull { it.name == text("tool") }
+            require(tool != null) { "Nexus no está emparejado con AXEL Commander: el agente no tiene herramientas remotas." }
+            val session = com.vidadomu.nexus.agent.core.tools.AgentSession("adb_remote", com.vidadomu.nexus.agent.core.config.AgentMode.AGENT)
+            val result = tool.run(input["input"]?.jsonObject ?: buildJsonObject {}, session)
+            return buildJsonObject {
+                put("ok", !result.isError); put("tools", JsonArray(remote.map { JsonPrimitive(it.name) })); put("result", result.result)
+            }
+        }
         if(method=="device_sync_probe") {
             val id=text("id")
             require(id.matches(Regex("sync_probe_[a-f0-9]{32}")))

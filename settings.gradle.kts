@@ -19,3 +19,5 @@ include(":app")
 include(":agent-core")
 // Núcleo de Nexus Cut (editor multipista): Kotlin puro, probado en JVM.
 include(":cut-core")
+// AXEL Link: cliente único de AXEL Commander (Kotlin puro), copia idéntica del módulo de AXEL Hub.
+include(":axel-link")
