@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.vidadomu.nexus.NexusApplication
 import com.vidadomu.nexus.agent.core.assets.Asset
+import com.vidadomu.nexus.agent.core.assets.DeletionTarget
 import com.vidadomu.nexus.agent.core.assets.Project
+import com.vidadomu.nexus.ui.library.LibraryEraseDialog
 import com.vidadomu.nexus.ui.theme.NexusTokens
 import com.vidadomu.nexus.ui.theme.NexusSheetSystemBars
 import kotlinx.coroutines.CancellationException
@@ -122,7 +124,6 @@ internal fun rememberProjectMediaPicker(managementOnly: Boolean, useLabel: Strin
             onProjectChange = { project -> request = current.copy(projectId = project.id, projectName = project.name) },
             progress = operation.progress,
             onCancel = library::cancel,
-            onDelete = { chosen -> current.projectId?.let { library.delete(it, chosen) } },
             onExport = { chosen -> current.projectId?.let {
                 library.prepareExport(it, chosen)
                 val name = current.projectName.orEmpty().replace(Regex("[^\\p{L}\\p{N} _-]"), "_").take(60).ifBlank { "proyecto" }
@@ -153,7 +154,7 @@ internal fun ProjectMediaPickerSheet(
     assets: List<Asset>, projectId: String?, projectName: String?, mimeTypes: List<String>, maximum: Int,
     busy: Boolean, onDismiss: () -> Unit, onImport: () -> Unit, onUse: (List<Asset>) -> Unit,
     managementOnly: Boolean = false, useLabel: String = "Adjuntar", progress: String? = null, onCancel: () -> Unit = {},
-    onDelete: (List<Asset>) -> Unit = {}, onExport: (List<Asset>) -> Unit = {},
+    onExport: (List<Asset>) -> Unit = {},
     projects: List<Project> = emptyList(), onProjectChange: (Project) -> Unit = {},
 ) {
     val context=LocalContext.current
@@ -172,11 +173,13 @@ internal fun ProjectMediaPickerSheet(
     // En el orden en que se marcaron: es el orden en que entran (en un montaje, el de la línea de tiempo).
     val chosen = remember(all, selected) { val byId = all.associateBy { it.id }; selected.mapNotNull { byId[it] } }
     LaunchedEffect(all) { selected = selected.filter { id -> all.any { it.id == id } } }
+    val scope = rememberCoroutineScope()
     confirmDelete?.let { toDelete ->
-        AlertDialog(onDismissRequest = { confirmDelete = null }, title = { Text("¿Borrar ${toDelete.size} de la biblioteca?") },
-            text = { Text("Dejarán de aparecer en la biblioteca. Se conservarán los archivos para no romper las conversaciones ni los trabajos anteriores.") },
-            confirmButton = { TextButton(onClick = { confirmDelete = null; onDelete(toDelete); selected = emptyList() }) { Text("Borrar") } },
-            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("Cancelar") } })
+        val targets = remember(toDelete) { toDelete.map { DeletionTarget("asset:" + it.id, it.displayName, setOf(it.id), setOf(it.uri)) } }
+        LibraryEraseDialog(targets, scope, onDismiss = { confirmDelete = null }) { text ->
+            selected = emptyList()
+            Toast.makeText(context, text, Toast.LENGTH_LONG).show()
+        }
     }
     val filtered = remember(all, query) { all.filter { it.displayName.contains(query.trim(), ignoreCase = true) } }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -215,7 +218,7 @@ internal fun ProjectMediaPickerSheet(
                     TextButton(onClick = { selected = if (chosen.size == all.size) emptyList() else all.map { it.id } }, enabled = !busy) {
                         Text(if (chosen.size == all.size) "Desmarcar todas" else "Seleccionar todas")
                     }
-                    TextButton(onClick = { confirmDelete = chosen }, enabled = chosen.isNotEmpty() && !busy) { Text("Borrar · ${chosen.size}") }
+                    TextButton(onClick = { confirmDelete = chosen }, enabled = chosen.isNotEmpty() && !busy) { Text("Eliminar · ${chosen.size}") }
                 }
             }
             StudioTextField(query, { query = it }, placeholder = { Text("Buscar archivos") }, singleLine = true, modifier = Modifier.fillMaxWidth())

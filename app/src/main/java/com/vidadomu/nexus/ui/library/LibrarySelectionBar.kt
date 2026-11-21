@@ -26,7 +26,7 @@ import com.vidadomu.nexus.ui.components.nexusScreenTitleStyle
 internal fun LibrarySelectionBar(count: Int, single: Boolean, favoritesOn: Boolean,
     onClose: () -> Unit, onSelectAll: () -> Unit, onExport: () -> Unit,
     onFavorite: () -> Unit, onHide: () -> Unit, onOptions: () -> Unit,
-    onMove: () -> Unit, onRename: () -> Unit, onCrop: (() -> Unit)?, onArtBox: (() -> Unit)?,
+    onMove: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit, onCrop: (() -> Unit)?, onArtBox: (() -> Unit)?,
     onMontar: (() -> Unit)?, mounting: Boolean = false) {
     var menu by remember { mutableStateOf(false) }
     NexusTopAppBar(title = {
@@ -55,6 +55,8 @@ internal fun LibrarySelectionBar(count: Int, single: Boolean, favoritesOn: Boole
                     leadingIcon = { Icon(Icons.Default.Star, null) }, onClick = { menu = false; onFavorite() })
                 DropdownMenuItem(text = { Text("Ocultar / mostrar") },
                     leadingIcon = { Icon(Icons.Default.VisibilityOff, null) }, onClick = { menu = false; onHide() })
+                DropdownMenuItem(text = { Text("Eliminar") },
+                    leadingIcon = { Icon(Icons.Default.DeleteOutline, null) }, onClick = { menu = false; onDelete() })
                 if (single) DropdownMenuItem(text = { Text("Más opciones del archivo") },
                     leadingIcon = { Icon(Icons.Default.OpenInNew, null) }, onClick = { menu = false; onOptions() })
             }

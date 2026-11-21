@@ -410,6 +410,7 @@ class DeviceSync private constructor(private val app: NexusApplication) {
                     return dest
                 } finally { tmp.delete() }
             }
+            val erased = com.vidadomu.nexus.ui.library.LibraryDeletions.blobHashes(app)
             var applied = 0; var conflicts = 0; var skillsChanged = false
             for (doc in selected) {
                 currentCoroutineContext().ensureActive()
@@ -481,6 +482,8 @@ class DeviceSync private constructor(private val app: NexusApplication) {
                         if (!uri.startsWith("nexus-sync-blob:")) return uri
                         val hash = uri.substringAfter(':')
                         if (!o.attachments) return uri
+                        // Erased here with «Eliminar»: keep pointing where it was, without fetching it again.
+                        if (hash in erased && !File(blobs, hash).isFile) return Uri.fromFile(File(blobs, hash)).toString()
                         needed += hash
                         return Uri.fromFile(obtain(hash)).toString()
                     }

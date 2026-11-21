@@ -186,4 +186,34 @@ class SyncWorkspaceTest {
             assertTrue(cloud.commits.values.all {!it.toString(Charsets.UTF_8).contains(privateMarker)})
         } finally {localDir.deleteRecursively();peerDir.deleteRecursively()}
     }
+    @Test fun fileErasedOnOneDeviceKeepsItsDriveReferenceAndIsNotFetchedAgain()=runTest {
+        val cloud=SyncJournalTest.Cloud();val a=root();val b=root();val c=root()
+        val original=File(a,"agent_media/agent_1.png").apply {parentFile.mkdirs();writeBytes(byteArrayOf(1,2,3,9))}
+        val sourceFile=File(a,"index.json").apply {writeText(buildJsonObject {
+            put("assets",buildJsonArray {add(buildJsonObject {put("id","a");put("uri",original.toURI().toString());put("type","IMAGE");put("displayName","Plano");put("createdAt",2)})})
+        }.toString())}
+        val source=AssetIndex(sourceFile);val target=AssetIndex(File(b,"index.json"))
+        workspace(source,File(a,"sync"),cloud).cycle(null)
+        workspace(target,File(b,"sync"),cloud).cycle(null)
+        val copy=target.snapshot().assets.single().uri
+        assertTrue(File(URI(copy)).isFile)
+        // «Eliminar» on device A: the row stays as removed and the original and A's Drive copy are erased.
+        source.deleteLibraryAssets(setOf("a"))
+        assertTrue(original.delete());File(a,"sync/blobs").listFiles().orEmpty().forEach {assertTrue(it.delete())}
+        repeat(2) {assertEquals(0,workspace(source,File(a,"sync"),cloud).cycle(null)["missingMedia"]!!.jsonPrimitive.int)}
+        assertTrue(source.snapshot().assets.single().uri.startsWith(SyncBlobs.PREFIX))
+        assertTrue(File(a,"sync/blobs").listFiles().orEmpty().none {it.isFile})
+        // A device that never had it receives the removed row without its bytes.
+        val third=AssetIndex(File(c,"index.json"))
+        workspace(third,File(c,"sync"),cloud).cycle(null)
+        assertTrue(third.snapshot().assets.single().libraryDeleted)
+        assertTrue(third.snapshot().assets.single().uri.startsWith(SyncBlobs.PREFIX))
+        assertTrue(File(c,"sync/blobs").listFiles().orEmpty().none {it.isFile})
+        // The device that already had a copy keeps it, and its reference to it.
+        workspace(target,File(b,"sync"),cloud).cycle(null)
+        assertTrue(target.snapshot().assets.single().libraryDeleted)
+        assertEquals(copy,target.snapshot().assets.single().uri)
+        assertTrue(File(URI(copy)).isFile)
+        assertEquals(1,cloud.blobs.size)
+    }
 }

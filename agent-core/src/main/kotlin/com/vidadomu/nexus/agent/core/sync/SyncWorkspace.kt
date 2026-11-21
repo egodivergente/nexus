@@ -24,7 +24,7 @@ class SyncWorkspace(
         // Device-local transfer receipts are never part of a portable snapshot or sync journal.
         val encoded=AssetIndex.JSON.encodeToJsonElement(IndexData.serializer(),expected.copy(projectTransfers=emptyList())).jsonObject
         val missing=linkedSetOf<String>();val replacements=mutableMapOf<String,String>()
-        fun portable(uri:String):String {
+        fun portable(uri:String,report:Boolean=true):String {
             if(uri.startsWith(SyncBlobs.PREFIX))return uri
             replacements[uri]?.let {return it}
             // A downloaded copy is stored under its verified hash. Capturing it again put a Drive request in every
@@ -35,14 +35,22 @@ class SyncWorkspace(
                 runCatching {File(java.net.URI(uri)).canonicalFile.parentFile==blobs.directory.canonicalFile}.getOrDefault(false))
                 return (SyncBlobs.PREFIX+name).also {replacements[uri]=it}
             return try {
-                val input=open(uri)?:return uri.also {missing+=uri}
+                val input=open(uri)?:return uri.also {if(report)missing+=uri}
                 blobs.capture(input.stream,input.extension).also {replacements[uri]=it}
-            }catch(e:java.io.IOException){missing+=uri;uri}
+            }catch(e:java.io.IOException){if(report)missing+=uri;uri}
         }
         val rows=linkedMapOf<String,JsonObject>()
         for(kind in collections)for(element in encoded[kind]?.jsonArray.orEmpty()) {
             var row=if(useStory)StorySyncCodec.legacyRow(kind,element.jsonObject)else element.jsonObject
-            if(kind=="assets")row=JsonObject(row+mapOf("uri" to JsonPrimitive(portable(row["uri"]!!.jsonPrimitive.content))))
+            if(kind=="assets") {
+                val deleted=row["libraryDeleted"]?.jsonPrimitive?.booleanOrNull==true
+                val published=journal.published(kind+":"+row["id"]!!.jsonPrimitive.content)?.get("uri")?.jsonPrimitive?.contentOrNull
+                // A file erased from this device keeps its Drive reference: other devices keep their copy,
+                // nothing is re-captured and the gap is not reported as missing media.
+                val uri=if(deleted && published?.startsWith(SyncBlobs.PREFIX)==true)published
+                    else portable(row["uri"]!!.jsonPrimitive.content,report=!deleted)
+                row=JsonObject(row+mapOf("uri" to JsonPrimitive(uri)))
+            }
             if(kind=="generations")row=JsonObject(row+mapOf("referenceUris" to JsonArray(row["referenceUris"]?.jsonArray.orEmpty().map {JsonPrimitive(portable(it.jsonPrimitive.content))})))
             rows[kind+":"+row["id"]!!.jsonPrimitive.content]=row
         }
@@ -74,7 +82,9 @@ class SyncWorkspace(
             val project=row["projectId"]?.jsonPrimitive?.contentOrNull
                 ?:if(key.startsWith("projects:"))row["id"]?.jsonPrimitive?.contentOrNull else null
             val linked=key.startsWith("assets:") && row["id"]?.jsonPrimitive?.contentOrNull in selectedStoryAssets
-            return SyncBlobs.rewrite(row){deviceUri(it,linked || downloadProjects==null || project==null || project in downloadProjects)}.jsonObject
+            // Removed from the Library: an existing copy is reused, a missing one is not fetched again.
+            val removed=key.startsWith("assets:") && row["libraryDeleted"]?.jsonPrimitive?.booleanOrNull==true
+            return SyncBlobs.rewrite(row){deviceUri(it,!removed && (linked || downloadProjects==null || project==null || project in downloadProjects))}.jsonObject
         }
         val localized=retained.mapValues {(key,row)->localize(key,row)}.toMutableMap()
         val localizedStory=retainedStory.mapValues {(key,row)->localize(key,row)}

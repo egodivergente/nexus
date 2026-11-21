@@ -62,6 +62,8 @@ class SyncJournal(private val file:File,private val remote:SyncRemote,deviceLabe
         set(value) {field=value;byKey=null}
     private fun accepts(key:String)=key.substringBefore(':') in allowedKinds && key.length in 3..250 && !key.any {it<' '}
     @Synchronized fun knownKeys():Set<String> = grouped().keys.toSet()
+    /** The row this device last exchanged for [key], in its portable form. */
+    @Synchronized fun published(key:String):JsonObject? = state.baseline[key]
     private fun save(next:SyncState) { atomic(file,SyncState.serializer(),next);state=next }
     private fun heads(key:String):List<SyncRevision> {
         val rows=grouped()[key].orEmpty()

@@ -112,7 +112,7 @@ internal fun LibraryFileSheet(entry:LibraryEntry,name:String,localUri:String?,fa
                 onOpenResult?.let {open -> Option(Icons.Default.Info,"Ficha del resultado") {onDismiss();open()}}
             }
             Option(Icons.Default.VisibilityOff,if(hidden) "Restaurar en la biblioteca" else "Ocultar de la biblioteca") {onDismiss();onHide()}
-            Option(Icons.Default.DeleteOutline,"Eliminar de la biblioteca") {onDismiss();onDelete()}
+            Option(Icons.Default.DeleteOutline,"Eliminar") {onDismiss();onDelete()}
         }
     }
 }
@@ -192,4 +192,73 @@ internal fun folderCount(count: Int): String = when {
     count < 1000 -> count.toString()
     count < 10_000 -> "%.1f mil".format(java.util.Locale("es", "ES"), count / 1000.0).replace(",0 mil", " mil")
     else -> "${count / 1000} mil"
+}
+
+internal data class EraseCopy(val title:String,val lines:List<String>,val canErase:Boolean)
+
+internal fun eraseCopy(plan:com.vidadomu.nexus.agent.core.assets.DeletionPlan,targets:List<com.vidadomu.nexus.agent.core.assets.DeletionTarget>):EraseCopy {
+    val n=plan.removable.size
+    val title=when {
+        n==0 -> "No se puede eliminar"
+        targets.size==1 -> "¿Eliminar «${targets[0].name}»?"
+        else -> "¿Eliminar $n archivos?"
+    }
+    val names=targets.associate {it.key to it.name}
+    val lines=buildList {
+        if(n>0) add(if(n==1) "Se borrará de este móvil y no se puede deshacer." else "Se borrarán de este móvil y no se puede deshacer.")
+        if(plan.external==1) add("Un archivo está en la galería o en Documentos/ALEXIA: se queda allí; Nexus solo deja de mostrarlo.")
+        else if(plan.external>1) add("${plan.external} archivos están en la galería o en Documentos/ALEXIA: se quedan allí; Nexus solo deja de mostrarlos.")
+        if(plan.inChats==1) add("Aparece en un chat; allí se verá como no disponible.")
+        else if(plan.inChats>1) add("${plan.inChats} aparecen en chats; allí se verán como no disponibles.")
+        plan.blocked.entries.take(3).forEach {(key,why) -> add("No se elimina «${names[key] ?: "un archivo"}»: $why.")}
+        if(plan.blocked.size>3) add("Tampoco ${plan.blocked.size-3} más, que se usan en otro sitio.")
+        if(n>0) add("Drive y tus otros dispositivos conservan su copia.")
+    }
+    return EraseCopy(title,lines,n>0)
+}
+
+/** Real deletion, checked before asking: what is erased, what only leaves Nexus and what stays because it is in use. */
+@Composable
+internal fun LibraryEraseDialog(targets:List<com.vidadomu.nexus.agent.core.assets.DeletionTarget>,scope:kotlinx.coroutines.CoroutineScope,
+    onDismiss:()->Unit,onDone:(String)->Unit) {
+    val app=LocalContext.current.applicationContext as com.vidadomu.nexus.NexusApplication
+    val haptics=com.vidadomu.nexus.ui.theme.rememberNexusHaptics()
+    var erase by remember(targets) {mutableStateOf<LibraryDeletions.Erase?>(null)}
+    var failed by remember(targets) {mutableStateOf(false)}
+    LaunchedEffect(targets) {
+        try {erase=LibraryDeletions.plan(app,targets)}
+        catch(e:CancellationException) {throw e}
+        catch(e:Exception) {failed=true}
+    }
+    val copy=erase?.let {eraseCopy(it.plan,targets)}
+    AlertDialog(onDismissRequest=onDismiss,
+        title={Text(copy?.title ?: if(targets.size==1) "¿Eliminar «${targets[0].name}»?" else "¿Eliminar ${targets.size} archivos?")},
+        text={Column(verticalArrangement=Arrangement.spacedBy(NexusTokens.space8)) {
+            when {
+                failed -> Text("No se pudo comprobar si se usa en otro sitio. No se ha borrado nada.")
+                copy==null -> Text("Comprobando dónde se usa…")
+                else -> copy.lines.forEach {Text(it)}
+            }
+        }},
+        confirmButton={
+            val ready=erase
+            if(copy!=null && !copy.canErase || failed) TextButton(onClick=onDismiss) {Text("Entendido")}
+            else TextButton(enabled=ready!=null,onClick={ready?.let {plan ->
+                haptics.perform(com.vidadomu.nexus.ui.theme.NexusHapticEvent.CANCEL_CONFIRMED)
+                onDismiss()
+                scope.launch {
+                    val n=plan.plan.removable.size
+                    try {
+                        val left=LibraryDeletions.erase(app,plan)
+                        onDone(when {
+                            left>0 -> if(left==1) "Eliminado; un archivo no se pudo borrar del móvil" else "Eliminado; $left archivos no se pudieron borrar del móvil"
+                            n==1 -> "Eliminado"
+                            else -> "$n eliminados"
+                        })
+                    } catch(e:CancellationException) {throw e}
+                    catch(e:Exception) {onDone("No se pudo eliminar")}
+                }
+            }}) {Text("Eliminar")}
+        },
+        dismissButton=if(copy!=null && !copy.canErase || failed) null else ({TextButton(onClick=onDismiss) {Text("Cancelar")}}))
 }

@@ -33,20 +33,6 @@ internal class ProjectLibraryViewModel(app: Application, private val saved: Save
     fun clearMessage() { mutable.value = mutable.value.copy(message = null) }
     fun cancel() { call?.cancel(); operation?.cancel() }
 
-    fun delete(projectId: String, assets: List<Asset>) {
-        if (mutable.value.busy) return
-        mutable.value = ProjectLibraryOperation(busy = true)
-        operation = viewModelScope.launch {
-            try {
-                val count = withContext(Dispatchers.IO) { runtime.assets.deleteFromLibrary(projectId, assets.map { it.id }.toSet()) }
-                mutable.value = ProjectLibraryOperation(message = "$count archivos borrados de la biblioteca")
-            } catch (error: Exception) {
-                mutable.value = ProjectLibraryOperation(message = "No se pudo borrar. Vuelve a intentarlo.")
-                if (error is CancellationException) throw error
-            }
-        }
-    }
-
     fun prepareExport(projectId: String, assets: List<Asset>) {
         saved["zipProject"] = projectId
         saved["zipIds"] = ArrayList(assets.filter { it.projectId == projectId && it.type == AssetType.IMAGE && !it.libraryDeleted }.map { it.id }.distinct())
